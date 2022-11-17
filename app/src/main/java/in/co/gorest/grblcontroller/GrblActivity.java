@@ -330,6 +330,8 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
                         }
                     }
                 })
+                //setNeutralButton
+                // //devide by 2 the value of coordinate is very useful for centre the workpiece
                 .setNeutralButton("/2",
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {

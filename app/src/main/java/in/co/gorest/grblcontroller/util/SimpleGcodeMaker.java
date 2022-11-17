@@ -218,7 +218,7 @@ public  class SimpleGcodeMaker {
             sw=!sw;
         }
         gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
-        gcode+=Constants.CAM_GCODE_END;;
+        gcode+=Constants.CAM_GCODE_TAIL;;
         return gcode;
     }
 
@@ -234,7 +234,7 @@ public  class SimpleGcodeMaker {
             gcode+=cut_path;
         }
         gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
-        gcode+=Constants.CAM_GCODE_END;
+        gcode+=Constants.CAM_GCODE_TAIL;
         return gcode;
     }
 
