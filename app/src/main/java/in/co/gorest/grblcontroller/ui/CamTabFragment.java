@@ -44,7 +44,6 @@ import org.greenrobot.eventbus.EventBus;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 
 import in.co.gorest.grblcontroller.R;
@@ -422,7 +421,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_feedrate));
+        alertDialogBuilder.setTitle(getString(R.string.text_cam_feedrate_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_feedrate_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate), "10.0"));
@@ -460,7 +460,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_step_over));
+        alertDialogBuilder.setTitle(getString(R.string.text_cam_step_over_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_step_over_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_step_over), "10.0"));
@@ -499,7 +500,8 @@ public class CamTabFragment extends BaseFragment {
 
             AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
             alertDialogBuilder.setView(v);
-            alertDialogBuilder.setTitle(getString(R.string.text_cam_traversal));
+            alertDialogBuilder.setTitle(getString(R.string.text_cam_traversal_title));
+            alertDialogBuilder.setMessage(getString(R.string.text_cam_traversal_message));
 
             final EditText editText = v.findViewById(R.id.dialog_input_decimal);
             editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal), "10.0"));
@@ -538,7 +540,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_facing_zdeep));
+        alertDialogBuilder.setTitle(getString(R.string.text_facing_zdeep_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_facing_zdeep_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_deep), "0.0"));
@@ -576,7 +579,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_facing_zstep));
+        alertDialogBuilder.setTitle(getString(R.string.cam_zstep_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_zstep_desc));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_step), "0.0"));
@@ -614,6 +618,7 @@ public class CamTabFragment extends BaseFragment {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
         alertDialogBuilder.setTitle(getString(R.string.text_cam_tool_dia));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_tool_dia_desc));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_tool_dia), "10.0"));
@@ -646,7 +651,7 @@ public class CamTabFragment extends BaseFragment {
 
     private void showCamHelp(){
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity())
-                .setTitle(getString(R.string.text_manual_tool_change))
+                .setTitle(getString(R.string.text_cam_title_help))
                 .setMessage(R.string.text_cam_help)
                 .setPositiveButton(getString(R.string.text_ok), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) { }
@@ -655,5 +660,8 @@ public class CamTabFragment extends BaseFragment {
 
         alertDialogBuilder.show();
     }
+
+
+
 }
 
