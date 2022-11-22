@@ -129,14 +129,25 @@ public  class SimpleGcodeMaker {
 
         for (int i = 1; i < npass + 1; i++) {
             step = Math.round(this.yf - (dist * i));
+
             if (sw) {
-                s+="X"+this.xt+"\nY"+step+"\n";
-                sw = false;
+                s+="X"+this.xt+"\n";
+                //sw = false;
             } else {
-                s+="X"+this.xf+"\nY"+step+"\n";
-                sw = true;
+                s+="X"+this.xf+"\n";
+                //sw = true;
             }
+            sw = !sw;
+            s+="Y"+step+"\n";
         }
+        if (sw) {
+            s+="X"+this.xt+"\n";
+            //sw = false;
+        } else {
+            s+="X"+this.xf+"\n";
+            //sw = true;
+        }
+
         return this.ZLoop(s,this.xf,this.yf);
     }
 
@@ -153,13 +164,23 @@ public  class SimpleGcodeMaker {
         for (int i = 1; i < npass + 1; i++) {
             step = Math.round(this.xf - (dist * -i));
             if (sw) {
-                s+="Y"+this.yt+"\nX"+step+"\n";
-                sw = false;
+                s+="Y"+this.yt+"\n";
+                //sw = false;
             } else {
-                s+="Y"+this.yf+"\nX"+step+"\n";
-                sw = true;
+                s+="Y"+this.yf+"\n";
+               // sw = true;
             }
+            sw=!sw;
+            s+="X"+step+"\n";
 
+
+        }
+        if (sw) {
+            s+="Y"+this.yt+"\n";
+            //sw = false;
+        } else {
+            s+="Y"+this.yf+"\n";
+            // sw = true;
         }
         return this.ZLoop(s,this.xf,this.yf);
     }
@@ -232,8 +253,9 @@ public  class SimpleGcodeMaker {
         for (int i=1;i<=(int)pass.first ;i++){
             gcode+="G01Z"+(this.zfrom-((double)pass.second*i))+" F"+this.feedrate+"\n";
             gcode+=cut_path;
+            gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
         }
-        gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
+
         gcode+=Constants.CAM_GCODE_TAIL;
         return gcode;
     }
