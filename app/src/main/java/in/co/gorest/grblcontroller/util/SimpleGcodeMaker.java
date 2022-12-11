@@ -128,7 +128,7 @@ public  class SimpleGcodeMaker {
         s += "G01X"+this.xf+" Y"+this.yf+"\n";
 
         for (int i = 1; i < npass + 1; i++) {
-            step = Math.round(this.yf - (dist * i));
+            step = this.yf - (dist * i);
 
             if (sw) {
                 s+="X"+this.xt+"\n";
@@ -162,7 +162,7 @@ public  class SimpleGcodeMaker {
         String s=  "(snake y)\n";
         s+="G01X"+this.xf+" Y"+this.yf+"\n";
         for (int i = 1; i < npass + 1; i++) {
-            step = Math.round(this.xf - (dist * -i));
+            step = this.xf - (dist * -i);
             if (sw) {
                 s+="Y"+this.yt+"\n";
                 //sw = false;
@@ -185,19 +185,19 @@ public  class SimpleGcodeMaker {
         return this.ZLoop(s,this.xf,this.yf);
     }
     public String CorneringCut (double tool_radius) {//tr tool radius
-        System.out.println("toolradius"+tool_radius);
+       //,-300,400 ,0.0,-10.0
         String s="(cornering cut)\n";
-        s += "G01X"+this.xf+" Y"+(this.yf+tool_radius)+"\n";//start
-        s += ("G01X" + this.xt  + "\n");//1seg
-        s += ("G02X" + (this.xt +tool_radius)+"Y" + this.yf  +"I0.000J-"+tool_radius+ "\n");//1arc
-        s += ("G01Y" + this.yt  + "\n");//2seg
-        s += ("G02X" + this.xt +"Y" + (this.yt-tool_radius) +"I-"+tool_radius+"J0.0000\n");//2arc
-        s += ("G01X" + this.xf+ "\n");//3seg
-        s += ("G02X" + (this.xf-tool_radius) +"Y" + this.yt  +"I0.000J"+tool_radius+ "\n");//3arc
-        s += ("G01Y" + this.yf + "\n");//4seg
-        s += ("G02X" + this.xf +"Y" + (this.yf+tool_radius) +"I"+tool_radius+"J0.0000\n");//4arc
+        s += "G01X"+(this.xf+tool_radius)+" Y"+this.yf+"\n";//start-290.000,400.000
+        s += ("G01X" + (this.xt-tool_radius)  + "\n");//1seg -10.000,400.000
+        s += ("G02X" + this.xt +"Y" + (this.yf-tool_radius) +"I0.000J-"+tool_radius+ "\n");//1arc0.000,390.000
+        s += ("G01Y" + (this.yt+tool_radius)  + "\n");//2seg 0.000,0.000
+        s += ("G02X" + (this.xt-tool_radius) +"Y" + this.yt +"I-"+tool_radius+"J0.0000\n");//2arc  -10.000,-10.000
+        s += ("G01X" + (this.xf+tool_radius)+ "\n");//3seg -290.000,-10.000
+        s += ("G02X" + this.xf +"Y" +(this.yt+tool_radius)  +"I0.000J"+tool_radius+ "\n");//3arc -300.000,0.000
+        s += ("G01Y" + (this.yf-tool_radius) + "\n");//4seg -300.000,390.000
+        s += ("G02X" +(this.xf+tool_radius) +"Y" + this.yf +"I"+tool_radius+"J0.0000\n");//4arc -290.000,400.000
 
-        return this.ZLoop(s, this.xf,this.yf+tool_radius);
+        return this.ZLoop(s, this.xf+tool_radius,this.yf);
     }
     public String circleCut (double offset, boolean aprox_pass) {
 

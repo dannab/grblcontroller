@@ -299,8 +299,8 @@ public class CamTabFragment extends BaseFragment {
 
         String gcode="";
         SimpleGcodeMaker gcodemaker;
-        gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
-        //gcodemaker = new SimpleGcodeMaker(0.0,-10.0,-300,400,-10.0, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
+        //gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
+        gcodemaker = new SimpleGcodeMaker(0.0,-10.0,-300,400,-10.0, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
 
 
         switch (jobType){
