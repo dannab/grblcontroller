@@ -249,8 +249,8 @@ public  class SimpleGcodeMaker {
         String gcode="";
         gcode+= Constants.CAM_GCODE_HEAD;
         gcode+="G00 Z"+(this.zfrom+this.ztraversal)+ '\n';
-        gcode+="X"+startX+" Y"+startY+"\n";
         for (int i=1;i<=(int)pass.first ;i++){
+            gcode+="X"+startX+" Y"+startY+"\n";
             gcode+="G01Z"+(this.zfrom-((double)pass.second*i))+" F"+this.feedrate+"\n";
             gcode+=cut_path;
             gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
