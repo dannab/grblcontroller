@@ -24,37 +24,7 @@
                 android:layout_height="wrap_content">
 
 
-            <TableLayout
-                android:layout_centerHorizontal="true"
-                android:stretchColumns="*"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                tools:ignore="ObsoleteLayoutParam">
 
-                <TableRow tools:ignore="UselessParent">
-
-
-
-                    <TextView
-
-                        android:layout_width="wrap_content"
-                        android:layout_height="33dp"
-                        android:layout_alignParentStart="true"
-
-                        android:text=" facing along x or y axis" />
-
-                    <ToggleButton
-                        android:id="@+id/button_x_or_y"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textOff="X"
-                        android:textOn="Y"/>
-
-                </TableRow>
-
-
-
-            </TableLayout>
 
 
 
@@ -63,11 +33,56 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
-                    android:text="Facing"
+                    android:text="@string/on_the_fly_cam"
                     tools:ignore="RelativeOverlap" />
 
 
             </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/job_type_view"
+                android:padding="4dp"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+
+                <Spinner
+                    android:id="@+id/job_type_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:entries="@array/job_type_list"
+                    android:text="@string/job_type" />
+
+            </RelativeLayout>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             <RelativeLayout
                 android:id="@+id/cam_feed_rate_view"
@@ -85,7 +100,7 @@
                     android:layout_marginStart="4dp"
                     android:layout_marginEnd="-20dp"
                     android:layout_toStartOf="@+id/cam_feed_rate"
-                    android:text="@string/text_probing_feed_rate" />
+                    android:text="@string/text_cam_feed_rate" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_feed_rate"
@@ -116,7 +131,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_step_over"
-                    android:text="step over" />
+                    android:text="@string/step_over" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_step_over"
@@ -141,7 +156,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_z_traversal"
-                    android:text="Z traversal" />
+                    android:text="@string/z_traversal" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_z_traversal"
@@ -149,6 +164,82 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:text="2.0"
+                    tools:ignore="HardcodedText" />
+
+            </RelativeLayout>
+            <RelativeLayout
+                android:id="@+id/cam_z_step_view"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:padding="4dp"
+                android:layout_marginBottom="4dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/cam_z_step"
+                    android:text="@string/z_step" />
+
+                <com.joanzapata.iconify.widget.IconTextView
+                    android:id="@+id/cam_z_step"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="0.0"
+                    tools:ignore="HardcodedText" />
+
+            </RelativeLayout>
+            <RelativeLayout
+                android:id="@+id/cam_z_deep_view"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:padding="4dp"
+                android:layout_marginBottom="4dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/cam_z_deep"
+                    android:text="@string/z_deep" />
+
+                <com.joanzapata.iconify.widget.IconTextView
+                    android:id="@+id/cam_z_deep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="0.0"
+                    tools:ignore="HardcodedText" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/cam_tool_dia_view"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:padding="4dp"
+                android:layout_marginBottom="4dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/cam_tool_dia"
+                    android:text="@string/tool_diameter_for_cornering" />
+
+                <com.joanzapata.iconify.widget.IconTextView
+                    android:id="@+id/cam_tool_dia"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="10.0"
                     tools:ignore="HardcodedText" />
 
             </RelativeLayout>
@@ -168,7 +259,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="0.33"
                         android:enabled="@{machineStatus.state.equals(machineStatus.STATE_IDLE)}"
-                        android:text="Set Facing Coord From" />
+                        android:text="@string/set_coord_from" />
 
                     <TextView
                         android:id="@+id/cam_from_text"
@@ -178,30 +269,30 @@
                         android:layout_toStartOf="@+id/cam_from"
                         android:text="  0000.0000 , 0000.0000"
                         android:freezesText="true"
-                        />
+                        tools:ignore="HardcodedText" />
 
                 </TableRow>
                 <TableRow tools:ignore="UselessParent">
 
-                <com.joanzapata.iconify.widget.IconButton
-                    android:id="@+id/cam_to"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="0.33"
-                    android:enabled="@{machineStatus.state.equals(machineStatus.STATE_IDLE)}"
-                    android:text="Set Facing Coord To" />
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:id="@+id/cam_to"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0.33"
+                        android:enabled="@{machineStatus.state.equals(machineStatus.STATE_IDLE)}"
+                        android:text="@string/set_coord_to" />
 
-                <TextView
-                    android:id="@+id/cam_to_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_toStartOf="@+id/cam_to"
-                    android:text="  0000.0000 , 0000.0000"
-                    android:freezesText="true"
-                    />
+                    <TextView
+                        android:id="@+id/cam_to_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_toStartOf="@+id/cam_to"
+                        android:text="  0000.0000 , 0000.0000"
+                        android:freezesText="true"
+                        tools:ignore="HardcodedText" />
 
-            </TableRow>
+                </TableRow>
 
 
             </TableLayout>
@@ -230,7 +321,7 @@
                     <com.joanzapata.iconify.widget.IconButton
                         android:layout_weight="0.33"
                         android:id="@+id/start_cam_calc"
-                        android:text="Do Facing"
+                        android:text="@string/write_job_file"
 
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />

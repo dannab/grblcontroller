@@ -77,8 +77,6 @@
                         android:text="{fa-caret-up 32dp}"
                         tools:ignore="HardcodedText" />
 
-                    <androidx.legacy.widget.Space android:layout_weight="0.1" android:layout_gravity="fill" android:layout_width="0dp" />
-
                     <com.joanzapata.iconify.widget.IconButton
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
                         android:id="@+id/jog_z_positive"
@@ -117,8 +115,6 @@
                         android:layout_width="0dp" android:layout_height="65dp"
                         android:text="{fa-caret-right 32dp}"
                         tools:ignore="HardcodedText" />
-
-                    <androidx.legacy.widget.Space android:layout_weight="0.1" android:layout_gravity="fill" android:layout_width="0dp" />
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:id="@+id/jog_cancel"
@@ -160,8 +156,6 @@
                         android:layout_width="0dp" android:layout_height="65dp"
                         android:text="{fa-caret-down 32dp}"
                         tools:ignore="HardcodedText" />
-
-                    <androidx.legacy.widget.Space android:layout_weight="0.1" android:layout_gravity="fill" android:layout_width="0dp" />
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
