@@ -100,20 +100,20 @@ public  class SimpleGcodeMaker {
     public String cutRectangle (double offset, boolean aprox_pass) {
         double min_edge = Math.min(this.height/2, this.width/2);
         int npass=1;
+        boolean up_on_zstep = false;
         if (offset >0) {
             Pair pass = this.pass(min_edge, offset, aprox_pass);//npass,step
             npass = (int) pass.first;
             offset = (double) pass.second;
+            up_on_zstep = true;
         }
         double o;
         String s="(cut rectangle)\n";
 
         for (int i=0; i<npass; i++)
              s+=this.cutCw(offset * i);
-        return  this.ZLoop(s,this.xf,this.yf);
+        return  this.ZLoop(s,this.xf,this.yf,up_on_zstep);
     }
-
-
 
 
     public String  snakeX (double dist, boolean aprox_pass) {
@@ -137,7 +137,7 @@ public  class SimpleGcodeMaker {
                 sw = true;
             }
         }
-        return this.ZLoop(s,this.xf,this.yf);
+        return this.ZLoop(s,this.xf,this.yf,true);
     }
 
     public String snakeY (double dist, boolean aprox_pass) {
@@ -161,7 +161,7 @@ public  class SimpleGcodeMaker {
             }
 
         }
-        return this.ZLoop(s,this.xf,this.yf);
+        return this.ZLoop(s,this.xf,this.yf,true);
     }
     public String CorneringCut (double tool_radius) {//tr tool radius
         System.out.println("toolradius"+tool_radius);
@@ -176,18 +176,19 @@ public  class SimpleGcodeMaker {
         s += ("G01Y" + this.yf + "\n");//4seg
         s += ("G02X" + this.xf +"Y" + (this.yf+tool_radius) +"I"+tool_radius+"J0.0000\n");//4arc
 
-        return this.ZLoop(s, this.xf,this.yf+tool_radius);
+        return this.ZLoop(s, this.xf,this.yf+tool_radius,false);
     }
     public String circleCut (double offset, boolean aprox_pass) {
-
         double quadR= this.xcenter+this.ray;//punto x a destra del centro O POINT?
         double quadL=this.xcenter-this.ray;//punto x a sinistra del centro
         String s="(circle cut)\n";
         int npass=1;
+        boolean up_on_zstep = false;
         if (offset >0) {
             Pair pass = this.pass(this.ray, offset, aprox_pass);//npass,step
             npass = (int) pass.first;
             offset = (double) pass.second;
+            up_on_zstep=true;
         }
         double o;
         for (int i=0; i<npass; i++) {
@@ -197,7 +198,7 @@ public  class SimpleGcodeMaker {
             s +="X"+(quadR - o)+"I"+(this.ray - o)+"J0.0\n";
         }
 
-        return this.ZLoop(s,quadR,this.ycenter);
+        return this.ZLoop(s,quadR,this.ycenter,up_on_zstep);
     }
 
     public String lineCut( ) {
@@ -222,18 +223,24 @@ public  class SimpleGcodeMaker {
         return gcode;
     }
 
-    public String ZLoop(String cut_path,double startX,double startY ) {
+    public String ZLoop(String cut_path,double startX,double startY ,boolean up_before_zstep) {
         Pair pass = this.pass(Math.abs(this.zdeep), this.zstep, this.Zaprox_pass);//npass,step
         //int npass =
         String gcode="";
         gcode+= Constants.CAM_GCODE_HEAD;
         gcode+="G00 Z"+(this.zfrom+this.ztraversal)+ '\n';
-        gcode+="X"+startX+" Y"+startY+"\n";
         for (int i=1;i<=(int)pass.first ;i++){
-            gcode+="G01Z"+(this.zfrom-((double)pass.second*i))+" F"+this.feedrate+"\n";
+            gcode+="X"+startX+" Y"+startY+"\n";//punto iniziale della lavorazione
+            gcode+="G01Z"+(this.zfrom-((double)pass.second*i))+" F"+this.feedrate/2+"\n";
+            gcode+="F"+this.feedrate+"\n";
             gcode+=cut_path;
+            if(up_before_zstep) {
+                gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";//traversal z
+            }
+
         }
-        gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";
+        gcode+="G00 Z"+(this.ztraversal+this.zfrom)+"\n";//traversal z
+
         gcode+=Constants.CAM_GCODE_END;
         return gcode;
     }

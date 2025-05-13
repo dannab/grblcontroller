@@ -14,11 +14,10 @@ repositories {
 
 android {
     compileSdkVersion 33
-    buildToolsVersion '29.0.3'
 
     defaultConfig {
         applicationId "in.co.gorest.grblcontroller"
-        minSdkVersion 19
+        minSdkVersion 21
         targetSdkVersion 33
         versionCode 38
         versionName "2.57"
@@ -62,12 +61,12 @@ allprojects {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.google.firebase:firebase-core:21.1.1'
-    implementation 'com.google.firebase:firebase-messaging:23.1.1'
+    implementation 'com.google.firebase:firebase-messaging:24.1.1'
     androidTestImplementation('androidx.test.espresso:espresso-core:3.3.0', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
 
-    implementation 'androidx.appcompat:appcompat:1.6.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.google.android.material:material:1.6.0'
     implementation 'org.apache.commons:commons-collections4:4.4'

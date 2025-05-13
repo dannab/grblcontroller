@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Grbl Controller</string>
+    <string name="text_yes_confirm">Sì</string>
+    <string name="text_no_confirm">No</string>
+    <string name="text_cancel">Annulla</string>
+    <string name="text_reset">Ripristina</string>
+    <string name="text_connect">Connetti</string>
+    <string name="text_grbl_unsupported">È supportata solo la versione %s o superiore di Grbl</string>
+    <string name="text_app_rating_summary">Se ti piace Grbl Controller, puoi mostrare il tuo apprezzamento qui.</string>
+    <string name="text_app_rating">Vota l\'applicazione</string>
+    <string name="text_bluetooth_adapter_error">Errore adattatore Bluetooth, riavvia il telefono</string>
+    <string name="text_unable_to_connect_to_device">Impossibile connettersi al dispositivo</string>
+    <string name="text_device_connection_was_lost">La connessione al dispositivo è stata persa</string>
+    <string name="text_unknown_error">Errore sconosciuto: riavvia l\'applicazione</string>
+    <string name="text_no_bluetooth_permission">Impossibile avviare il Bluetooth, controlla le autorizzazioni</string>
+    <string name="text_bluetooth_adaptor_error">Errore adattatore Bluetooth!</string>
+    <string name="text_no_paired_devices">Nessun dispositivo associato</string>
+    <string name="text_select_paired_device">Seleziona Dispositivo Associato</string>
+    <string name="text_none_found">Nessuno trovato</string>
+    <string name="text_not_connected">Non connesso</string>
+    <string name="text_application_settings">Impostazioni Applicazione</string>
+    <string name="text_no_bluetooth_adapter">Nessun adattatore Bluetooth trovato!</string>
+    <string name="text_connected_to">Connesso a </string>
+    <string name="text_connected">Connesso</string>
+    <string name="text_connecting">Connessione in corso&#8230;.</string>
+    <string name="text_connection_lost">Connessione persa</string>
+    <string name="text_disconnect">Disconnetti!</string>
+    <string name="text_disconnect_confirm">vuoi davvero disconnetterti?</string>
+    <string name="text_bt_service_not_running">Il servizio Bluetooth non è in esecuzione!</string>
+    <string name="text_bt_not_enabled">Il Bluetooth non è abilitato!</string>
+    <string name="text_grbl_soft_reset">Reset software Grbl!</string>
+    <string name="text_grbl_soft_reset_desc">vuoi effettuare un reset software della macchina?</string>
+    <string name="text_unknown">Sconosciuto</string>
+    <string name="text_buy_app">Aggiorna a Grbl Controller +</string>
+    <string name="text_buy_app_summary">supporta lo sviluppo | ottieni più funzionalità</string>
+
+    <string name="text_app_share">Condividi</string>
+    <string name="text_app_about">Informazioni</string>
+    <string name="text_settings">Impostazioni</string>
+    <string name="text_custom_action">Azione personalizzata</string>
+    <string name="text_send_custom_command">invia comandi personalizzati per l\'azione</string>
+    <string name="text_auto_connect">Connessione automatica</string>
+    <string name="text_auto_connect_desc">connetti all\'ultimo dispositivo Bluetooth utilizzato all\'avvio dell\'applicazione</string>
+    <string name="text_soft_reset_confirm">Conferma reset software</string>
+    <string name="text_soft_reset_confirm_desc">chiedi conferma prima di effettuare il reset software</string>
+    <string name="text_sleep_after_job">Sospendi dopo il lavoro</string>
+    <string name="text_sleep_after_job_desc">porta la macchina in modalità di sospensione a basso consumo usando il comando $SLP</string>
+    <string name="text_jogging_max_steps">Dimensione massima passo jogging per XY</string>
+    <string name="text_jogging_max_steps_z">Dimensione massima passo jogging per Z</string>
+    <string name="text_jogging_max_steps_desc">valore massimo della barra di scorrimento per gli assi X e Y</string>
+    <string name="text_jogging_max_steps_desc_z">valore massimo della barra di scorrimento per l\'asse Z</string>
+    <string name="text_keep_screen_on">Mantieni schermo attivo</string>
+    <string name="text_keep_screen_on_description">lo schermo non si spegnerà mai durante il lavoro</string>
+    <string name="text_enable_custom_buttons">Abilita pulsanti personalizzati</string>
+    <string name="text_enable_custom_buttons_desc">abilita quattro pulsanti personalizzati nella scheda di controllo jogging.</string>
+    <string name="text_custom_buttons">Pulsanti personalizzati</string>
+    <string name="text_custom_buttons_desc">più comandi devono essere separati da una nuova riga</string>
+    <string name="text_custom_button_1">Pulsante personalizzato 1</string>
+    <string name="text_configure_custom_button">configura comportamento e comandi del pulsante</string>
+    <string name="text_button_1_behaviour">Configura il comportamento del pulsante personalizzato 1</string>
+    <string name="text_button_label">Etichetta pulsante</string>
+    <string name="text_button_label_desc">assegna un nome al pulsante, massimo 3 caratteri</string>
+    <string name="text_short_click_commands">Comandi click breve</string>
+    <string name="text_short_click_desc">comandi da inviare dopo il click breve del pulsante</string>
+    <string name="text_long_click_commands">Comandi click lungo</string>
+    <string name="text_long_click_desc">comandi da inviare dopo il click lungo del pulsante</string>
+    <string name="text_confirm_first">Conferma prima</string>
+    <string name="text_confirm_first_desc">chiedi conferma prima di inviare</string>
+    <string name="text_custom_button_2">Pulsante personalizzato 2</string>
+    <string name="text_button_2_behaviour">Configura il comportamento del pulsante personalizzato 2</string>
+    <string name="text_custom_button_3">Pulsante personalizzato 3</string>
+    <string name="text_button_3_behaviour">Configura il comportamento del pulsante personalizzato 3</string>
+    <string name="text_custom_button_4">Pulsante personalizzato 4</string>
+    <string name="text_quick_jogging">Pulsanti passo jogging rapido</string>
+    <string name="text_quick_jogging_desc">configura i pulsanti di jogging rapido</string>
+    <string name="text_button_4_behaviour">Configura il comportamento del pulsante personalizzato 4</string>
+    <string name="text_default_connection">Connessione predefinita</string>
+    <string name="text_rotate_jogging_pad">Ruota il pad di jogging XY</string>
+    <string name="text_streaming_stop_button_behaviour">Comportamento del pulsante di stop streaming</string>
+    <string name="text_check_machine_position">Controlla la posizione della macchina</string>
+    <string name="text_check_machine_position_description">impedisci lo streaming del file se la macchina non è in posizione zero</string>
+    <string name="text_haptic_feedback">Feedback aptico</string>
+    <string name="text_haptic_feedback_description">abilita una breve vibrazione quando vengono toccati i pulsanti</string>
+    <string name="text_only_internal_storage_supported">È supportata solo la memoria interna</string>
+    <string name="text_enable_ab_axis">Abilita asse AB</string>
+    <string name="text_notifications">Notifiche</string>
+    <string name="enable_ab_axis_description">abilita due assi aggiuntivi A e B nella scheda di controllo jogging</string>
+    <string name="text_grbl_status_update_interval">Intervallo aggiornamento stato</string>
+    <string name="text_grbl_status_update_interval_summary">%s (se hai una CPU lenta o un telefono molto vecchio, aumenta questo valore, il valore predefinito è 150)</string>
+
+    <string-array name="preference_entries_default_connection">
+        <item>Bluetooth</item>
+        <item>USB OTG (115200 baud)</item>
+    </string-array>
+
+    <string-array name="preference_values_default_connection">
+        <item>bluetooth</item>
+        <item>usbotg</item>
+    </string-array>
+
+    <string-array name="preference_entries_stop_button_behaviour">
+        <item>solo interrompi lo streaming</item>
+        <item>interrompi lo streaming ed esegui un reset software</item>
+    </string-array>
+
+    <string-array name="preference_values_stop_button_behaviour">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="preference_entries_gcode_file_picker_types">
+        <item>selettore file semplice</item>
+        <item>selettore file completo</item>
+    </string-array>
+
+    <string-array name="preference_values_gcode_file_picker_types">
+        <item>simple</item>
+        <item>full</item>
+    </string-array>
+
+    <string-array name="preference_entries_update_pool_interval">
+        <item>100 Millisecondi</item>
+        <item>150 Millisecondi</item>
+        <item>200 Millisecondi</item>
+        <item>250 Millisecondi</item>
+        <item>300 Millisecondi</item>
+    </string-array>
+
+    <string-array name="preference_values_update_pool_interval">
+        <item>100</item>
+        <item>150</item>
+        <item>200</item>
+        <item>250</item>
+        <item>300</item>
+    </string-array>
+
+    <string-array name="preference_entries_usb_baud_rate">
+        <item>300</item>
+        <item>1200</item>
+        <item>2400</item>
+        <item>4800</item>
+        <item>9600</item>
+        <item>19200</item>
+        <item>38400</item>
+        <item>57600</item>
+        <item>74880</item>
+        <item>115200 (predefinito)</item>
+        <item>230400</item>
+        <item>250000</item>
+        <item>460800</item>
+        <item>921600</item>
+    </string-array>
+
+    <string-array name="preference_values_usb_baud_rate">
+        <item>300</item>
+        <item>1200</item>
+        <item>2400</item>
+        <item>4800</item>
+        <item>9600</item>
+        <item>19200</item>
+        <item>38400</item>
+        <item>57600</item>
+        <item>74880</item>
+        <item>115200</item>
+        <item>230400</item>
+        <item>250000</item>
+        <item>460800</item>
+        <item>921600</item>
+    </string-array>
+
+    <string name="text_paired_devices">Scegli un dispositivo associato</string>
+    <string name="text_machine_not_idle">Macchina non inattiva</string>
+    <string name="text_no_gcode_file_selected">Nessun file gcode selezionato</string>
+    <string name="text_no_external_read_permission">Impossibile leggere la memoria esterna, controlla le autorizzazioni</string>
+    <string name="text_grbl_alarm_format">Allarme:%d %s</string>
+    <string name="text_grbl_error_format">Errore:%d %s</string>
+    <string name="text_bluetooth_service_foreground_message">Questo gestirà tutta la comunicazione Bluetooth.</string>
+    <string name="text_usb_service_foreground_message">Questo gestirà tutta la comunicazione Usb.</string>
+    <string name="text_bluetooth_service">Servizio Bluetooth</string>
+    <string name="text_usb_service">Servizio USB otg</string>
+    <string name="text_ok">OK</string>
+
+
+    <string name="text_probing_help">1. Eseguire il probing con il primo utensile.  2. Cambiare l\'utensile.  3. Eseguire nuovamente il probing con "Probe + TLO".</string>
+    <string name="text_probing_feed_rate">Velocità di avanzamento</string>
+    <string name="text_touch_plate_thickness">Spessore piastra di contatto</string>
+    <string name="text_distance_to_probe">Distanza da probare</string>
+    <string name="text_auto_zero_z_axis_after_probe">Regolazione automatica asse Z</string>
+    <string name="text_start_probe">Probing</string>
+    <string name="text_straight_probe">G38.3: Probing Diretto</string>
+    <string name="text_straight_probe_desc">Probare verso il pezzo, fermarsi al contatto. Assicurarsi che la configurazione della sonda sia corretta e fare clic su Sì per avviare il probing</string>
+    <string name="text_last_probe_location_unknown">Ultima posizione di probing sconosciuta</string>
+    <string name="text_dynamic_tool_length_offset">G43.1: Compensazione dinamica lunghezza utensile</string>
+    <string name="text_dynamic_tlo_desc">Il TLO verrà applicato con la differenza tra l\'ultima posizione di probing e la posizione di probing corrente. G43.1 abs(ultimaProbing) - abs(probingCorrente) Fare clic su Sì per continuare.</string>
+    <string name="text_cancel_tlo">G49: Annulla Compensazione Lunghezza Utensile</string>
+    <string name="text_cancel_tlo_desc">Vuoi annullare il TLO corrente?</string>
+    <string name="text_probing_distance">Distanza di probing</string>
+    <string name="text_manual_tool_change">Cambio utensile manuale</string>
+    <string name="text_probe_failed">Probing fallito, riprova</string>
+    <string name="text_probe_success_auto_zero">Probing riuscito con regolazione automatica</string>
+    <string name="text_probe_success">Probing riuscito</string>
+    <string name="text_probe_success_with_tlo">Probing riuscito. Compensazione lunghezza utensile applicata</string>
+    <string name="text_probing_tab_heading">Probing | Compensazione lunghezza utensile {fa-info-circle 16dp @color/colorAccent}</string>
+    <string name="text_last_probe_position">Ultima posizione di probing</string>
+    <string name="text_current_tlo">TLO Corrente</string>
+    <string name="probe_plus_tlo">Probing {fa-plus 14dp} TLO</string>
+
+    <string-array name="preference_entries_rotate_xy_jogging_pad">
+        <item>0 gradi in senso orario</item>
+        <item>90 gradi in senso orario</item>
+        <item>180 gradi in senso orario</item>
+        <item>270 gradi in senso orario</item>
+    </string-array>
+
+    <string name="text_steps_feed">Dimensione Passo | Avanzamento Jog</string>
+    <string name="text_zero_selected_axis">Azzerra l\'asse selezionato</string>
+    <string name="text_set_axis_location_in_current_wpos">imposta la posizione dell\'asse selezionato a zero nel sistema di coordinate corrente | </string>
+    <string name="text_selected_coordinate_system">"Sistema di coordinate selezionato "</string>
+    <string name="text_homing_cycle">Ciclo di homing $H</string>
+    <string name="text_do_homing_cycle">**DISABILITATO**Eseguire il ciclo di homing?</string>
+    <string name="text_set_coordinate_system">G10 L20 Imposta il sistema di coordinate</string>
+    <string name="text_set_all_axes_zero">imposta a zero la posizione di tutti gli assi nel sistema di coordinate corrente | G10 L20 P0 X0Y0Z0A0</string>
+    <string name="text_return_to_zero_position">Ritorna alla posizione Zero</string>
+    <string name="text_go_to_zero_position_in_current_wpos">Vai alla posizione X0 Y0 Z0 nel sistema di coordinate corrente</string>
+    <string name="text_empty_command">Comando vuoto</string>
+    <string name="text_long_click">click lungo</string>
+    <string name="text_short_click">click breve</string>
+    <string name="text_on_button">sul pulsante</string>
+    <string name="text_send">Invia</string>
+    <string name="text_move">Muovi</string>
+    <string name="text_axis_to_zero_position">asse in posizione zero?</string>
+    <string name="text_go_to_zero_position">vai alla posizione zero dell\'asse nel sistema di coordinate corrente | G0</string>
+    <string name="text_save_coordinate_system">Salva il sistema di coordinate</string>
+    <string name="text_save_coordinate_system_desc">salva la posizione corrente nel sistema di coordinate</string>
+    <string name="text_jogging_step_and_feed">Passo e avanzamento Jogging</string>
+    <string name="text_inches">Pollici</string>
+
+    <string name="text_mist_disabled">Il refrigerante nebulizzato non è abilitato durante la compilazione</string>
+    <string name="text_file_reading_in_progress">Lettura del file in corso</string>
+    <string name="text_file_checking_started">Controllo del file avviato</string>
+    <string name="text_file_streaming_started">Streaming del file avviato</string>
+    <string name="text_starting_streaming">Avvio dello streaming GCODE</string>
+    <string name="text_check_every_thing">controlla che tutto sia pronto!</string>
+    <string name="text_continue_streaming">Continua</string>
+    <string name="text_gcode_length_warning">ATTENZIONE! Comando Gcode con lunghezza fino a 80 caratteri trovato alla riga</string>
+    <string name="text_lines_total_sent">Linee Totali | Inviate</string>
+    <string name="text_time_elapsed">Tempo trascorso</string>
+    <string name="text_file_not_found">File non trovato!</string>
+    <string name="text_overrides_fsv">Override F:S:V</string>
+    <string name="text_overrides_fs">Override F:S</string>
+    <string name="text_check_mode_on">Controllo {fa-toggle-on 16dp @color/colorAccent}</string>
+    <string name="text_check_mode_off">Controllo {fa-toggle-off 16dp}</string>
+    <string name="text_check_mode_on_large">Controllo {fa-toggle-on 24dp @color/colorAccent}</string>
+    <string name="text_check_mode_off_large">Controllo {fa-toggle-off 24dp}</string>
+    <string name="text_spindle_on">Mandrino {fa-toggle-on 16dp @color/colorAccent}</string>
+    <string name="text_spindle_off">Mandrino {fa-toggle-off 18dp}</string>
+    <string name="text_spindle_on_large">Mandrino {fa-toggle-on 24dp @color/colorAccent}</string>
+    <string name="text_spindle_off_large">Mandrino {fa-toggle-off 24dp}</string>
+    <string name="text_flood_on">Refrigerante {fa-toggle-on 16dp @color/colorAccent}</string>
+    <string name="text_flood_off">Refrigerante {fa-toggle-off 16dp}</string>
+    <string name="text_flood_on_large">Refrigerante {fa-toggle-on 24dp @color/colorAccent}</string>
+    <string name="text_flood_off_large">Refrigerante {fa-toggle-off 24dp}</string>
+    <string name="text_mist_on">Nebbia {fa-toggle-on 16dp @color/colorAccent}</string>
+    <string name="text_mist_off">Nebbia {fa-toggle-off 16dp}</string>
+    <string name="text_mist_on_large">Nebbia {fa-toggle-on 24dp @color/colorAccent}</string>
+    <string name="text_mist_off_large">Nebbia {fa-toggle-off 24dp}</string>
+
+    <string name="text_clear_console">Cancellare i messaggi della console?</string>
+    <string name="text_clear_console_description">questo cancellerà tutta la cronologia della console</string>
+    <string name="text_verbose_output">Output dettagliato</string>
+
+    <string name="app_shortcut_short_test_settings">Impostazioni</string>
+    <string name="app_shortcut_long_text_settings">Impostazioni Applicazione</string>
+    <string name="app_shortcut_short_test_about">Informazioni</string>
+    <string name="app_shortcut_long_text_about">Informazioni</string>
+    <string name="app_shortcut_short_test_help">Documentazione</string>
+    <string name="app_shortcut_long_text_help">Guida alla Documentazione dell\'Applicazione</string>
+
+    <string name="text_power_management_warning_title">Attenzione! L\'ottimizzazione della batteria è abilitata</string>
+    <string name="text_power_management_warning_description">Per lavori di lunga durata, disabilitare l\'ottimizzazione della batteria di Android per questa applicazione.</string>
+    <string name="text_delete_notification">Vuoi davvero eliminare questa notifica?</string>
+    <string name="text_usb_device_connected">Dispositivo USB connesso</string>
+    <string name="text_no_usb_permission">Nessuna autorizzazione USB</string>
+    <string name="text_usb_permission_not_granted">Autorizzazione USB non concessa</string>
+    <string name="text_no_usb_device">Nessun dispositivo USB</string>
+    <string name="text_usb_device_disconnected">Dispositivo USB disconnesso</string>
+    <string name="text_usb_device_not_supported">Dispositivo non supportato</string>
+    <string name="text_application_settings_desc">configura il comportamento e l\'aspetto dell\'applicazione</string>
+    <string name="text_usb_connection_baud_rate">Velocità di trasmissione della connessione USB</string>
+    <string name="text_remember_file_location">Ricorda la posizione del file</string>
+    <string name="text_remember_file_location_desc">apre il selettore con l\'ultima posizione del file utilizzata</string>
+    <string name="text_jogging_preferences">Preferenze Jogging</string>
+    <string name="test_set_cordinate_system">Imposta Sistema di Coordinate G10 L20 P0 %s-</string>
+    <string name="test_set_cordinate_system_description">cambia la posizione dell\'asse %s nel sistema di coordinate corrente al valore specificato</string>
+    <string name="text_delete_command_history_confirm">Vuoi eliminare questo comando dalla cronologia?</string>
+    <string name="text_single_step_mode">Abilita la modalità a passo singolo</string>
+    <string name="text_single_step_mode_description">invia una riga di gcode a grbl e attende un messaggio di risposta ok o errore prima di inviare la riga di gcode successiva</string>
+    <string name="text_warning_error_20">ATTENZIONE: Non dovresti abilitare questa opzione a meno che tu non sappia cosa stai facendo.</string>
+
+    <string name="text_cam_from_title">Punto 1</string>
+    <string name="text_cam_from_message">Primo punto, nel rettangolo rappresenta un angolo, nella lavorazione circolare verrà utilizzato come centro, la coordinata Z verrà utilizzata come piano di partenza delle lavorazioni</string>
+    <string name="text_cam_to_title">Punto 2</string>
+    <string name="text_cam_to_message">Secondo punto, nel rettangolo rappresenta l\'angolo opposto al primo, nella lavorazione circolare verrà utilizzato come raggio, la coordinata Z non viene presa in considerazione</string>
+    <string name="text_start_cam_calc">Crea percorso utensile</string>
+    <string name="text_start_cam_calc_desc">crea il percorso utensile e scrivi un file di lavoro nell\'ultima directory utilizzata</string>
+
+    <string name="text_cam_feedrate_title">Imposta Velocità di Avanzamento</string>
+    <string name="text_cam_feedrate_message">velocità di taglio per la lavorazione</string>
+
+    <string name="text_cam_step_over_title">Imposta Passo Laterale</string>
+    <string name="text_cam_step_over_message">nelle lavorazioni di spianatura, la distanza tra i passaggi di taglio</string>
+
+    <string name="text_cam_traversal_title">Imposta Z di Traslazione</string>
+    <string name="text_cam_traversal_message">distanza di sicurezza dell\'utensile per attraversamenti rapidi, questo valore verrà AGGIUNTO alla coordinata Z del punto [Punto 1]</string>
+
+
+    <string name="text_facing_zdeep_title">Imposta Z Profondità</string>
+    <string name="text_facing_zdeep_message">questo valore è la profondità totale della lavorazione, verrà SOTTRATTO alla coordinata Z del punto [Punto 1] </string>
+
+    <string name="cam_zstep_title">imposta passo z</string>
+    <string name="text_cam_zstep_desc">il valore del passo z indica quanto verrà tagliato per ogni strato, questo valore verrà armonizzato per raggiungere la profondità totale con passaggi della stessa altezza</string>
+
+
+    <string name="text_cam_tool_dia">diametro utensile</string>
+    <string name="text_cam_tool_dia_desc">imposta il diametro dell\'utensile che verrà utilizzato per la profilatura di un rettangolo con smussatura degli angoli</string>
+
+    <string name="text_cam_title_help">Crea percorso utensile semplice</string>
+    <string name="text_cam_help">"Crea vari percorsi utensile "</string>
+
+    <string name="write_job_file">Scrivi file di lavoro</string>
+
+    <string name="set_coord_to">Punto 2</string>
+    <string name="set_coord_from">Punto 1</string>
+    <string name="tool_diameter_for_cornering">Diametro punta(per scontornatura)</string>
+    <string name="z_deep">Profondita totale</string>
+    <string name="z_step">profondità per passata</string>
+    <string name="z_traversal">altezza attraversamento</string>
+    <string name="step_over">Sovrapposizione passata</string>
+    <string name="text_cam_feed_rate">Velocità di Avanzamento</string>
+    <string name="job_type">Tipo di lavoro</string>
+    <string name="on_the_fly_cam">CAM al volo</string>
+
+    <string-array name="job_type_list">
+        <item>spianatura rettangolare avanzamento X</item>
+        <item>spianatura rettangolare avanzamento Y</item>
+        <item>offset rettangolare interno</item>
+        <item>offset rettangolare esterno</item>
+        <item>spianatura circolare interna</item>
+        <item>spianatura circolare esterna</item>
+        <item>incisione rettangolare</item>
+        <item>incisione circolare</item>
+        <item>profilatura rettangolare con smussatura</item>
+        <item>taglio su linea</item>
+    </string-array>
+</resources>
+
+

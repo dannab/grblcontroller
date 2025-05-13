@@ -33,7 +33,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
-                    android:text="On the fly cam"
+                    android:text="@string/on_the_fly_cam"
                     tools:ignore="RelativeOverlap" />
 
 
@@ -53,7 +53,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:entries="@array/job_type_list"
-                    android:text="Job type" />
+                    android:text="@string/job_type" />
 
             </RelativeLayout>
 
@@ -100,7 +100,7 @@
                     android:layout_marginStart="4dp"
                     android:layout_marginEnd="-20dp"
                     android:layout_toStartOf="@+id/cam_feed_rate"
-                    android:text="@string/text_probing_feed_rate" />
+                    android:text="@string/text_cam_feed_rate" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_feed_rate"
@@ -131,7 +131,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_step_over"
-                    android:text="step over" />
+                    android:text="@string/step_over" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_step_over"
@@ -156,7 +156,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_z_traversal"
-                    android:text="Z traversal" />
+                    android:text="@string/z_traversal" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_z_traversal"
@@ -181,7 +181,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_z_step"
-                    android:text="Z step" />
+                    android:text="@string/z_step" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_z_step"
@@ -206,7 +206,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_z_deep"
-                    android:text="Z deep" />
+                    android:text="@string/z_deep" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_z_deep"
@@ -232,7 +232,7 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
                     android:layout_toStartOf="@+id/cam_tool_dia"
-                    android:text="tool diameter(for cornering)" />
+                    android:text="@string/tool_diameter_for_cornering" />
 
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/cam_tool_dia"
@@ -259,7 +259,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="0.33"
                         android:enabled="@{machineStatus.state.equals(machineStatus.STATE_IDLE)}"
-                        android:text="Set Coord From" />
+                        android:text="@string/set_coord_from" />
 
                     <TextView
                         android:id="@+id/cam_from_text"
@@ -269,7 +269,7 @@
                         android:layout_toStartOf="@+id/cam_from"
                         android:text="  0000.0000 , 0000.0000"
                         android:freezesText="true"
-                        />
+                        tools:ignore="HardcodedText" />
 
                 </TableRow>
                 <TableRow tools:ignore="UselessParent">
@@ -280,7 +280,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="0.33"
                         android:enabled="@{machineStatus.state.equals(machineStatus.STATE_IDLE)}"
-                        android:text="Set Coord To" />
+                        android:text="@string/set_coord_to" />
 
                     <TextView
                         android:id="@+id/cam_to_text"
@@ -290,7 +290,7 @@
                         android:layout_toStartOf="@+id/cam_to"
                         android:text="  0000.0000 , 0000.0000"
                         android:freezesText="true"
-                        />
+                        tools:ignore="HardcodedText" />
 
                 </TableRow>
 
@@ -321,7 +321,7 @@
                     <com.joanzapata.iconify.widget.IconButton
                         android:layout_weight="0.33"
                         android:id="@+id/start_cam_calc"
-                        android:text="Write job file"
+                        android:text="@string/write_job_file"
 
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />

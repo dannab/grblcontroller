@@ -303,5 +303,59 @@
         <item>460800</item>
         <item>921600</item>
     </string-array>
+    <string name="text_cam_from_title">Point From</string>
+    <string name="text_cam_from_message">First point, in the rectangle represents an angle,in round machining it will be used as a center,the Z coordinate will be used as the starting plane of the workings</string>
+    <string name="text_cam_to_title">Point to</string>
+    <string name="text_cam_to_message">Second point, in the rectangle it represents the angle opposite to the first, in round machining it will be used as a radius, the Z coordinate is not taken into consideration</string>
+    <string name="text_start_cam_calc">Create toolpath</string>
+    <string name="text_start_cam_calc_desc">create toolpath and write a job file in the last used directory</string>
+
+    <string name="text_cam_feedrate_title">Set Feedrate</string>
+    <string name="text_cam_feedrate_message">cutting speed for machining</string>
+
+    <string name="text_cam_step_over_title">Set Stepover</string>
+    <string name="text_cam_step_over_message">in facing machining, the distance between the cutting steps</string>
+
+    <string name="text_cam_traversal_title">Set Z Traversal</string>
+    <string name="text_cam_traversal_message">tool safety distance for fast crossings, this value will be ADDED to the Z coordinate of the point [Point From]</string>
+
+
+    <string name="text_facing_zdeep_title">Set Z Deep</string>
+    <string name="text_facing_zdeep_message">this value is the total depth of the machining ,it will be SUBTRACTED to the Z coordinate of the point [Point From] </string>
+
+    <string name="cam_zstep_title">set z step</string>
+    <string name="text_cam_zstep_desc">z step value is how much will be cut for each layer,this value will be harmonized to reach the full depth with passes of the same height</string>
+
+
+    <string name="text_cam_tool_dia">tool diameter</string>
+    <string name="text_cam_tool_dia_desc">set the tool diameter will be used to profiling a rectangle with cornering</string>
+
+    <string name="text_cam_title_help">Create simple toolpath</string>
+    <string name="text_cam_help">"Create various toolpath "</string>
+    <string name="write_job_file">Write job file</string>
+    <string name="set_coord_to">Set Coord To</string>
+    <string name="set_coord_from">Set Coord From</string>
+    <string name="tool_diameter_for_cornering">tool diameter(for cornering)</string>
+    <string name="z_deep">Z deep</string>
+    <string name="z_step">Z step</string>
+    <string name="z_traversal">Z traversal</string>
+    <string name="step_over">step over</string>
+    <string name="text_cam_feed_rate" />
+    <string name="job_type">Job type</string>
+    <string name="on_the_fly_cam">On the fly cam</string>
+
+
+    <string-array name="job_type_list">
+        <item>rectangle facing feeding X</item>
+        <item>rectangle facing feeding Y</item>
+        <item>rectangle offset in</item>
+        <item>rectangle offset out</item>
+        <item>circle facing in</item>
+        <item>circle facing out</item>
+        <item>rectangle engraving</item>
+        <item>circle engraving</item>
+        <item>rectangle profile with cornering</item>
+        <item>cut on line</item>
+    </string-array>
 
 </resources>

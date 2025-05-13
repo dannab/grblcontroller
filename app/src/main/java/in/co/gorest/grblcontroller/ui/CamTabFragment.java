@@ -44,7 +44,6 @@ import org.greenrobot.eventbus.EventBus;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 
 import in.co.gorest.grblcontroller.R;
@@ -96,7 +95,7 @@ public class CamTabFragment extends BaseFragment {
         //if(GrblActivity.isTablet(getActivity())){
         //    this.editIcon = " {fa-edit 22sp}";
         //}else{
-            this.editIcon = " {fa-edit 16sp}";
+        this.editIcon = " {fa-edit 16sp}";
         //}
 
         //EventBus.getDefault().register(this);
@@ -285,7 +284,7 @@ public class CamTabFragment extends BaseFragment {
 
         //if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
 
-            //mettere finestra per head e tail gcode
+        //mettere finestra per head e tail gcode
 
         double Ztraversal = Double.parseDouble(camZTraversal.getText().toString().replaceAll("[^\\d.]", ""));
         double cam_z_step = Double.parseDouble(camZStep.getText().toString().replaceAll("[^\\d.]", "") + "\n");
@@ -301,53 +300,53 @@ public class CamTabFragment extends BaseFragment {
         String gcode="";
         SimpleGcodeMaker gcodemaker;
         gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
-        //gcodemaker = new SimpleGcodeMaker(0.0,0.0,300,400,-10.0, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
+        //gcodemaker = new SimpleGcodeMaker(0.0,0.0,30,30,-10.0, 0.7, 4.22, 5,1000,true);
 
 
         switch (jobType){
-                case 0: //<item>rectangle facing feeding X</item>
-                     gcode=gcodemaker.snakeX(step_over,true);
-                     break;
-                case 1: //<item>rectangle facing feeding Y</item>
-                    gcode=gcodemaker.snakeY(step_over,true);
-                     break;
-                case 2: //<item>rectangle offset in</item>
-                    //only out at moment
-                    gcode=gcodemaker.cutRectangle(step_over,true);
-                    break;
-                case 3: //<item>rectangle offset out</item>
-                    gcode=gcodemaker.cutRectangle(step_over,true);
-                     break;
-                case 4: //<item>circle facing in</item>
-                    //only out at moment
-                    gcode=gcodemaker.circleCut(step_over,true);
-                     break;
-                case 5: //<item>circle facing out</item>
-                    gcode=gcodemaker.circleCut(step_over,true);
-                    break;
-                case 6: //<item>rectangle engraving</item>
-                    gcode=gcodemaker.cutRectangle(0.0,true);
-                    break;
-                case 7: //<item>circle engraving</item>
-                    gcode=gcodemaker.circleCut(0.0,true);
-                    break;
-                case 8: //<item>rectangle profile with cornering</item>
-                    gcode=gcodemaker.CorneringCut(cam_tool_dia);
-                    break;
-                case 9: //<item>cut on line</item>
-                    gcode=gcodemaker.lineCut ();
+            case 0: //<item>rectangle facing feeding X</item>
+                gcode=gcodemaker.snakeX(step_over,true);
+                break;
+            case 1: //<item>rectangle facing feeding Y</item>
+                gcode=gcodemaker.snakeY(step_over,true);
+                break;
+            case 2: //<item>rectangle offset in</item>
+                //only out at moment
+                gcode=gcodemaker.cutRectangle(step_over,true);
+                break;
+            case 3: //<item>rectangle offset out</item>
+                gcode=gcodemaker.cutRectangle(step_over,true);
+                break;
+            case 4: //<item>circle facing in</item>
+                //only out at moment
+                gcode=gcodemaker.circleCut(step_over,true);
+                break;
+            case 5: //<item>circle facing out</item>
+                gcode=gcodemaker.circleCut(step_over,true);
+                break;
+            case 6: //<item>rectangle engraving</item>
+                gcode=gcodemaker.cutRectangle(0.0,true);
+                break;
+            case 7: //<item>circle engraving</item>
+                gcode=gcodemaker.circleCut(0.0,true);
+                break;
+            case 8: //<item>rectangle profile with cornering</item>
+                gcode=gcodemaker.CorneringCut(cam_tool_dia);
+                break;
+            case 9: //<item>cut on line</item>
+                gcode=gcodemaker.lineCut ();
         }
 
 
-            System.out.println(gcode);
+        System.out.println(gcode);
 
         writeOnFile(gcode);
 
 
 
-       // }else{
-       //    EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_machine_not_idle), true, true));
-       // }
+        // }else{
+        //    EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_machine_not_idle), true, true));
+        // }
     }
 
 
@@ -422,10 +421,11 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_feedrate));
+        alertDialogBuilder.setTitle(getString(R.string.text_cam_feedrate_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_feedrate_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate), "10.0"));
+        editText.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate), "1000.0"));
         editText.setSelection(editText.getText().length());
 
         final String faEditIcon = this.editIcon;
@@ -460,10 +460,11 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_step_over));
+        alertDialogBuilder.setTitle(getString(R.string.text_cam_step_over_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_step_over_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_step_over), "10.0"));
+        editText.setText(sharedPref.getString(getString(R.string.preference_cam_step_over), "1.0"));
         editText.setSelection(editText.getText().length());
 
         final String faEditIcon = this.editIcon;
@@ -473,7 +474,7 @@ public class CamTabFragment extends BaseFragment {
                         String stepover = editText.getText().toString();
                         if(stepover.length() <=0) stepover = "1";
                         sharedPref.edit().putString(getString(R.string.preference_cam_step_over), stepover).apply();
-                         camStepOver.setText(stepover  + faEditIcon);
+                        camStepOver.setText(stepover  + faEditIcon);
                     }
                 })
                 .setNegativeButton(getString(R.string.text_cancel),
@@ -493,42 +494,43 @@ public class CamTabFragment extends BaseFragment {
 
     private void setCamZTraversal(){
 
-            LayoutInflater inflater = LayoutInflater.from(getActivity());
-            final ViewGroup nullParent = null;
-            View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
+        LayoutInflater inflater = LayoutInflater.from(getActivity());
+        final ViewGroup nullParent = null;
+        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
 
-            AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-            alertDialogBuilder.setView(v);
-            alertDialogBuilder.setTitle(getString(R.string.text_cam_traversal));
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
+        alertDialogBuilder.setView(v);
+        alertDialogBuilder.setTitle(getString(R.string.text_cam_traversal_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_traversal_message));
 
-            final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-            editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal), "10.0"));
-            editText.setSelection(editText.getText().length());
+        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
+        editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal), "5.0"));
+        editText.setSelection(editText.getText().length());
 
-            final String faEditIcon = this.editIcon;
-            alertDialogBuilder.setCancelable(true)
-                    .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            String ztraversal = editText.getText().toString();
-                            if(ztraversal.length() <=0) ztraversal = "1";
-                            sharedPref.edit().putString(getString(R.string.preference_cam_z_traversal), ztraversal).apply();
-                            camZTraversal.setText(ztraversal  + faEditIcon);
-                        }
-                    })
-                    .setNegativeButton(getString(R.string.text_cancel),
-                            new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int id) {
-                                    dialog.cancel();
-                                }
-                            });
+        final String faEditIcon = this.editIcon;
+        alertDialogBuilder.setCancelable(true)
+                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        String ztraversal = editText.getText().toString();
+                        if(ztraversal.length() <=0) ztraversal = "1";
+                        sharedPref.edit().putString(getString(R.string.preference_cam_z_traversal), ztraversal).apply();
+                        camZTraversal.setText(ztraversal  + faEditIcon);
+                    }
+                })
+                .setNegativeButton(getString(R.string.text_cancel),
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                dialog.cancel();
+                            }
+                        });
 
-            AlertDialog dialog = alertDialogBuilder.create();
-            if(dialog.getWindow() != null){
-                dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-            }
-
-            dialog.show();
+        AlertDialog dialog = alertDialogBuilder.create();
+        if(dialog.getWindow() != null){
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         }
+
+        dialog.show();
+    }
 
     private void setCamZDeep(){
 
@@ -538,7 +540,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_facing_zdeep));
+        alertDialogBuilder.setTitle(getString(R.string.text_facing_zdeep_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_facing_zdeep_message));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_deep), "0.0"));
@@ -576,7 +579,8 @@ public class CamTabFragment extends BaseFragment {
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_facing_zstep));
+        alertDialogBuilder.setTitle(getString(R.string.cam_zstep_title));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_zstep_desc));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_step), "0.0"));
@@ -614,6 +618,7 @@ public class CamTabFragment extends BaseFragment {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
         alertDialogBuilder.setView(v);
         alertDialogBuilder.setTitle(getString(R.string.text_cam_tool_dia));
+        alertDialogBuilder.setMessage(getString(R.string.text_cam_tool_dia_desc));
 
         final EditText editText = v.findViewById(R.id.dialog_input_decimal);
         editText.setText(sharedPref.getString(getString(R.string.preference_cam_tool_dia), "10.0"));
@@ -646,7 +651,7 @@ public class CamTabFragment extends BaseFragment {
 
     private void showCamHelp(){
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity())
-                .setTitle(getString(R.string.text_manual_tool_change))
+                .setTitle(getString(R.string.text_cam_title_help))
                 .setMessage(R.string.text_cam_help)
                 .setPositiveButton(getString(R.string.text_ok), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) { }
