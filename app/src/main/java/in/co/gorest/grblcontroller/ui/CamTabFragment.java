@@ -21,6 +21,14 @@
 
 package in.co.gorest.grblcontroller.ui;
 
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor; // Importa ParcelFileDescriptor
+import androidx.activity.result.ActivityResultLauncher; // Importa ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts; // Importa ActivityResultContracts
+
+// ... altre importazioni
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
@@ -78,7 +86,25 @@ public class CamTabFragment extends BaseFragment {
     private Double Yfrom = 0.0;
     private Double Zfrom = 0.0;
     private int jobType=0;
+
+    private String gcodeToSave; // Variabile per memorizzare temporaneamente il gcode
+
     //double Ztraversal=0.0;
+    private final ActivityResultLauncher<Intent> createFileLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                            Uri uri = result.getData().getData();
+                            if (uri != null && gcodeToSave != null) {
+                                writeGcodeToUri(uri, gcodeToSave);
+                                gcodeToSave = null; // Resetta dopo il salvataggio
+                            }
+                        } else {
+                            // L'utente ha annullato o c'è stato un errore
+                            EventBus.getDefault().post(new UiToastEvent("Salvataggio file annullato.", true, true));
+                        }
+                    });
+
     public CamTabFragment() {}
 
     public static CamTabFragment newInstance() {
@@ -338,21 +364,51 @@ public class CamTabFragment extends BaseFragment {
         }
 
 
-        System.out.println(gcode);
+        System.out.println(gcode); // Per il debug
 
-        writeOnFile(gcode);
+        // Invece di chiamare direttamente writeOnFile, avvia SAF
+        this.gcodeToSave = gcode; // Salva il gcode per usarlo nel callback
+        launchCreateFileIntent();
+    }
 
+    private void launchCreateFileIntent() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/octet-stream"); // Tipo MIME generico per file G-code, puoi usare "text/plain" se preferisci
+        intent.putExtra(Intent.EXTRA_TITLE, "job1.nc"); // Nome file suggerito
 
-
-        // }else{
-        //    EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_machine_not_idle), true, true));
+        // Potresti voler suggerire una directory iniziale se hai un URI salvato
+        // Uri initialUri = getSavedInitialDirectoryUri(); // Funzione da implementare se necessario
+        // if (initialUri != null) {
+        //    intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri);
         // }
+
+        createFileLauncher.launch(intent);
+    }
+
+    private void writeGcodeToUri(Uri uri, String gcodeData) {
+        try {
+            // Utilizza il ContentResolver per aprire un ParcelFileDescriptor
+            ParcelFileDescriptor pfd = requireActivity().getContentResolver().openFileDescriptor(uri, "w"); // "w" per scrivere
+            if (pfd != null) {
+                FileOutputStream fileOutputStream = new FileOutputStream(pfd.getFileDescriptor());
+                fileOutputStream.write(gcodeData.getBytes());
+                fileOutputStream.close();
+                pfd.close();
+                EventBus.getDefault().post(new UiToastEvent("Nuovo file job salvato in: " + uri.getPath(), true, true));
+            } else {
+                EventBus.getDefault().post(new UiToastEvent("Errore durante l'apertura del file per la scrittura.", true, true));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            EventBus.getDefault().post(new UiToastEvent("Errore durante la scrittura del file: " + e.getMessage(), true, true));
+        }
     }
 
 
 
 
-    private void writeOnFile(String gcode){
+   /* private void writeOnFile(String gcode){
         //su file path gia in uso
         String rootPath = "/storage/";
 
@@ -384,7 +440,7 @@ public class CamTabFragment extends BaseFragment {
 
         EventBus.getDefault().post(new UiToastEvent("new job file at "+rootPath , true, true));
 
-    }
+    }*/
     private void setCamFrom() {
         if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
 

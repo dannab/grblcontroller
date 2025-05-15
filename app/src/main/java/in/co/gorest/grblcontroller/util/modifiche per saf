@@ -1,0 +1,373 @@
+/ ... (altre importazioni esistenti)
+import android.app.Activity;
+import android.content.Intent;
+import android.database.Cursor; // Necessario per ottenere il nome del file dall'URI
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.os.ParcelFileDescriptor; // Per leggere con SAF
+import android.provider.OpenableColumns; // Per ottenere il nome del file
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.databinding.DataBindingUtil;
+
+// ... (altre importazioni)
+
+import java.io.BufferedReader;
+import java.io.File; // Mantieni per compatibilità con la logica esistente di FileSenderListener se necessario
+import java.io.FileInputStream; // Per leggere dall'URI
+import java.io.InputStreamReader; // Per leggere dall'URI
+import java.io.IOException;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+// ... (il resto delle tue importazioni)
+
+public class FileSenderTabFragment extends BaseFragment implements View.OnClickListener, View.OnLongClickListener{
+
+    private static final String TAG = FileSenderTabFragment.class.getSimpleName();
+    private MachineStatusListener machineStatus;
+    private FileSenderListener fileSender;
+    private EnhancedSharedPreferences sharedPref;
+
+    // Launcher per l'intent di apertura del documento SAF
+    private final ActivityResultLauncher<Intent> openFileLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                            Uri uri = result.getData().getData();
+                            if (uri != null) {
+                                // Non impostare più gcodeFile come File, ma passa l'URI
+                                // fileSender.setGcodeFile(new File(filePath)); // Rimuovi o commenta
+                                fileSender.setGcodeFileUri(uri); // Aggiungi un metodo in FileSenderListener per gestire l'URI
+                                String fileName = getFileNameFromUri(uri);
+                                fileSender.setGcodeFileName(fileName); // Aggiungi un metodo per impostare il nome del file
+
+                                fileSender.setElapsedTime("00:00:00");
+                                // Modifica ReadFileAsyncTask per accettare Uri
+                                new ReadFileAsyncTask().execute(uri);
+                                sharedPref.edit().putString(getString(R.string.most_recent_selected_file_uri), uri.toString()).apply(); // Salva l'URI come stringa
+                            }
+                        } else {
+                            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_file_selection_cancelled), true, true));
+                        }
+                    });
+
+    public FileSenderTabFragment() {}
+
+    public static FileSenderTabFragment newInstance() {
+        return new FileSenderTabFragment();
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        machineStatus = MachineStatusListener.getInstance();
+        fileSender = FileSenderListener.getInstance();
+        sharedPref = EnhancedSharedPreferences.getInstance(requireActivity().getApplicationContext(), getString(R.string.shared_preference_key));
+
+        // Prova a caricare l'ultimo file URI all'avvio, se presente
+        String lastFileUriString = sharedPref.getString(getString(R.string.most_recent_selected_file_uri), null);
+        if (lastFileUriString != null) {
+            Uri lastFileUri = Uri.parse(lastFileUriString);
+            // Potresti voler verificare se hai ancora i permessi per questo URI prima di usarlo
+            // Se ReadFileAsyncTask può gestire la potenziale mancanza di permessi, va bene
+            fileSender.setGcodeFileUri(lastFileUri);
+            String fileName = getFileNameFromUri(lastFileUri);
+            fileSender.setGcodeFileName(fileName);
+            fileSender.setElapsedTime("00:00:00");
+            new ReadFileAsyncTask().execute(lastFileUri);
+        }
+    }
+
+    // ... (onStart, onStop)
+
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        // ... (codice esistente di binding)
+        FragmentFileSenderTabBinding binding = DataBindingUtil.inflate(inflater, R.layout.fragment_file_sender_tab, container, false);
+        binding.setMachineStatus(machineStatus);
+        binding.setFileSender(fileSender); // Assicurati che il binding funzioni con i nuovi campi URI/fileName in FileSenderListener
+        View view = binding.getRoot();
+
+        IconTextView selectGcodeFile = view.findViewById(R.id.select_gcode_file);
+        selectGcodeFile.setOnClickListener(view14 -> {
+            // Non c'è più bisogno di controllare i permessi di archiviazione per SAF
+            // if(hasExternalStorageReadPermission()){
+            launchOpenFileIntent();
+            // }else{
+            // askExternalReadPermission();
+            // }
+        });
+
+        // ... (il resto del tuo onCreateView come prima)
+        final IconButton enableChecking = view.findViewById(R.id.enable_checking);
+        enableChecking.setOnClickListener(view13 -> {
+            if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE) || machineStatus.getState().equals(Constants.MACHINE_STATUS_CHECK)){
+                stopFileStreaming();
+                fragmentInteractionListener.onGcodeCommandReceived(GrblUtils.GRBL_TOGGLE_CHECK_MODE_COMMAND);
+            }
+        });
+
+        final IconButton startStreaming = view.findViewById(R.id.start_streaming);
+        startStreaming.setOnClickListener(view12 -> {
+            // Modifica il controllo per usare l'URI o un flag che indica se un file è caricato
+            if(fileSender.getGcodeFileUri() == null){
+                EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_no_gcode_file_selected), true, true));
+                return;
+            }
+
+            if(fileSender.getStatus().equals(FileSenderListener.STATUS_READING)){
+                EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_file_reading_in_progress), true, true));
+                return;
+            }
+
+            startFileStreaming();
+        });
+        // ...
+        return view;
+    }
+
+
+    private void launchOpenFileIntent() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*"); // Puoi specificare tipi MIME più precisi se vuoi, es. "text/plain" o tipi personalizzati per gcode
+        // String[] mimeTypes = {"text/plain", "application/octet-stream", "application/x-gcode"}; // Esempio
+        // intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+
+        // Potresti voler suggerire una directory iniziale se hai un URI salvato
+        String lastFileUriString = sharedPref.getString(getString(R.string.most_recent_selected_file_uri), null);
+        if (lastFileUriString != null) {
+            // Per ACTION_OPEN_DOCUMENT, non puoi impostare direttamente EXTRA_INITIAL_URI come in ACTION_CREATE_DOCUMENT.
+            // L'utente inizierà dal selettore di file standard.
+            // Per un controllo più fine sulla directory iniziale, potresti dover usare ACTION_OPEN_DOCUMENT_TREE
+            // e poi navigare all'interno di quell'albero, ma è più complesso.
+        }
+        openFileLauncher.launch(intent);
+    }
+
+    // Metodo helper per ottenere il nome del file da un URI
+    private String getFileNameFromUri(Uri uri) {
+        String fileName = null;
+        if (uri.getScheme().equals("content")) {
+            try (Cursor cursor = requireActivity().getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (nameIndex != -1) {
+                        fileName = cursor.getString(nameIndex);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting file name from URI", e);
+            }
+        }
+        if (fileName == null) {
+            fileName = uri.getLastPathSegment();
+            if (fileName == null || fileName.isEmpty()) {
+                fileName = "unknown_file.gcode"; // Fallback
+            }
+        }
+        return fileName;
+    }
+
+
+    // Rimuovi o commenta il vecchio onActivityResult se non è più usato per altro
+    /*
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if(requestCode == Constants.FILE_PICKER_REQUEST_CODE && resultCode == Activity.RESULT_OK){
+            String filePath = data.getStringExtra(FilePickerActivity.RESULT_FILE_PATH);
+
+            if(filePath != null){
+                fileSender.setGcodeFile(new File(filePath));
+                if(fileSender.getGcodeFile().exists()){ // Questo controllo non è più direttamente applicabile con URI
+                    fileSender.setElapsedTime("00:00:00");
+                    new ReadFileAsyncTask().execute(fileSender.getGcodeFile());
+                    sharedPref.edit().putString(getString(R.string.most_recent_selected_file), fileSender.getGcodeFile().getAbsolutePath()).apply();
+                }else{
+                    EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_file_not_found), true, true));
+                }
+            }
+        }
+    }
+    */
+
+    // ... (onClick, onLongClick, sendRealTimeCommand, ecc. come prima)
+    // ... (startFileStreaming, stopFileStreaming potrebbero aver bisogno di aggiustamenti
+    //      se FileStreamerIntentService si aspetta un percorso di file invece di un URI.
+    //      Se FileStreamerIntentService legge il file, dovrai passargli l'URI
+    //      e farlo leggere usando ContentResolver)
+
+
+    // Modifica ReadFileAsyncTask per accettare Uri invece di File
+    private static class ReadFileAsyncTask extends AsyncTask<Uri, Integer, Integer> { // Modificato File in Uri
+
+        @Override
+        protected void onPreExecute(){
+            FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_READING);
+            // this.initFileSenderListener(); // Rimuovi se initFileSenderListener non è necessario o è gestito altrove
+            FileSenderListener.getInstance().clearGcodeCommands(); // Pulisci i comandi precedenti
+            FileSenderListener.getInstance().setTotalLines(0);
+        }
+
+        @Override
+        protected Integer doInBackground(Uri... uris){ // Modificato File in Uri
+            Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+            if (uris == null || uris.length == 0 || uris[0] == null) {
+                return 0;
+            }
+            Uri fileUri = uris[0];
+            Integer lines = 0;
+            FileSenderListener listener = FileSenderListener.getInstance();
+
+            try {
+                // Usa ContentResolver per aprire un InputStream per l'URI
+                ParcelFileDescriptor pfd = GrblController.getAppContext().getContentResolver().openFileDescriptor(fileUri, "r");
+                if (pfd == null) {
+                    Log.e(TAG, "ParcelFileDescriptor is null for URI: " + fileUri);
+                    return 0; // O gestisci l'errore diversamente
+                }
+                FileInputStream fileInputStream = new FileInputStream(pfd.getFileDescriptor());
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream));
+
+                String line;
+                Pattern pattern = Pattern.compile(Constants.GRBL_COMMAND_STRIP_REGEX);
+
+                while((line = bufferedReader.readLine()) != null){
+                    if(isCancelled()) break; // Controlla se il task è stato annullato
+
+                    line = line.trim();
+                    String strippedLine = pattern.matcher(line).replaceAll("").toUpperCase(); // Applica la regex come prima
+
+                    if(!strippedLine.isEmpty()){
+                        // Aggiungi GcodeCommand come prima
+                        listener.getGcodeCommands().add(new GcodeCommand(strippedLine, false));
+                        lines++;
+                        if(lines % 100 == 0){ // Aggiorna il progresso ogni 100 linee
+                            publishProgress(lines);
+                        }
+                    }
+                }
+                bufferedReader.close();
+                fileInputStream.close();
+                pfd.close();
+
+            } catch (IOException e) {
+                Log.e(TAG, "Error reading file from URI", e);
+                EventBus.getDefault().post(new UiToastEvent("Error reading file: " + e.getMessage(), true, true));
+                return -1; // Indica un errore
+            } catch (SecurityException e) {
+                Log.e(TAG, "Security exception reading file from URI", e);
+                EventBus.getDefault().post(new UiToastEvent("Permission denied to read file: " + e.getMessage(), true, true));
+                return -1; // Indica un errore
+            }
+            return lines;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... progress){
+            FileSenderListener.getInstance().setTotalLines(progress[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Integer result){
+            if (result == -1) { // Errore durante la lettura
+                FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_IDLE); // O uno stato di errore
+                FileSenderListener.getInstance().setTotalLines(0);
+                FileSenderListener.getInstance().clearGcodeCommands();
+                // Non cancellare gcodeFileUri qui, l'utente potrebbe voler riprovare o il file è ancora selezionato
+            } else if (result == 0 && FileSenderListener.getInstance().getGcodeCommands().isEmpty()) {
+                FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_IDLE);
+                FileSenderListener.getInstance().setTotalLines(0);
+                EventBus.getDefault().post(new UiToastEvent("Selected file is empty or contains no G-code commands.", true, true));
+            } else {
+                FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_LOADED); // O STATUS_IDLE se preferisci
+                FileSenderListener.getInstance().setTotalLines(result);
+                EventBus.getDefault().post(new UiToastEvent(FileSenderListener.getInstance().getGcodeFileName() + " loaded: " + result + " lines.", false, true));
+            }
+        }
+    }
+}
+
+
+
+Modifiche necessarie in FileSenderListener.java:Dovrai aggiungere campi per memorizzare l'URI del file e il nome del file, e modificare come gestisci il "file G-code".
+
+
+
+
+
+public class FileSenderListener extends BaseObservable {
+    // ... (variabili esistenti)
+
+    // private File gcodeFile; // Commenta o rimuovi
+    private Uri gcodeFileUri;     // Nuovo campo per l'URI del file
+    private String gcodeFileName; // Nuovo campo per il nome del file (per la UI)
+
+    // ... (costruttore e altri metodi)
+
+    // Commenta o rimuovi il vecchio getter/setter per gcodeFile
+    /*
+    @Bindable
+    public File getGcodeFile() {
+        return gcodeFile;
+    }
+
+    public void setGcodeFile(File gcodeFile) {
+        this.gcodeFile = gcodeFile;
+        notifyPropertyChanged(BR.gcodeFile); // Assicurati che BR.gcodeFile esista o rimuovi
+        if (gcodeFile != null) {
+            notifyPropertyChanged(BR.gcodeFileName); // Aggiorna anche il nome se il binding lo usa
+        }
+    }
+    */
+
+    @Bindable
+    public Uri getGcodeFileUri() {
+        return gcodeFileUri;
+    }
+
+    public void setGcodeFileUri(Uri gcodeFileUri) {
+        this.gcodeFileUri = gcodeFileUri;
+        notifyPropertyChanged(BR.gcodeFileUri); // Avrai bisogno di un campo BR.gcodeFileUri
+    }
+
+    @Bindable
+    public String getGcodeFileName() {
+        // Se gcodeFileName non è impostato esplicitamente, prova a derivarlo o restituisci un default
+        if (gcodeFileName != null && !gcodeFileName.isEmpty()) {
+            return gcodeFileName;
+        }
+        // Rimuovi la dipendenza da gcodeFile se non esiste più
+        // if (gcodeFile != null) {
+        // return gcodeFile.getName();
+        // }
+        return "No file selected";
+    }
+
+    public void setGcodeFileName(String gcodeFileName) {
+        this.gcodeFileName = gcodeFileName;
+        notifyPropertyChanged(BR.gcodeFileName); // Avrai bisogno di un campo BR.gcodeFileName
+    }
+
+    public void clearGcodeCommands() {
+        if (gcodeCommands != null) {
+            gcodeCommands.clear();
+        }
+        // ... (eventuali altre pulizie necessarie)
+    }
+
+    // ... (il resto della classe)
+}
+
+
+Spiegazione delle modifiche:1.ActivityResultLauncher<Intent> openFileLauncher: Simile a createFileLauncher, questo gestisce il risultato dell'intent ACTION_OPEN_DOCUMENT.2.launchOpenFileIntent():•Crea un Intent con ACTION_OPEN_DOCUMENT. Questo avvia il selettore di file di sistema per permettere all'utente di scegliere un file.•intent.addCategory(Intent.CATEGORY_OPENABLE): Indica che il file deve essere apribile.•intent.setType("*/*"): Permette all'utente di selezionare qualsiasi tipo di file. Puoi restringerlo se conosci i tipi MIME specifici per i file G-code (es. text/plain, o un tipo personalizzato se ne hai uno registrato).•openFileLauncher.launch(intent): Avvia l'intent.3.Callback di openFileLauncher:•Quando l'utente seleziona un file, questo callback riceve l'URI del file.•fileSender.setGcodeFileUri(uri): Salva l'URI nel tuo FileSenderListener.•getFileNameFromUri(uri): Un nuovo metodo helper per estrarre un nome file visualizzabile dall'URI (utile per la UI).•fileSender.setGcodeFileName(fileName): Salva il nome del file.•new ReadFileAsyncTask().execute(uri): Avvia l'AsyncTask per leggere il file usando l'URI.•sharedPref.edit().putString(getString(R.string.most_recent_selected_file_uri), uri.toString()).apply(): Salva l'URI dell'ultimo file selezionato nelle SharedPreferences per poterlo ricaricare all'avvio successivo.4.getFileNameFromUri(Uri uri):•Questo metodo tenta di ottenere il nome visualizzabile del file dal ContentResolver interrogando la colonna OpenableColumns.DISPLAY_NAME. Fornisce un fallback se non riesce.5.Modifiche in onCreateView:•Il OnClickListener per selectGcodeFile ora chiama launchOpenFileIntent() direttamente, senza più controllare i permessi di archiviazione legacy.•Il controllo in startStreaming ora verifica fileSender.getGcodeFileUri() == null.6.Modifiche in onCreate:•Aggiunto codice per tentare di caricare l'ultimo URI del file salvato all'avvio dell'app/fragment.7.ReadFileAsyncTask Modificato:•Ora accetta Uri come parametro invece di File.•doInBackground(Uri... uris):•Ottiene un ParcelFileDescriptor dall'URI usando GrblController.getAppContext().getContentResolver().openFileDescriptor(fileUri, "r") (modalità "r" per lettura).•Crea un FileInputStream dal FileDescriptor.•Il resto della logica di lettura (con BufferedReader, Pattern, ecc.) rimane sostanzialmente lo stesso, ma legge dal FileInputStream ottenuto tramite SAF.•È importante chiudere pfd, fileInputStream e bufferedReader in un blocco finally o usando try-with-resources (come mostrato implicitamente dalla chiusura dopo il loop).•onPreExecute e onPostExecute: Aggiornati per gestire lo stato di caricamento e i risultati in modo appropriato. Ho aggiunto clearGcodeCommands() e setTotalLines(0) in onPreExecute e una gestione degli errori più robusta in onPostExecute.8.Modifiche in FileSenderListener:•Rimosso/commentato il vecchio campo gcodeFile (di tipo File).•Aggiunti gcodeFileUri (tipo Uri) e gcodeFileName (tipo String).•Aggiunti i relativi getter e setter @Bindable (ricorda di aggiungere i campi BR.gcodeFileUri e BR.gcodeFileName se il tuo data binding li richiede, altrimenti rimuovi @Bindable e notifyPropertyChanged se non usi il data binding per questi specifici campi).•Il metodo getGcodeFileName() ora usa il campo gcodeFileName o fornisce un testo predefinito.9.Rimuovere i permessi di archiviazione (se non più necessari):•Se non accedi più direttamente ai percorsi dei file e usi SAF per tutte le operazioni sui file, potresti essere in grado di rimuovere <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/> e <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/> (quest'ultimo con android:maxSdkVersion="28" se lo avevi) dal tuo AndroidManifest.xml. SAF non richiede questi permessi perché l'utente concede l'accesso tramite il selettore.Importante - FileStreamerIntentService:Il codice sopra si occupa della selezione e della lettura del file nel FileSenderTabFragment. Tuttavia, se FileStreamerIntentService è responsabile dell'effettivo streaming del file e si aspetta un String filePath o un oggetto File, dovrai modificarlo significativamente.•Opzione 1 (Preferita per coerenza SAF): Modifica FileStreamerIntentService per accettare l'URI del file (come stringa) nell'Intent. All'interno del servizio, usa getContentResolver().openInputStream(uri) per ottenere un InputStream e leggere i dati del file da lì, proprio come fa ReadFileAsyncTask. Questo mantiene l'accesso al file incapsulato tramite SAF.•Opzione 2 (Meno ideale, potrebbe richiedere la copia del file): Se modificare FileStreamerIntentService è troppo complesso, potresti, dopo aver letto il file in ReadFileAsyncTask, salvare temporaneamente il contenuto in un file nella cache interna dell'app (getContext().getCacheDir()) e passare il percorso di quel file cache al servizio. Questo aggiunge un passaggio di copia e complessità.Dato che ReadFileAsyncTask già legge e analizza l'intero file in listener.getGcodeCommands(), FileStreamerIntentService probabilmente non ha bisogno di rileggere il file dall'URI, ma piuttosto di accedere alla lista di comandi G-code già preparata da FileSenderListener. Dovrai assicurarti che il servizio abbia accesso a questa lista (ad esempio, tramite FileSenderListener.getInstance().getGcodeCommands()).Ricorda di testare accuratamente dopo queste modifiche, specialmente il flusso di selezione, lettura e avvio dello streaming.

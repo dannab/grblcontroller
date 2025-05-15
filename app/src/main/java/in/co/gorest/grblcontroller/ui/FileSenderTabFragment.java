@@ -35,6 +35,24 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.app.Activity;
+import android.content.Intent;
+import android.database.Cursor; // Necessario per ottenere il nome del file dall'URI
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.os.ParcelFileDescriptor; // Per leggere con SAF
+import android.provider.OpenableColumns; // Per ottenere il nome del file
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.databinding.DataBindingUtil;
+
 
 import androidx.annotation.NonNull;
 import androidx.databinding.DataBindingUtil;
@@ -54,6 +72,15 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.regex.Pattern;
+
+import java.io.BufferedReader;
+import java.io.File; // Mantieni per compatibilità con la logica esistente di FileSenderListener se necessario
+import java.io.FileInputStream; // Per leggere dall'URI
+import java.io.InputStreamReader; // Per leggere dall'URI
+import java.io.IOException;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
 
 import in.co.gorest.grblcontroller.GrblController;
 import in.co.gorest.grblcontroller.R;
@@ -76,6 +103,8 @@ public class FileSenderTabFragment extends BaseFragment implements View.OnClickL
     private MachineStatusListener machineStatus;
     private FileSenderListener fileSender;
     private EnhancedSharedPreferences sharedPref;
+
+
 
     public FileSenderTabFragment() {}
 
