@@ -128,6 +128,14 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         Iconify.with(new FontAwesomeModule());
         setupTabLayout();
         checkPowerManagement();
+
+        //preference cam z step and deep to are set to zero to ensure that
+        // there are no unwanted z-dips in onboard cam operations
+        sharedPref.edit().putString(getString(R.string.preference_cam_z_step), "0").apply();
+        sharedPref.edit().putString(getString(R.string.preference_cam_z_deep), "0").apply();
+        //
+
+
     }
 
     private boolean hasPaidVersion() {
