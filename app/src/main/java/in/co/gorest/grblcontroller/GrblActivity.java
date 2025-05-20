@@ -133,7 +133,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         // there are no unwanted z-dips in onboard cam operations
         sharedPref.edit().putString(getString(R.string.preference_cam_z_step), "0").apply();
         sharedPref.edit().putString(getString(R.string.preference_cam_z_deep), "0").apply();
-        //
+
 
 
     }
@@ -162,6 +162,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         lastToast = null;
     }
 
+    @SuppressLint("MissingSuperCall")
     @Override
     public void onBackPressed(){ moveTaskToBack(true); }
 
