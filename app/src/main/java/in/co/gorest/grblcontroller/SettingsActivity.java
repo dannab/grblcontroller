@@ -26,6 +26,7 @@ import android.os.Bundle;
 import android.preference.PreferenceFragment;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.preference.PreferenceManager;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -44,6 +45,27 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_application_settings));
         getFragmentManager().beginTransaction().replace(android.R.id.content, new SettingsFragment()).commit();
+
+        /*
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+
+        // Imposta ZStep e ZDeep a "0" NELLE SHARED PREFERENCES ogni volta che l'app parte.
+        // CamTabFragment poi leggerà questi valori "0" dalle SharedPreferences al suo avvio.
+        editor.putString(getString(R.string.preference_cam_z_step), "0");
+        editor.putString(getString(R.string.preference_cam_z_deep), "0");
+
+        // Se hai altri campi CAM che vuoi resettare a valori specifici (diversi da "0")
+        // all'avvio dell'app, impostali qui nelle SharedPreferences.
+        // Ad esempio, per resettare camFeedRate al valore di Constants:
+        // editor.putString(getString(R.string.preference_cam_feed_rate), String.valueOf(Constants.CAM_FEED_RATE));
+
+        editor.apply();
+
+        System.out.println("SharedPreferences for ZStep and ZDeep set to 0 for this app session.");
+*/
+
+
     }
 
     public static class SettingsFragment extends PreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener {

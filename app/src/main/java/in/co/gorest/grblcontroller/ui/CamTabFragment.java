@@ -28,7 +28,6 @@ import android.os.ParcelFileDescriptor; // Importa ParcelFileDescriptor
 import androidx.activity.result.ActivityResultLauncher; // Importa ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts; // Importa ActivityResultContracts
 
-// ... altre importazioni
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
@@ -49,10 +48,9 @@ import com.joanzapata.iconify.widget.IconButton;
 
 import org.greenrobot.eventbus.EventBus;
 
-import java.io.File;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Objects;
 
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentCamTabBinding;
@@ -317,71 +315,70 @@ public class CamTabFragment extends BaseFragment {
         double cam_z_deep = Double.parseDouble(camZDeep.getText().toString().replaceAll("[^\\d.]", "") + "\n");
         double cam_feedrate = Double.parseDouble(camFeedRate.getText().toString().replaceAll("[^\\d.]", "") + "\n");
         double cam_tool_dia = Double.parseDouble(camToolDia.getText().toString().replaceAll("[^\\d.]", "") + "\n");
-        if(cam_z_step > cam_z_deep){
-            EventBus.getDefault().post(new UiToastEvent("error Z step greater than Z deep", true, true));
+
+        if(cam_z_step <= cam_z_deep){
+
+            double step_over= Double.parseDouble(camStepOver.getText().toString().replaceAll("[^\\d.]", ""));
+
+            String gcode="";
+            SimpleGcodeMaker gcodemaker;
+            gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
+            //gcodemaker = new SimpleGcodeMaker(0.0,0.0,30,30,-10.0, 0.7, 4.22, 5,1000,true);
+
+
+            switch (jobType){
+                case 0: //<item>rectangle facing feeding X</item>
+                    gcode=gcodemaker.snakeX(step_over,true);
+                    break;
+                case 1: //<item>rectangle facing feeding Y</item>
+                    gcode=gcodemaker.snakeY(step_over,true);
+                    break;
+                case 2: //<item>rectangle offset in</item>
+                    //only out at moment
+                    gcode=gcodemaker.cutRectangle(step_over,true);
+                    break;
+                case 3: //<item>rectangle offset out</item>
+                    gcode=gcodemaker.cutRectangle(step_over,true);
+                    break;
+                case 4: //<item>circle facing in</item>
+                    //only out at moment
+                    gcode=gcodemaker.circleCut(step_over,true);
+                    break;
+                case 5: //<item>circle facing out</item>
+                    gcode=gcodemaker.circleCut(step_over,true);
+                    break;
+                case 6: //<item>rectangle engraving</item>
+                    gcode=gcodemaker.cutRectangle(0.0,true);
+                    break;
+                case 7: //<item>circle engraving</item>
+                    gcode=gcodemaker.circleCut(0.0,true);
+                    break;
+                case 8: //<item>rectangle profile with cornering</item>
+                    gcode=gcodemaker.CorneringCut(cam_tool_dia);
+                    break;
+                case 9: //<item>cut on line</item>
+                    gcode=gcodemaker.lineCut ();
+            }
+
+
+            System.out.println(gcode); // Per il debug
+
+            // Invece di chiamare direttamente writeOnFile, avvia SAF
+            this.gcodeToSave = gcode; // Salva il gcode per usarlo nel callback
+            launchCreateFileIntent();
         }
+        else
+        {
+            EventBus.getDefault().post(new UiToastEvent(getString(R.string.error_z_step_greater_than_z_deep), true, true));
 
-        double step_over= Double.parseDouble(camStepOver.getText().toString().replaceAll("[^\\d.]", ""));
-
-        String gcode="";
-        SimpleGcodeMaker gcodemaker;
-        gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
-        //gcodemaker = new SimpleGcodeMaker(0.0,0.0,30,30,-10.0, 0.7, 4.22, 5,1000,true);
-
-
-        switch (jobType){
-            case 0: //<item>rectangle facing feeding X</item>
-                gcode=gcodemaker.snakeX(step_over,true);
-                break;
-            case 1: //<item>rectangle facing feeding Y</item>
-                gcode=gcodemaker.snakeY(step_over,true);
-                break;
-            case 2: //<item>rectangle offset in</item>
-                //only out at moment
-                gcode=gcodemaker.cutRectangle(step_over,true);
-                break;
-            case 3: //<item>rectangle offset out</item>
-                gcode=gcodemaker.cutRectangle(step_over,true);
-                break;
-            case 4: //<item>circle facing in</item>
-                //only out at moment
-                gcode=gcodemaker.circleCut(step_over,true);
-                break;
-            case 5: //<item>circle facing out</item>
-                gcode=gcodemaker.circleCut(step_over,true);
-                break;
-            case 6: //<item>rectangle engraving</item>
-                gcode=gcodemaker.cutRectangle(0.0,true);
-                break;
-            case 7: //<item>circle engraving</item>
-                gcode=gcodemaker.circleCut(0.0,true);
-                break;
-            case 8: //<item>rectangle profile with cornering</item>
-                gcode=gcodemaker.CorneringCut(cam_tool_dia);
-                break;
-            case 9: //<item>cut on line</item>
-                gcode=gcodemaker.lineCut ();
         }
-
-
-        System.out.println(gcode); // Per il debug
-
-        // Invece di chiamare direttamente writeOnFile, avvia SAF
-        this.gcodeToSave = gcode; // Salva il gcode per usarlo nel callback
-        launchCreateFileIntent();
     }
 
     private void launchCreateFileIntent() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/octet-stream"); // Tipo MIME generico per file G-code, puoi usare "text/plain" se preferisci
+        intent.setType("text/plain"); // Tipo MIME generico per file G-code, puoi usare "text/plain" se preferisci
         intent.putExtra(Intent.EXTRA_TITLE, "job1.nc"); // Nome file suggerito
-
-        // Potresti voler suggerire una directory iniziale se hai un URI salvato
-        // Uri initialUri = getSavedInitialDirectoryUri(); // Funzione da implementare se necessario
-        // if (initialUri != null) {
-        //    intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri);
-        // }
 
         createFileLauncher.launch(intent);
     }
@@ -408,39 +405,6 @@ public class CamTabFragment extends BaseFragment {
 
 
 
-   /* private void writeOnFile(String gcode){
-        //su file path gia in uso
-        String rootPath = "/storage/";
-
-        if(sharedPref.getBoolean(getString(R.string.preference_remember_last_file_location), true)){
-            String recentFile = sharedPref.getString(getString(R.string.most_recent_selected_file), null);
-            if(recentFile != null){
-                File f = new File(recentFile);
-                do{
-                    f = new File(Objects.requireNonNull(f.getParent()));
-                    rootPath = f.getAbsolutePath();
-                }while (!f.isDirectory());
-            }
-        }
-
-        //save gcode job on file ,save at last position of open file??
-        File jobFile;
-
-        jobFile = new File(rootPath, "job1.nc");
-
-        try {
-            FileOutputStream fos = new FileOutputStream(jobFile);
-            fos.write(gcode.getBytes());
-            fos.flush();
-            fos.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        EventBus.getDefault().post(new UiToastEvent("new job file at "+rootPath , true, true));
-
-    }*/
     private void setCamFrom() {
         if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
 

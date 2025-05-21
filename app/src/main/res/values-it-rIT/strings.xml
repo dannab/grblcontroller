@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Grbl Controller</string>
     <string name="text_yes_confirm">Sì</string>
     <string name="text_no_confirm">No</string>
     <string name="text_cancel">Annulla</string>
@@ -322,8 +321,8 @@
     <string name="text_cam_zstep_desc">il valore del passo z indica quanto verrà tagliato per ogni strato, questo valore verrà armonizzato per raggiungere la profondità totale con passaggi della stessa altezza</string>
 
 
-    <string name="text_cam_tool_dia">diametro utensile</string>
-    <string name="text_cam_tool_dia_desc">imposta il diametro dell\'utensile che verrà utilizzato per la profilatura di un rettangolo con smussatura degli angoli</string>
+    <string name="text_cam_tool_dia">Raggio utensile</string>
+    <string name="text_cam_tool_dia_desc">imposta il raggio dell\'utensile che verrà utilizzato per la profilatura di un rettangolo con smussatura degli angoli</string>
 
     <string name="text_cam_title_help">Crea percorso utensile semplice</string>
     <string name="text_cam_help">"Crea vari percorsi utensile "</string>
@@ -332,7 +331,7 @@
 
     <string name="set_coord_to">Punto 2</string>
     <string name="set_coord_from">Punto 1</string>
-    <string name="tool_diameter_for_cornering">Diametro punta(per scontornatura)</string>
+    <string name="tool_diameter_for_cornering">Raggio punta(per scontornatura)</string>
     <string name="z_deep">Profondita totale</string>
     <string name="z_step">profondità per passata</string>
     <string name="z_traversal">altezza attraversamento</string>
@@ -340,6 +339,7 @@
     <string name="text_cam_feed_rate">Velocità di Avanzamento</string>
     <string name="job_type">Tipo di lavoro</string>
     <string name="on_the_fly_cam">CAM al volo</string>
+    <string name="error_z_step_greater_than_z_deep">Attenzione Z step piu\' grande di Z deep controlla e riprova</string>
 
     <string-array name="job_type_list">
         <item>spianatura rettangolare avanzamento X</item>
