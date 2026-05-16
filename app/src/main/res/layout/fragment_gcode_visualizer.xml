@@ -1,0 +1,84 @@
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+        <variable name="machineStatus" type="in.co.gorest.grblcontroller.listeners.MachineStatusListener" />
+        <variable name="fileSender" type="in.co.gorest.grblcontroller.listeners.FileSenderListener" />
+    </data>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000">
+
+        <!-- GLSurfaceView: occupa tutto lo spazio disponibile -->
+        <android.opengl.GLSurfaceView
+            android:id="@+id/glSurfaceView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Overlay info: dimensioni oggetto, in basso a sinistra -->
+        <TextView
+            android:id="@+id/tvDimensions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="8dp"
+            android:padding="4dp"
+            android:background="#80000000"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:text='@{fileSender.rowsSent.toString() + " / " + fileSender.rowsInFile.toString()}'
+            tools:text="0 / 0" />
+
+        <!-- Toolbar in alto: pulsanti reset vista e zoom fit + stato GRBL -->
+        <LinearLayout
+            android:id="@+id/toolbarVisualizer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:orientation="horizontal"
+            android:background="#CC111111"
+            android:padding="4dp">
+
+            <ImageButton
+                android:id="@+id/btnResetView"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Reset vista" />
+
+            <ImageButton
+                android:id="@+id/btnZoomFit"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_zoom"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Zoom adatta" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <!-- Stato GRBL + righe inviate -->
+            <TextView
+                android:id="@+id/tvGrblStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="8dp"
+                android:textColor="#44FF44"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:text="@{machineStatus.state}"
+                tools:text="DISCONNECTED" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</layout>

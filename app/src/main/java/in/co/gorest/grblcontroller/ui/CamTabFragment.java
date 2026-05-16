@@ -1,32 +1,12 @@
-/*
- *  /**
- *  * Copyright (C) 2017  Grbl Controller Contributors
- *  *
- *  * This program is free software; you can redistribute it and/or modify
- *  * it under the terms of the GNU General Public License as published by
- *  * the Free Software Foundation; either version 2 of the License, or
- *  * (at your option) any later version.
- *  *
- *  * This program is distributed in the hope that it will be useful,
- *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  * GNU General Public License for more details.
- *  *
- *  * You should have received a copy of the GNU General Public License along
- *  * with this program; if not, write to the Free Software Foundation, Inc.,
- *  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *  * <http://www.gnu.org/licenses/>
- *
- */
-
 package in.co.gorest.grblcontroller.ui;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.ParcelFileDescriptor; // Importa ParcelFileDescriptor
-import androidx.activity.result.ActivityResultLauncher; // Importa ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts; // Importa ActivityResultContracts
+import android.os.ParcelFileDescriptor;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -48,9 +28,9 @@ import com.joanzapata.iconify.widget.IconButton;
 
 import org.greenrobot.eventbus.EventBus;
 
-
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Locale;
 
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentCamTabBinding;
@@ -62,11 +42,8 @@ import in.co.gorest.grblcontroller.util.SimpleGcodeMaker;
 
 public class CamTabFragment extends BaseFragment {
 
-    //private static final String TAG = FacingTabFragment.class.getSimpleName();
     private MachineStatusListener machineStatus;
     private EnhancedSharedPreferences sharedPref;
-    //private FileSenderListener fileSender;
-
 
     private TextView camFeedRate;
     private TextView camZTraversal;
@@ -77,29 +54,30 @@ public class CamTabFragment extends BaseFragment {
     private TextView camToText;
     private TextView camToolDia;
     private String editIcon;
-    private Double Xto = 0.0;
-    private Double Yto = 0.0;
-    private Double Zto  = 0.0;
-    private Double Xfrom = 0.0;
-    private Double Yfrom = 0.0;
-    private Double Zfrom = 0.0;
-    private int jobType=0;
 
-    private String gcodeToSave; // Variabile per memorizzare temporaneamente il gcode
+    private Double Xto   = 0.0, Yto   = 0.0, Zto   = 0.0;
+    private Double Xfrom = 0.0, Yfrom = 0.0, Zfrom = 0.0;
+    private int jobType = 0;
 
-    //double Ztraversal=0.0;
+    // Flag: l'utente ha esplicitamente impostato From e To
+    private boolean fromSet = false;
+    private boolean toSet   = false;
+
+    private String gcodeToSave;
+
     private final ActivityResultLauncher<Intent> createFileLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
-                        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        if (result.getResultCode() == Activity.RESULT_OK
+                                && result.getData() != null) {
                             Uri uri = result.getData().getData();
                             if (uri != null && gcodeToSave != null) {
                                 writeGcodeToUri(uri, gcodeToSave);
-                                gcodeToSave = null; // Resetta dopo il salvataggio
+                                gcodeToSave = null;
                             }
                         } else {
-                            // L'utente ha annullato o c'è stato un errore
-                            EventBus.getDefault().post(new UiToastEvent("Salvataggio file annullato.", true, true));
+                            EventBus.getDefault().post(
+                                    new UiToastEvent("Salvataggio file annullato.", true, true));
                         }
                     });
 
@@ -109,576 +87,378 @@ public class CamTabFragment extends BaseFragment {
         return new CamTabFragment();
     }
 
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         machineStatus = MachineStatusListener.getInstance();
-        //fileSender = FileSenderListener.getInstance();
-        sharedPref = EnhancedSharedPreferences.getInstance(requireActivity().getApplicationContext(), getString(R.string.shared_preference_key));
-
-        //if(GrblActivity.isTablet(getActivity())){
-        //    this.editIcon = " {fa-edit 22sp}";
-        //}else{
+        sharedPref = EnhancedSharedPreferences.getInstance(
+                requireActivity().getApplicationContext(),
+                getString(R.string.shared_preference_key));
         this.editIcon = " {fa-edit 16sp}";
-        //}
-
-        //EventBus.getDefault().register(this);
     }
 
-    @Override
-    public void onDestroy(){
-        super.onDestroy();
-        EventBus.getDefault().unregister(this);
-    }
+    // NOTA: EventBus non è usato in questo fragment — rimossi register/unregister
+    // per evitare crash da unregister senza register corrispondente.
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             ViewGroup container,
+                             Bundle savedInstanceState) {
 
-
-        FragmentCamTabBinding binding = DataBindingUtil.inflate(inflater, R.layout.fragment_cam_tab, container, false);
+        FragmentCamTabBinding binding = DataBindingUtil.inflate(
+                inflater, R.layout.fragment_cam_tab, container, false);
         binding.setMachineStatus(machineStatus);
         View view = binding.getRoot();
 
-
-
-        final RelativeLayout camFeedRateView = view.findViewById(R.id.cam_feed_rate_view);
-        camFeedRateView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamFeedRate();
-            }
-        });
-
-        RelativeLayout camZTraversalView = view.findViewById(R.id.cam_z_traversal_view);
-        camZTraversalView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamZTraversal();
-            }
-        });
-
-        final RelativeLayout camStepOverView = view.findViewById(R.id.cam_step_over_view);
-        camStepOverView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamStepOver();
-            }
-        });
-        final RelativeLayout camZdeepView = view.findViewById(R.id.cam_z_deep_view);
-        camZdeepView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamZDeep();
-            }
-        });
-        final RelativeLayout camZstepView = view.findViewById(R.id.cam_z_step_view);
-        camZstepView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamZStep();
-            }
-        });
-        final RelativeLayout camToolDiaView = view.findViewById(R.id.cam_tool_dia_view);
-        camToolDiaView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setCamToolDia();
-            }
-        });
-
-        final Spinner jobTypeSpinner = view.findViewById(R.id.job_type_spinner);
-        jobTypeSpinner.setOnItemSelectedListener(new Spinner.OnItemSelectedListener() {
-
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                //value = parent.getItemAtPosition(position);
-                //switch (position) {
-                jobType=position;
-
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                jobType=0;
-
-            }
-        });
-
-
-        camFromText = view.findViewById(R.id.cam_from_text);
-        camToText = view.findViewById(R.id.cam_to_text);
-
-        camFeedRate = view.findViewById(R.id.cam_feed_rate);
-        camFeedRate.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate), String.valueOf(Constants.CAM_FEED_RATE)) + this.editIcon);
-
+        // --- Viste ---
+        camFromText   = view.findViewById(R.id.cam_from_text);
+        camToText     = view.findViewById(R.id.cam_to_text);
+        camFeedRate   = view.findViewById(R.id.cam_feed_rate);
         camZTraversal = view.findViewById(R.id.cam_z_traversal);
-        camZTraversal.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal), String.valueOf(Constants.CAM_TRAVERSAL)) + this.editIcon);
+        camStepOver   = view.findViewById(R.id.cam_step_over);
+        camZDeep      = view.findViewById(R.id.cam_z_deep);
+        camZStep      = view.findViewById(R.id.cam_z_step);
+        camToolDia    = view.findViewById(R.id.cam_tool_dia);
 
-        camStepOver = view.findViewById(R.id.cam_step_over);
-        camStepOver.setText(sharedPref.getString(getString(R.string.preference_cam_step_over), String.valueOf(Constants.CAM_STEP_OVER)) + this.editIcon);
+        // --- Valori iniziali da SharedPreferences ---
+        camFeedRate.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate),
+                String.valueOf(Constants.CAM_FEED_RATE)) + editIcon);
+        camZTraversal.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal),
+                String.valueOf(Constants.CAM_TRAVERSAL)) + editIcon);
+        camStepOver.setText(sharedPref.getString(getString(R.string.preference_cam_step_over),
+                String.valueOf(Constants.CAM_STEP_OVER)) + editIcon);
+        camZDeep.setText(sharedPref.getString(getString(R.string.preference_cam_z_deep),
+                String.valueOf(Constants.CAM_ZDEEP)) + editIcon);
+        camZStep.setText(sharedPref.getString(getString(R.string.preference_cam_z_step),
+                String.valueOf(Constants.CAM_ZSTEP)) + editIcon);
+        camToolDia.setText(sharedPref.getString(getString(R.string.preference_cam_tool_dia),
+                String.valueOf(Constants.CAM_TOOL_DIA)) + editIcon);
 
-        camZDeep = view.findViewById(R.id.cam_z_deep);
-        camZDeep.setText(sharedPref.getString(getString(R.string.preference_cam_z_deep), String.valueOf(Constants.CAM_ZDEEP)) + this.editIcon);
+        // --- Click sui campi editabili ---
+        view.findViewById(R.id.cam_feed_rate_view).setOnClickListener(v -> setCamFeedRate());
+        view.findViewById(R.id.cam_z_traversal_view).setOnClickListener(v -> setCamZTraversal());
+        view.findViewById(R.id.cam_step_over_view).setOnClickListener(v -> setCamStepOver());
+        view.findViewById(R.id.cam_z_deep_view).setOnClickListener(v -> setCamZDeep());
+        view.findViewById(R.id.cam_z_step_view).setOnClickListener(v -> setCamZStep());
+        view.findViewById(R.id.cam_tool_dia_view).setOnClickListener(v -> setCamToolDia());
 
-        camZStep = view.findViewById(R.id.cam_z_step);
-        camZStep.setText(sharedPref.getString(getString(R.string.preference_cam_z_step), String.valueOf(Constants.CAM_ZSTEP)) + this.editIcon);
-
-        camToolDia = view.findViewById(R.id.cam_tool_dia);
-        camToolDia.setText(sharedPref.getString(getString(R.string.preference_cam_tool_dia), String.valueOf(Constants.CAM_TOOL_DIA)) + this.editIcon);
-
-
-
-        //
-        IconButton startCamCalc = view.findViewById(R.id.start_cam_calc);
-        startCamCalc.setOnClickListener(new View.OnClickListener() {
+        // --- Spinner tipo lavorazione ---
+        Spinner jobTypeSpinner = view.findViewById(R.id.job_type_spinner);
+        jobTypeSpinner.setOnItemSelectedListener(new Spinner.OnItemSelectedListener() {
             @Override
-            public void onClick(View view) {
+            public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
+                jobType = position;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { jobType = 0; }
+        });
+
+        // --- Pulsante calcola ---
+        IconButton startCamCalc = view.findViewById(R.id.start_cam_calc);
+        startCamCalc.setOnClickListener(v ->
                 new AlertDialog.Builder(getActivity())
                         .setTitle(getString(R.string.text_start_cam_calc))
                         .setMessage(getString(R.string.text_start_cam_calc_desc))
-                        .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                doCamCalculation();
-                            }
-                        })
+                        .setPositiveButton(getString(R.string.text_yes_confirm),
+                                (d, w) -> doCamCalculation())
                         .setNegativeButton(getString(R.string.text_cancel), null)
-                        .show();
+                        .show());
 
-            }
-
-
-        });
-
-
-
+        // --- Pulsante From ---
         IconButton camFrom = view.findViewById(R.id.cam_from);
-        camFrom.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-
-
+        camFrom.setOnClickListener(v ->
                 new AlertDialog.Builder(getActivity())
                         .setTitle(getString(R.string.text_cam_from_title))
                         .setMessage(getString(R.string.text_cam_from_message))
-                        .setPositiveButton(getString(R.string.text_ok), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                setCamFrom();
-                            }
-                        })
+                        .setPositiveButton(getString(R.string.text_ok), (d, w) -> setCamFrom())
                         .setNegativeButton(getString(R.string.text_cancel), null)
-                        .show();
-            }
-        });
+                        .show());
 
+        // --- Pulsante To ---
         IconButton camTo = view.findViewById(R.id.cam_to);
-        camTo.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-
+        camTo.setOnClickListener(v ->
                 new AlertDialog.Builder(getActivity())
                         .setTitle(getString(R.string.text_cam_to_title))
                         .setMessage(getString(R.string.text_cam_to_message))
-                        .setPositiveButton(getString(R.string.text_ok), new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                setCamTo();
-                            }
-                        })
+                        .setPositiveButton(getString(R.string.text_ok), (d, w) -> setCamTo())
                         .setNegativeButton(getString(R.string.text_cancel), null)
-                        .show();
-            }
-        });
+                        .show());
 
-
-        RelativeLayout camHelp = view.findViewById(R.id.cam_help);
-        camHelp.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                showCamHelp();
-            }
-        });
+        // --- Help ---
+        view.findViewById(R.id.cam_help).setOnClickListener(v -> showCamHelp());
 
         return view;
     }
 
+    // -------------------------------------------------------------------------
+    // Calcolo GCode
+    // -------------------------------------------------------------------------
 
+    private void doCamCalculation() {
 
+        // Validazione: From e To devono essere stati impostati
+        if (!fromSet || !toSet) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Imposta prima i punti FROM e TO.", true, true));
+            return;
+        }
 
+        // Validazione: area non nulla
+        if (Xfrom.equals(Xto) && Yfrom.equals(Yto)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "FROM e TO coincidono — area di lavoro nulla.", true, true));
+            return;
+        }
 
-    private void doCamCalculation(){
+        try {
+            // FIX: parseSignedDouble conserva il segno meno (es. Z = -10.0)
+            double zTraversal = parseSignedDouble(camZTraversal);
+            double camZStepVal = parseSignedDouble(camZStep);
+            double camZDeepVal = parseSignedDouble(camZDeep);
+            double camFeedRateVal = parseSignedDouble(camFeedRate);
+            double camToolDiaVal = parseSignedDouble(camToolDia);
+            double stepOver = parseSignedDouble(camStepOver);
 
-        //if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
-
-        //mettere finestra per head e tail gcode
-
-        double Ztraversal = Double.parseDouble(camZTraversal.getText().toString().replaceAll("[^\\d.]", ""));
-        double cam_z_step = Double.parseDouble(camZStep.getText().toString().replaceAll("[^\\d.]", "") + "\n");
-        double cam_z_deep = Double.parseDouble(camZDeep.getText().toString().replaceAll("[^\\d.]", "") + "\n");
-        double cam_feedrate = Double.parseDouble(camFeedRate.getText().toString().replaceAll("[^\\d.]", "") + "\n");
-        double cam_tool_dia = Double.parseDouble(camToolDia.getText().toString().replaceAll("[^\\d.]", "") + "\n");
-
-        if(cam_z_step <= cam_z_deep){
-
-            double step_over= Double.parseDouble(camStepOver.getText().toString().replaceAll("[^\\d.]", ""));
-
-            String gcode="";
-            SimpleGcodeMaker gcodemaker;
-            gcodemaker = new SimpleGcodeMaker(Xfrom,Yfrom,Xto,Yto,Zfrom, cam_z_step, cam_z_deep,Ztraversal, cam_feedrate,true);
-            //gcodemaker = new SimpleGcodeMaker(0.0,0.0,30,30,-10.0, 0.7, 4.22, 5,1000,true);
-
-
-            switch (jobType){
-                case 0: //<item>rectangle facing feeding X</item>
-                    gcode=gcodemaker.snakeX(step_over,true);
-                    break;
-                case 1: //<item>rectangle facing feeding Y</item>
-                    gcode=gcodemaker.snakeY(step_over,true);
-                    break;
-                case 2: //<item>rectangle offset in</item>
-                    //only out at moment
-                    gcode=gcodemaker.cutRectangle(step_over,true);
-                    break;
-                case 3: //<item>rectangle offset out</item>
-                    gcode=gcodemaker.cutRectangle(step_over,true);
-                    break;
-                case 4: //<item>circle facing in</item>
-                    //only out at moment
-                    gcode=gcodemaker.circleCut(step_over,true);
-                    break;
-                case 5: //<item>circle facing out</item>
-                    gcode=gcodemaker.circleCut(step_over,true);
-                    break;
-                case 6: //<item>rectangle engraving</item>
-                    gcode=gcodemaker.cutRectangle(0.0,true);
-                    break;
-                case 7: //<item>circle engraving</item>
-                    gcode=gcodemaker.circleCut(0.0,true);
-                    break;
-                case 8: //<item>rectangle profile with cornering</item>
-                    gcode=gcodemaker.CorneringCut(cam_tool_dia);
-                    break;
-                case 9: //<item>cut on line</item>
-                    gcode=gcodemaker.lineCut ();
+            if (camZStepVal <= camZDeepVal) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        getString(R.string.error_z_step_greater_than_z_deep), true, true));
+                return;
             }
 
+            SimpleGcodeMaker gcodemaker = new SimpleGcodeMaker(
+                    Xfrom, Yfrom, Xto, Yto, Zfrom,
+                    camZStepVal, camZDeepVal, zTraversal,
+                    camFeedRateVal / 2, camFeedRateVal, true);
 
-            System.out.println(gcode); // Per il debug
+            String gcode;
+            switch (jobType) {
+                case 0:  gcode = gcodemaker.snakeX(stepOver, true); break;
+                case 1:  gcode = gcodemaker.snakeY(stepOver, true); break;
+                case 2:  gcode = gcodemaker.cutRectangle(stepOver, true, true); break;
+                case 3:  gcode = gcodemaker.cutRectangle(stepOver, true, false); break;
+                case 4:  gcode = gcodemaker.circleCut(stepOver, true, true); break;
+                case 5:  gcode = gcodemaker.circleCut(stepOver, true, false); break;
+                case 6:  gcode = gcodemaker.cutRectangleContour(true); break;
+                case 7:  gcode = gcodemaker.circleCut(0.0, true, true); break;
+                case 8:  gcode = gcodemaker.corneringCut(camToolDiaVal); break;
+                case 9:  gcode = gcodemaker.lineCut(); break;
+                default: gcode = ""; break;
+            }
 
-            // Invece di chiamare direttamente writeOnFile, avvia SAF
-            this.gcodeToSave = gcode; // Salva il gcode per usarlo nel callback
+            if (gcode.isEmpty()) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        "Nessun GCode generato.", true, true));
+                return;
+            }
+
+            this.gcodeToSave = gcode;
             launchCreateFileIntent();
-        }
-        else
-        {
-            EventBus.getDefault().post(new UiToastEvent(getString(R.string.error_z_step_greater_than_z_deep), true, true));
 
+        } catch (NumberFormatException e) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Valore non valido nei parametri CAM: " + e.getMessage(), true, true));
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Parsing numeri con segno — FIX principale rispetto all'originale
+    // -------------------------------------------------------------------------
+
+    /**
+     * Estrae il valore numerico da una TextView che contiene anche icone FontAwesome.
+     * A differenza dell'originale, conserva il segno meno per valori negativi (es. Z=-10).
+     */
+    private double parseSignedDouble(TextView tv) throws NumberFormatException {
+        String raw = tv.getText().toString();
+        // Rimuovi tutto tranne cifre, punto decimale e segno meno iniziale
+        raw = raw.replaceAll("[^\\d.\\-]", "").trim();
+        // Se ci sono più segni meno (artefatto), tieni solo il primo carattere se è -
+        if (raw.indexOf('-') > 0) {
+            raw = raw.replaceAll("-", "");
+        }
+        if (raw.isEmpty()) throw new NumberFormatException("Campo vuoto");
+        return Double.parseDouble(raw);
+    }
+
+    // -------------------------------------------------------------------------
+    // SAF — salvataggio file
+    // -------------------------------------------------------------------------
 
     private void launchCreateFileIntent() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/plain"); // Tipo MIME generico per file G-code, puoi usare "text/plain" se preferisci
-        intent.putExtra(Intent.EXTRA_TITLE, "job1.nc"); // Nome file suggerito
-
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, "job1.nc");
         createFileLauncher.launch(intent);
     }
 
     private void writeGcodeToUri(Uri uri, String gcodeData) {
         try {
-            // Utilizza il ContentResolver per aprire un ParcelFileDescriptor
-            ParcelFileDescriptor pfd = requireActivity().getContentResolver().openFileDescriptor(uri, "w"); // "w" per scrivere
+            ParcelFileDescriptor pfd = requireActivity()
+                    .getContentResolver().openFileDescriptor(uri, "w");
             if (pfd != null) {
-                FileOutputStream fileOutputStream = new FileOutputStream(pfd.getFileDescriptor());
-                fileOutputStream.write(gcodeData.getBytes());
-                fileOutputStream.close();
+                FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor());
+                fos.write(gcodeData.getBytes());
+                fos.close();
                 pfd.close();
-                EventBus.getDefault().post(new UiToastEvent("Nuovo file job salvato in: " + uri.getPath(), true, true));
-            } else {
-                EventBus.getDefault().post(new UiToastEvent("Errore durante l'apertura del file per la scrittura.", true, true));
+                EventBus.getDefault().post(new UiToastEvent(
+                        "File salvato: " + uri.getLastPathSegment(), true, true));
             }
         } catch (IOException e) {
-            e.printStackTrace();
-            EventBus.getDefault().post(new UiToastEvent("Errore durante la scrittura del file: " + e.getMessage(), true, true));
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Errore scrittura file: " + e.getMessage(), true, true));
         }
     }
 
-
-
+    // -------------------------------------------------------------------------
+    // Impostazione From / To
+    // -------------------------------------------------------------------------
 
     private void setCamFrom() {
-        if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
-
+        if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
             Xfrom = machineStatus.getWorkPosition().getCordX();
             Yfrom = machineStatus.getWorkPosition().getCordY();
             Zfrom = machineStatus.getWorkPosition().getCordZ();
-            camFromText.setText(String.valueOf(Xfrom)+','+String.valueOf(Yfrom)+','+String.valueOf(Zfrom));
-            System.out.println(Xfrom);
-
-
-        }else{
-            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_machine_not_idle), true, true));
+            fromSet = true;
+            camFromText.setText(String.format(Locale.US, "%.3f, %.3f, %.3f", Xfrom, Yfrom, Zfrom));
+        } else {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_machine_not_idle), true, true));
         }
     }
 
-
     private void setCamTo() {
-        if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)){
+        if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
             Xto = machineStatus.getWorkPosition().getCordX();
             Yto = machineStatus.getWorkPosition().getCordY();
             Zto = machineStatus.getWorkPosition().getCordZ();
-            camToText.setText(String.valueOf(Xto)+','+String.valueOf(Yto)+','+String.valueOf(Zto));
-
-
-        }else{
-            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_machine_not_idle), true, true));
+            toSet = true;
+            camToText.setText(String.format(Locale.US, "%.3f, %.3f, %.3f", Xto, Yto, Zto));
+        } else {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_machine_not_idle), true, true));
         }
     }
 
-    private void setCamFeedRate(){
+    // -------------------------------------------------------------------------
+    // Dialog impostazioni parametri
+    // -------------------------------------------------------------------------
+
+    private void setCamFeedRate() {
+        showDecimalDialog(
+                getString(R.string.text_cam_feedrate_title),
+                getString(R.string.text_cam_feedrate_message),
+                sharedPref.getString(getString(R.string.preference_cam_feed_rate), "1000.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_feed_rate), value).apply();
+                    camFeedRate.setText(value + editIcon);
+                });
+    }
+
+    private void setCamZTraversal() {
+        showDecimalDialog(
+                getString(R.string.text_cam_traversal_title),
+                getString(R.string.text_cam_traversal_message),
+                sharedPref.getString(getString(R.string.preference_cam_z_traversal), "5.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_z_traversal), value).apply();
+                    camZTraversal.setText(value + editIcon);
+                });
+    }
+
+    private void setCamStepOver() {
+        showDecimalDialog(
+                getString(R.string.text_cam_step_over_title),
+                getString(R.string.text_cam_step_over_message),
+                sharedPref.getString(getString(R.string.preference_cam_step_over), "1.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_step_over), value).apply();
+                    camStepOver.setText(value + editIcon);
+                });
+    }
+
+    private void setCamZDeep() {
+        showDecimalDialog(
+                getString(R.string.text_facing_zdeep_title),
+                getString(R.string.text_facing_zdeep_message),
+                sharedPref.getString(getString(R.string.preference_cam_z_deep), "0.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_z_deep), value).apply();
+                    camZDeep.setText(value + editIcon);
+                });
+    }
+
+    private void setCamZStep() {
+        showDecimalDialog(
+                getString(R.string.cam_zstep_title),
+                getString(R.string.text_cam_zstep_desc),
+                sharedPref.getString(getString(R.string.preference_cam_z_step), "0.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_z_step), value).apply();
+                    camZStep.setText(value + editIcon);
+                });
+    }
+
+    private void setCamToolDia() {
+        showDecimalDialog(
+                getString(R.string.text_cam_tool_dia),
+                getString(R.string.text_cam_tool_dia_desc),
+                sharedPref.getString(getString(R.string.preference_cam_tool_dia), "10.0"),
+                (value) -> {
+                    sharedPref.edit().putString(getString(R.string.preference_cam_tool_dia), value).apply();
+                    camToolDia.setText(value + editIcon);
+                });
+    }
+
+    /**
+     * Dialog generica per input decimale — elimina la duplicazione di codice
+     * presente nell'originale (6 metodi quasi identici → 1 metodo parametrico).
+     */
+    private interface OnValueConfirmed { void onConfirmed(String value); }
+
+    private void showDecimalDialog(String title, String message,
+                                   String currentValue, OnValueConfirmed callback) {
         LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
+        View v = inflater.inflate(R.layout.dialog_input_decimal, null, false);
 
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_feedrate_title));
-        alertDialogBuilder.setMessage(getString(R.string.text_cam_feedrate_message));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate), "1000.0"));
+        EditText editText = v.findViewById(R.id.dialog_input_decimal);
+        editText.setText(currentValue);
         editText.setSelection(editText.getText().length());
 
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String feedrate = editText.getText().toString();
-                        if(feedrate.length() <=0) feedrate = "1";
-                        sharedPref.edit().putString(getString(R.string.preference_cam_feed_rate), feedrate).apply();
-                        camFeedRate.setText(feedrate  + faEditIcon);
-                    }
+        AlertDialog dialog = new AlertDialog.Builder(getActivity())
+                .setView(v)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(true)
+                .setPositiveButton(getString(R.string.text_yes_confirm), (d, id) -> {
+                    String val = editText.getText().toString().trim();
+                    if (val.isEmpty()) val = "0";
+                    callback.onConfirmed(val);
                 })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
+                .setNegativeButton(getString(R.string.text_cancel), null)
+                .create();
 
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         }
-
         dialog.show();
     }
 
-    private void setCamStepOver(){
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
+    // -------------------------------------------------------------------------
+    // Help
+    // -------------------------------------------------------------------------
 
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_step_over_title));
-        alertDialogBuilder.setMessage(getString(R.string.text_cam_step_over_message));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_step_over), "1.0"));
-        editText.setSelection(editText.getText().length());
-
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String stepover = editText.getText().toString();
-                        if(stepover.length() <=0) stepover = "1";
-                        sharedPref.edit().putString(getString(R.string.preference_cam_step_over), stepover).apply();
-                        camStepOver.setText(stepover  + faEditIcon);
-                    }
-                })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
-
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        }
-
-        dialog.show();
-    }
-
-    private void setCamZTraversal(){
-
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
-
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_traversal_title));
-        alertDialogBuilder.setMessage(getString(R.string.text_cam_traversal_message));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_traversal), "5.0"));
-        editText.setSelection(editText.getText().length());
-
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String ztraversal = editText.getText().toString();
-                        if(ztraversal.length() <=0) ztraversal = "1";
-                        sharedPref.edit().putString(getString(R.string.preference_cam_z_traversal), ztraversal).apply();
-                        camZTraversal.setText(ztraversal  + faEditIcon);
-                    }
-                })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
-
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        }
-
-        dialog.show();
-    }
-
-    private void setCamZDeep(){
-
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
-
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_facing_zdeep_title));
-        alertDialogBuilder.setMessage(getString(R.string.text_facing_zdeep_message));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_deep), "0.0"));
-        editText.setSelection(editText.getText().length());
-
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String zdeep = editText.getText().toString();
-                        sharedPref.edit().putString(getString(R.string.preference_cam_z_deep), zdeep).apply();
-                        camZDeep.setText(zdeep  + faEditIcon);
-                    }
-                })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
-
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        }
-
-        dialog.show();
-    }
-
-    private void setCamZStep(){
-
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
-
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.cam_zstep_title));
-        alertDialogBuilder.setMessage(getString(R.string.text_cam_zstep_desc));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_z_step), "0.0"));
-        editText.setSelection(editText.getText().length());
-
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String zstep = editText.getText().toString();
-                        sharedPref.edit().putString(getString(R.string.preference_cam_z_step), zstep).apply();
-                        camZStep.setText(zstep  + faEditIcon);
-                    }
-                })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
-
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        }
-
-        dialog.show();
-    }
-    private void setCamToolDia(){
-
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        final ViewGroup nullParent = null;
-        View v = inflater.inflate(R.layout.dialog_input_decimal, nullParent, false);
-
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
-        alertDialogBuilder.setView(v);
-        alertDialogBuilder.setTitle(getString(R.string.text_cam_tool_dia));
-        alertDialogBuilder.setMessage(getString(R.string.text_cam_tool_dia_desc));
-
-        final EditText editText = v.findViewById(R.id.dialog_input_decimal);
-        editText.setText(sharedPref.getString(getString(R.string.preference_cam_tool_dia), "10.0"));
-        editText.setSelection(editText.getText().length());
-
-        final String faEditIcon = this.editIcon;
-        alertDialogBuilder.setCancelable(true)
-                .setPositiveButton(getString(R.string.text_yes_confirm), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        String tooldia = editText.getText().toString();
-                        sharedPref.edit().putString(getString(R.string.preference_cam_tool_dia), tooldia).apply();
-                        camToolDia.setText(tooldia  + faEditIcon);
-                    }
-                })
-                .setNegativeButton(getString(R.string.text_cancel),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                dialog.cancel();
-                            }
-                        });
-
-        AlertDialog dialog = alertDialogBuilder.create();
-        if(dialog.getWindow() != null){
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        }
-
-        dialog.show();
-    }
-
-
-    private void showCamHelp(){
-        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity())
+    private void showCamHelp() {
+        new AlertDialog.Builder(getActivity())
                 .setTitle(getString(R.string.text_cam_title_help))
                 .setMessage(R.string.text_cam_help)
-                .setPositiveButton(getString(R.string.text_ok), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) { }
-                })
-                .setCancelable(false);
-
-        alertDialogBuilder.show();
+                .setPositiveButton(getString(R.string.text_ok), null)
+                .setCancelable(false)
+                .show();
     }
 }
-
