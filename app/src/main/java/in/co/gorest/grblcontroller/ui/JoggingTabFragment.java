@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2017 Grbl Controller Contributors
- * Modifications Copyright (C) 2025 Daniele Cicchinelli
+ * Copyright (C) 2017 Grbl Controller Contributors (zeevy)
+ * https://github.com/zeevy/grblcontroller
+ * Modifications Copyright (C) 2026 Daniele Cicchinelli
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +17,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  * <http://www.gnu.org/licenses/>
- *
- * Original project: GRBLController by zeevy
- * https://github.com/zeevy/grblcontroller
- * Modifications by Daniele Cicchinelli, 2025
  */
-
 package in.co.gorest.grblcontroller.ui;
 
 import android.annotation.SuppressLint;
@@ -91,6 +87,15 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      * i punti tra sessioni successive.
      */
     private String pointsCoords = "";
+
+    /**
+     * Valori possibili per il ciclo step XY e Z.
+     * Click breve cicla: 1.0 -> 0.1 -> 0.01 -> 1.0 ...
+     * Long click: imposta 1.0 direttamente.
+     */
+    private static final double[] STEP_CYCLE = {1.0, 0.1, 0.01};
+    private int stepCycleIndex = 0;
+    private IconButton btnStepCycle;
 
     public JoggingTabFragment() {}
 
@@ -166,16 +171,24 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         }
 
         for (int resourceId : new Integer[]{
-                R.id.jog_cancel, R.id.run_homing_cycle,
+                R.id.jog_cancel,
                 R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero}) {
             IconButton iconButton = view.findViewById(resourceId);
             iconButton.setOnLongClickListener(this);
         }
 
-        for (int resourceId : new Integer[]{R.id.run_homing_cycle, R.id.jog_cancel}) {
-            IconButton iconButton = view.findViewById(resourceId);
-            iconButton.setOnClickListener(this);
-        }
+        // jog_cancel: click breve = stop jog
+        view.findViewById(R.id.jog_cancel).setOnClickListener(this);
+
+        // btn_step_cycle: click breve = cicla step, long click = imposta 1.0
+        btnStepCycle = view.findViewById(R.id.btn_step_cycle);
+        updateStepCycleButton();
+        btnStepCycle.setOnClickListener(v -> cycleStep());
+        btnStepCycle.setOnLongClickListener(v -> {
+            stepCycleIndex = 0; // torna a 1.0
+            applyStep(STEP_CYCLE[stepCycleIndex]);
+            return true;
+        });
 
         TableRow resetZeroLayout = view.findViewById(R.id.reset_zero_layout);
         for (int i = 0; i < resetZeroLayout.getChildCount(); i++) {
@@ -211,7 +224,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                         sendCommandIfIdle(GrblUtils.GRBL_VIEW_PARSER_STATE_COMMAND);
                         EventBus.getDefault().post(new UiToastEvent(
                                 getString(R.string.text_selected_coordinate_system)
-                                + view13.getTag().toString()));
+                                        + view13.getTag().toString()));
                     } else {
                         EventBus.getDefault().post(new UiToastEvent(
                                 getString(R.string.text_machine_not_idle), true, true));
@@ -264,23 +277,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 this.setJoggingStepAndFeed();
                 return;
 
-            case R.id.run_homing_cycle:
-                if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
-                        || machineStatus.getState().equals(Constants.MACHINE_STATUS_ALARM)) {
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(getString(R.string.text_homing_cycle))
-                            .setMessage(getString(R.string.text_do_homing_cycle))
-                            .setPositiveButton(getString(R.string.text_yes_confirm),
-                                    (dialog, which) -> fragmentInteractionListener
-                                            .onGcodeCommandReceived(GrblUtils.GRBL_RUN_HOMING_CYCLE))
-                            .setNegativeButton(getString(R.string.text_no_confirm), null)
-                            .show();
-                } else {
-                    EventBus.getDefault().post(new UiToastEvent(
-                            getString(R.string.text_machine_not_idle), true, true));
-                }
-                break;
-
             case R.id.jog_cancel:
                 if (machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
                     fragmentInteractionListener.onGrblRealTimeCommandReceived(
@@ -328,29 +324,22 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         int id = view.getId();
 
         switch (id) {
-            case R.id.run_homing_cycle:
-                new AlertDialog.Builder(getActivity())
-                        .setTitle(getString(R.string.text_set_coordinate_system))
-                        .setMessage(getString(R.string.text_set_all_axes_zero))
-                        .setPositiveButton(getString(R.string.text_yes_confirm),
-                                (dialog, which) -> sendCommandIfIdle(
-                                        GrblUtils.GCODE_RESET_COORDINATES_TO_ZERO))
-                        .setNegativeButton(getString(R.string.text_no_confirm), null)
-                        .show();
-                return true;
-
             case R.id.jog_cancel:
-                new AlertDialog.Builder(getActivity())
-                        .setTitle(getString(R.string.text_return_to_zero_position))
-                        .setMessage(getString(R.string.text_go_to_zero_position_in_current_wpos))
-                        .setPositiveButton(getString(R.string.text_yes_confirm),
-                                (dialog, which) -> {
-                                    for (String gCommand : GrblUtils.getReturnToHomeCommands()) {
-                                        sendCommandIfIdle(gCommand);
-                                    }
-                                })
-                        .setNegativeButton(getString(R.string.text_no_confirm), null)
-                        .show();
+                // Long click: homing cycle (spostato da run_homing_cycle)
+                if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
+                        || machineStatus.getState().equals(Constants.MACHINE_STATUS_ALARM)) {
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(getString(R.string.text_homing_cycle))
+                            .setMessage(getString(R.string.text_do_homing_cycle))
+                            .setPositiveButton(getString(R.string.text_yes_confirm),
+                                    (dialog, which) -> fragmentInteractionListener
+                                            .onGcodeCommandReceived(GrblUtils.GRBL_RUN_HOMING_CYCLE))
+                            .setNegativeButton(getString(R.string.text_no_confirm), null)
+                            .show();
+                } else {
+                    EventBus.getDefault().post(new UiToastEvent(
+                            getString(R.string.text_machine_not_idle), true, true));
+                }
                 return true;
 
             case R.id.wpos_g54:
@@ -497,6 +486,55 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     // -------------------------------------------------------------------------
     // Resto del fragment — invariato rispetto all'originale
     // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Step cycle — pulsante centrale pad direzionale
+    // -------------------------------------------------------------------------
+
+    /**
+     * Cicla il valore step tra 1.0 -> 0.1 -> 0.01 -> 1.0
+     * Aggiorna XY e Z insieme e aggiorna il testo del pulsante.
+     */
+    private void cycleStep() {
+        stepCycleIndex = (stepCycleIndex + 1) % STEP_CYCLE.length;
+        applyStep(STEP_CYCLE[stepCycleIndex]);
+    }
+
+    /**
+     * Applica il valore step a XY e Z e aggiorna MachineStatus e SharedPreferences.
+     */
+    private void applyStep(double step) {
+        machineStatus.setJogging(
+                step,
+                step,
+                machineStatus.getJogging().feed,
+                sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
+
+        sharedPref.edit()
+                .putDouble(getString(R.string.preference_jogging_step_size), step)
+                .putDouble(getString(R.string.preference_jogging_step_size_z), step)
+                .commit();
+
+        updateStepCycleButton();
+    }
+
+    /**
+     * Aggiorna il testo del pulsante centrale con il valore step corrente.
+     * Mostra il numero senza zeri inutili: 1, 0.1, 0.01
+     */
+    private void updateStepCycleButton() {
+        if (btnStepCycle == null) return;
+        double step = STEP_CYCLE[stepCycleIndex];
+        String label;
+        if (step >= 1.0) {
+            label = "1";
+        } else if (step >= 0.1) {
+            label = "0.1";
+        } else {
+            label = "0.01";
+        }
+        btnStepCycle.setText(label);
+    }
 
     private void customButton(int resourceId, boolean isLongClick) {
         if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
