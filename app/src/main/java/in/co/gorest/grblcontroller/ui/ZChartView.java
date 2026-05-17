@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2025 Daniele Cicchinelli
+ * Copyright (C) 2026 Daniele Cicchinelli
+ *
+ * Based on GRBLController by zeevy
+ * https://github.com/zeevy/grblcontroller
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,10 +18,6 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  * <http://www.gnu.org/licenses/>
- *
- * Original project: GRBLController by zeevy
- * https://github.com/zeevy/grblcontroller
- * Written by Daniele Cicchinelli, 2025
  */
 
 package in.co.gorest.grblcontroller.ui;
@@ -36,15 +35,7 @@ import android.view.View;
 
 import java.util.List;
 
-/**
- * View custom che disegna:
- *  - Grafico lineare della quota Z (blu)
- *  - Grafico della velocità di discesa Z / derivata (arancione)
- *  - Linea di soglia orizzontale rossa
- *  - Punti critici evidenziati in rosso
- *
- * Supporta pan orizzontale (1 dito) e zoom pinch.
- */
+
 public class ZChartView extends View {
 
     // -------------------------------------------------------------------------

@@ -1,20 +1,29 @@
+/*
+ * Copyright (C) 2013-2018 Will Winder
+ * Part of Universal Gcode Sender (UGS)
+ * https://github.com/winder/Universal-G-Code-Sender
+ *
+ * Android porting and modifications Copyright (C) 2026 Daniele Cicchinelli
+ * Based on GRBLController by zeevy
+ * https://github.com/zeevy/grblcontroller
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * <http://www.gnu.org/licenses/>
+ */
 package in.co.gorest.grblcontroller.ui;
 
-/*
- * GcodeRenderer.java
- *
- * Renderer OpenGL ES 2.0 per il visualizzatore GCode.
- * Implementa GLSurfaceView.Renderer (equivalente Android di GLEventListener JOGL).
- *
- * Posizionamento nel progetto:
- *   app/src/main/java/in/co/gorest/grblcontroller/ui/GcodeRenderer.java
- *
- * NOTA: Questo file è la "scheletro" del renderer.
- *       Il passo successivo è implementare onDrawFrame() con la
- *       logica di rendering OpenGL ES 2.0 (shader, VBO, ecc.).
- *       I metodi load/color/vertex buffer corrispondono 1:1 a quelli
- *       del VisualizerCanvas originale.
- */
 
 import android.content.Context;
 import android.opengl.GLES20;
