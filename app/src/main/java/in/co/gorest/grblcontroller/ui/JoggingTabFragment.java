@@ -97,6 +97,22 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     private int stepCycleIndex = 0;
     private IconButton btnStepCycle;
 
+    /**
+     * Soglia ms per distinguere tap breve (passo singolo) da pressione lunga (jog continuo).
+     */
+    private static final long JOG_CONTINUOUS_THRESHOLD_MS = 250;
+
+    /**
+     * Distanza grande per jog continuo: GRBL si muove fino al jog cancel (0x85).
+     */
+    private static final double JOG_CONTINUOUS_DISTANCE = 9999.0;
+
+    /** Timestamp pressione tasto */
+    private long jogPressTime = 0;
+
+    /** true se è attivo un jog continuo — serve per mandare cancel al rilascio */
+    private boolean jogContinuousActive = false;
+
     public JoggingTabFragment() {}
 
     public static JoggingTabFragment newInstance() {
@@ -164,9 +180,46 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 R.id.jog_y_negative, R.id.jog_x_negative, R.id.jog_z_negative}) {
 
             final IconButton iconButton = view.findViewById(resourceId);
-            iconButton.setOnTouchListener(new RepeatListener(false, 300, 35));
-            iconButton.setOnClickListener(view1 -> {
-                if (isAdded()) sendJogCommand(iconButton.getTag().toString());
+
+            // Rimosso RepeatListener — gestione manuale con ACTION_DOWN/UP
+            // per distinguere tap breve (passo singolo) da pressione lunga (jog continuo)
+            iconButton.setOnTouchListener((v, event) -> {
+                if (!isAdded()) return false;
+
+                switch (event.getAction()) {
+
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        jogPressTime = System.currentTimeMillis();
+                        jogContinuousActive = false;
+
+                        // Avvia jog continuo dopo la soglia con un postDelayed
+                        iconButton.postDelayed(() -> {
+                            if (iconButton.isPressed()) {
+                                // Soglia superata — invia jog continuo
+                                sendJogContinuous(iconButton.getTag().toString());
+                                jogContinuousActive = true;
+                            }
+                        }, JOG_CONTINUOUS_THRESHOLD_MS);
+                        return false; // lascia propagare per il feedback visivo
+
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        long pressDuration = System.currentTimeMillis() - jogPressTime;
+
+                        if (jogContinuousActive) {
+                            // Era jog continuo — manda cancel mando due volte per sicurezza
+                            fragmentInteractionListener.onGrblRealTimeCommandReceived(
+                                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+                            fragmentInteractionListener.onGrblRealTimeCommandReceived(
+                                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+                            jogContinuousActive = false;
+                        } else if (pressDuration < JOG_CONTINUOUS_THRESHOLD_MS) {
+                            // Tap breve — jog passo singolo
+                            sendJogCommand(iconButton.getTag().toString());
+                        }
+                        return false;
+                }
+                return false;
             });
         }
 
@@ -700,6 +753,35 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_machine_not_idle), true, true));
         }
+    }
+
+    /**
+     * Invia un comando di jog continuo verso la direzione indicata dal tag.
+     * Usa una distanza molto grande (9999mm) — GRBL si muove indefinitamente
+     * fino a quando non riceve il jog cancel (0x85).
+     * Il movimento è completamente fluido perché GRBL gestisce
+     * internamente accelerazione e decelerazione.
+     *
+     * @param tag formato del comando jog (es. "$J=%sG91X%sF%s")
+     */
+    private void sendJogContinuous(String tag) {
+        if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
+                && !machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
+            return;
+        }
+
+        String units = "G21";
+        double jogFeed = machineStatus.getJogging().feed;
+
+        if (machineStatus.getJogging().inches) {
+            units = "G20";
+            jogFeed = jogFeed / 25.4;
+        }
+
+        // Per il jog continuo usiamo sempre la distanza massima
+        // Il segno (+ o -) è nel tag, la distanza è sempre positiva e grande
+        String jog = String.format(tag, units, JOG_CONTINUOUS_DISTANCE, jogFeed);
+        EventBus.getDefault().post(new JogCommandEvent(jog));
     }
 
     @SuppressLint("NonConstantResourceId")
