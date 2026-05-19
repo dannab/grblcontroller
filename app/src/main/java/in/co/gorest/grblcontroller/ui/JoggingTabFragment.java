@@ -100,7 +100,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     /**
      * Soglia ms per distinguere tap breve (passo singolo) da pressione lunga (jog continuo).
      */
-    private static final long JOG_CONTINUOUS_THRESHOLD_MS = 250;
+    private static final long JOG_CONTINUOUS_THRESHOLD_MS = 200;
 
     /**
      * Distanza grande per jog continuo: GRBL si muove fino al jog cancel (0x85).
@@ -189,25 +189,32 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 switch (event.getAction()) {
 
                     case android.view.MotionEvent.ACTION_DOWN:
+                        // FIX: cancella qualsiasi postDelayed pendente dalla pressione
+                        // precedente — evita che un doppio tap rapido lanci un jog
+                        // continuo non voluto
+                        iconButton.removeCallbacks(null);
                         jogPressTime = System.currentTimeMillis();
                         jogContinuousActive = false;
 
                         // Avvia jog continuo dopo la soglia con un postDelayed
                         iconButton.postDelayed(() -> {
                             if (iconButton.isPressed()) {
-                                // Soglia superata — invia jog continuo
                                 sendJogContinuous(iconButton.getTag().toString());
                                 jogContinuousActive = true;
                             }
                         }, JOG_CONTINUOUS_THRESHOLD_MS);
-                        return false; // lascia propagare per il feedback visivo
+                        return false;
 
                     case android.view.MotionEvent.ACTION_UP:
                     case android.view.MotionEvent.ACTION_CANCEL:
+                        // FIX: cancella il postDelayed se il dito è rilasciato
+                        // prima della soglia — previene jog continuo fantasma
+                        iconButton.removeCallbacks(null);
+
                         long pressDuration = System.currentTimeMillis() - jogPressTime;
 
                         if (jogContinuousActive) {
-                            // Era jog continuo — manda cancel mando due volte per sicurezza
+                            // Era jog continuo — manda cancel (due volte per sicurezza)
                             fragmentInteractionListener.onGrblRealTimeCommandReceived(
                                     GrblUtils.GRBL_JOG_CANCEL_COMMAND);
                             fragmentInteractionListener.onGrblRealTimeCommandReceived(
