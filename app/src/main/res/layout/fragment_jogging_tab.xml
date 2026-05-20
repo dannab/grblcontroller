@@ -263,8 +263,19 @@
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
-                        android:id="@+id/wpos_g55"
-                        android:tag="G55" android:text="G55"
+                        android:id="@+id/get_point"
+                        android:text="P"
+                        android:layout_weight="0.25"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:layout_width="0dp"
+                        tools:ignore="HardcodedText" />
+
+
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
+                        android:id="@+id/run_homing_cycle"
+                        android:text="{fa-home 26dp}"
                         android:layout_weight="0.25"
                         android:layout_height="wrap_content"
                         android:gravity="center"
@@ -273,18 +284,8 @@
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
-                        android:id="@+id/wpos_g56"
-                        android:tag="G56" android:text="G56"
-                        android:layout_weight="0.25"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:layout_width="0dp"
-                        tools:ignore="HardcodedText" />
-
-                    <com.joanzapata.iconify.widget.IconButton
-                        android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
-                        android:id="@+id/wpos_g57"
-                        android:tag="G57" android:text="G57"
+                        android:id="@+id/do_leveling"
+                        android:text="L"
                         android:layout_weight="0.25"
                         android:layout_height="wrap_content"
                         android:gravity="center"

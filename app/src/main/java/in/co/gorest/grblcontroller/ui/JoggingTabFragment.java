@@ -67,6 +67,21 @@ import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import android.view.View;
+
+
+
 public class JoggingTabFragment extends BaseFragment implements View.OnClickListener, View.OnLongClickListener {
 
     private static final String TAG = JoggingTabFragment.class.getSimpleName();
@@ -232,7 +247,8 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
         for (int resourceId : new Integer[]{
                 R.id.jog_cancel,
-                R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero}) {
+                R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero,
+                R.id.get_point,R.id.run_homing_cycle,R.id.do_leveling}) {
             IconButton iconButton = view.findViewById(resourceId);
             iconButton.setOnLongClickListener(this);
         }
@@ -350,7 +366,27 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 }
                 break;
 
-            case R.id.custom_button_1:
+            case R.id.run_homing_cycle:
+                // Long click: homing cycle (spostato da run_homing_cycle)
+                if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
+                        || machineStatus.getState().equals(Constants.MACHINE_STATUS_ALARM)) {
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(getString(R.string.text_homing_cycle))
+                            .setMessage(getString(R.string.text_do_homing_cycle))
+                            .setPositiveButton(getString(R.string.text_yes_confirm),
+                                    (dialog, which) -> fragmentInteractionListener
+                                            .onGcodeCommandReceived(GrblUtils.GRBL_RUN_HOMING_CYCLE))
+                            .setNegativeButton(getString(R.string.text_no_confirm), null)
+                            .show();
+                } else {
+                    EventBus.getDefault().post(new UiToastEvent(
+                            getString(R.string.text_machine_not_idle), true, true));
+                }
+                break;
+
+            case R.id.do_leveling:
+                break;
+            case R.id.get_point:
                 /**
                  * SALVATAGGIO PUNTO DI PIAZZAMENTO
                  * ---------------------------------
@@ -370,6 +406,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 saveCurrentPoint();
                 break;
 
+            case R.id.custom_button_1:
             case R.id.custom_button_2:
             case R.id.custom_button_3:
             case R.id.custom_button_4:
@@ -421,7 +458,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 gotoAxisZero("Z");
                 return true;
 
-            case R.id.custom_button_1:
+            case R.id.get_point:
                 /**
                  * CANCELLAZIONE FILE PUNTI DI PIAZZAMENTO
                  * ----------------------------------------
@@ -434,6 +471,10 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 deletePointsFile();
                 return true;
 
+            case R.id.do_leveling:
+                break;
+
+            case R.id.custom_button_1:
             case R.id.custom_button_2:
             case R.id.custom_button_3:
             case R.id.custom_button_4:
@@ -995,6 +1036,73 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             default:
                 return new String[]{"$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s", "$J=%sG91X-%sF%s", "$J=%sG91X%sF%s", "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s"};
         }
+    }
+    // Metodo da chiamare al click del bottone nel JoggingFragment
+    private void checkAndApplyAutolevel() {
+        // 1. Recupera la cartella di lavoro
+        File appDir = requireActivity().getExternalFilesDir(null);
+        File pointsFile = new File(appDir, "points.txt");
+
+        if (!pointsFile.exists()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "File points.txt non trovato! Esegui prima il probing dei 3 punti.", true, true));
+            return;
+        }
+
+        // 2. Leggi e controlla STRETTAMENTE il numero di righe
+        double[][] points = new double[3][3];
+        int lineCount = 0;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(pointsFile))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) continue; // Salta eventuali righe vuote
+
+                // Se troviamo una quarta riga, il file non è valido per il livellamento a 3 punti
+                if (lineCount >= 3) {
+                    lineCount++; // Incrementiamo per far fallire il controllo successivo
+                    break;
+                }
+
+                // Normalizza i separatori (spazi o virgole)
+                trimmed = trimmed.replaceAll(",", " ");
+                String[] parts = trimmed.split("\\s+");
+
+                if (parts.length >= 3) {
+                    points[lineCount][0] = Double.parseDouble(parts[0]); // X
+                    points[lineCount][1] = Double.parseDouble(parts[1]); // Y
+                    points[lineCount][2] = Double.parseDouble(parts[2]); // Z
+                    lineCount++;
+                }
+            }
+        } catch (Exception e) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Errore lettura points.txt: " + e.getMessage(), true, true));
+           return;
+        }
+
+        // Controllo tassativo: devono essere ESATTAMENTE 3 righe
+        if (lineCount != 3) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Errore: Il file points.txt contiene " + lineCount + " punti. Deve contenerne esattamente 3!" , true, true));
+            return;
+        }
+
+        // 3. Recupera il file G-Code attivo dal FileSender o dalla MainActivity
+        // (Adatta 'mainActivity.getCurrentGcodeFile()' in base a come memorizzi il file nella tua app)
+        File currentGcodeFile = ((FileSenderTabFragment.) requireActivity()).getCurrentGcodeFile();
+
+        if (currentGcodeFile == null) {
+            EventBus.getDefault().post(new UiToastEvent("Nessun file G-Code caricato nel sistema!", true,true);
+            return;
+        }
+
+        // 4. Se i controlli sono passati, mostra un caricamento e avvia il calcolo nativo
+        // (Assicurati di avere un overlay di caricamento nel layout o usa un ProgressDialog)
+        //if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
+
+        executeNativeAutolevel(points, currentGcodeFile);
     }
 
     private void sendCommandIfIdle(String command) {

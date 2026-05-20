@@ -237,7 +237,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     protected void setupTabLayout(){
         TabLayout tabLayout = findViewById(R.id.tab_layout);
 
-        if(isTablet(this)){
+        if (isTablet(this)) {
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(32)));
@@ -246,7 +246,10 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(32)));       // Visualizzatore 3D
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_line_chart).colorRes(R.color.colorAccent).sizeDp(32))); // Analisi Z
 
-        }else{
+            // NUOVO: Tab Editor di codice per Tablet
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(32)));       // Editor GCode
+
+        } else {
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(21)));
@@ -254,6 +257,9 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(21)));       // Visualizzatore 3D
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_line_chart).colorRes(R.color.colorAccent).sizeDp(21))); // Analisi Z
+
+            // NUOVO: Tab Editor di codice per Smartphone
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(21)));       // Editor GCode
         }
 
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);

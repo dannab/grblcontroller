@@ -48,6 +48,7 @@ public class GrblFragmentPagerAdapter extends FragmentPagerAdapter {
             case 4: return CamTabFragment.newInstance();
             case 5: return GcodeVisualizerFragment.newInstance(); // Visualizzatore 3D
             case 6: return ZAnalyzerTabFragment.newInstance();    // Analisi Z
+            case 7: return GcodeEditorFragment.newInstance();
             default: return JoggingTabFragment.newInstance();
         }
     }
