@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <variable
+            name="machineStatus"
+            type="in.co.gorest.grblcontroller.listeners.MachineStatusListener" />
+    </data>
+
+    <!-- Corretto: da "match_满足" a "match_parent" -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#121212">
+
+        <!-- Barra degli strumenti superiore -->
+        <RelativeLayout
+            android:id="@+id/editor_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="#1a1a1a"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/editor_file_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_alignParentStart="true"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:text="Nessun file caricato" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_alignParentEnd="true"
+                android:orientation="horizontal">
+
+                <com.joanzapata.iconify.widget.IconButton
+                    android:id="@+id/btn_editor_search"
+                    android:layout_width="48dp"
+                    android:layout_height="match_parent"
+                    android:text="{fa-search 18sp}"
+                    android:textColor="#FFFFFF"
+                    android:background="?attr/selectableItemBackgroundBorderless"/>
+
+                <com.joanzapata.iconify.widget.IconButton
+                    android:id="@+id/btn_editor_save"
+                    android:layout_width="48dp"
+                    android:layout_height="match_parent"
+                    android:text="{fa-save 18sp}"
+                    android:textColor="#FFFFFF"
+                    android:background="?attr/selectableItemBackgroundBorderless"/>
+            </LinearLayout>
+        </RelativeLayout>
+
+        <!-- WebView che ospita Ace Editor per la gestione di file enormi -->
+        <WebView
+            android:id="@+id/gcode_webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/editor_toolbar" />
+
+        <!-- Overlay di caricamento per file pesanti -->
+        <RelativeLayout
+            android:id="@+id/loading_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/editor_toolbar"
+            android:background="#CC121212"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"/>
+        </RelativeLayout>
+
+    </RelativeLayout>
+</layout>

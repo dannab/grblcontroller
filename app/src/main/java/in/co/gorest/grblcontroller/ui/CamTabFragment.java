@@ -22,13 +22,6 @@
 package in.co.gorest.grblcontroller.ui;
 
 import android.app.Activity;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.ParcelFileDescriptor;
-
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
@@ -49,7 +42,7 @@ import com.joanzapata.iconify.widget.IconButton;
 
 import org.greenrobot.eventbus.EventBus;
 
-import java.io.FileOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
@@ -57,6 +50,7 @@ import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentCamTabBinding;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
+import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.util.SimpleGcodeMaker;
@@ -84,24 +78,6 @@ public class CamTabFragment extends BaseFragment {
     private boolean fromSet = false;
     private boolean toSet   = false;
 
-    private String gcodeToSave;
-
-    private final ActivityResultLauncher<Intent> createFileLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
-                    result -> {
-                        if (result.getResultCode() == Activity.RESULT_OK
-                                && result.getData() != null) {
-                            Uri uri = result.getData().getData();
-                            if (uri != null && gcodeToSave != null) {
-                                writeGcodeToUri(uri, gcodeToSave);
-                                gcodeToSave = null;
-                            }
-                        } else {
-                            EventBus.getDefault().post(
-                                    new UiToastEvent("Salvataggio file annullato.", true, true));
-                        }
-                    });
-
     public CamTabFragment() {}
 
     public static CamTabFragment newInstance() {
@@ -121,9 +97,6 @@ public class CamTabFragment extends BaseFragment {
                 getString(R.string.shared_preference_key));
         this.editIcon = " {fa-edit 16sp}";
     }
-
-    // NOTA: EventBus non è usato in questo fragment — rimossi register/unregister
-    // per evitare crash da unregister senza register corrispondente.
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -220,15 +193,12 @@ public class CamTabFragment extends BaseFragment {
     // -------------------------------------------------------------------------
 
     private void doCamCalculation() {
-
-        // Validazione: From e To devono essere stati impostati
         if (!fromSet || !toSet) {
             EventBus.getDefault().post(new UiToastEvent(
                     "Imposta prima i punti FROM e TO.", true, true));
             return;
         }
 
-        // Validazione: area non nulla
         if (Xfrom.equals(Xto) && Yfrom.equals(Yto)) {
             EventBus.getDefault().post(new UiToastEvent(
                     "FROM e TO coincidono — area di lavoro nulla.", true, true));
@@ -236,7 +206,6 @@ public class CamTabFragment extends BaseFragment {
         }
 
         try {
-            // FIX: parseSignedDouble conserva il segno meno (es. Z = -10.0)
             double zTraversal = parseSignedDouble(camZTraversal);
             double camZStepVal = parseSignedDouble(camZStep);
             double camZDeepVal = parseSignedDouble(camZDeep);
@@ -276,8 +245,7 @@ public class CamTabFragment extends BaseFragment {
                 return;
             }
 
-            this.gcodeToSave = gcode;
-            launchCreateFileIntent();
+            saveGcodeToAppFolder(gcode);
 
         } catch (NumberFormatException e) {
             EventBus.getDefault().post(new UiToastEvent(
@@ -286,18 +254,12 @@ public class CamTabFragment extends BaseFragment {
     }
 
     // -------------------------------------------------------------------------
-    // Parsing numeri con segno — FIX principale rispetto all'originale
+    // Parsing numeri con segno
     // -------------------------------------------------------------------------
 
-    /**
-     * Estrae il valore numerico da una TextView che contiene anche icone FontAwesome.
-     * A differenza dell'originale, conserva il segno meno per valori negativi (es. Z=-10).
-     */
     private double parseSignedDouble(TextView tv) throws NumberFormatException {
         String raw = tv.getText().toString();
-        // Rimuovi tutto tranne cifre, punto decimale e segno meno iniziale
         raw = raw.replaceAll("[^\\d.\\-]", "").trim();
-        // Se ci sono più segni meno (artefatto), tieni solo il primo carattere se è -
         if (raw.indexOf('-') > 0) {
             raw = raw.replaceAll("-", "");
         }
@@ -306,32 +268,33 @@ public class CamTabFragment extends BaseFragment {
     }
 
     // -------------------------------------------------------------------------
-    // SAF — salvataggio file
+    // Salvataggio GCode nella cartella privata dell'app
     // -------------------------------------------------------------------------
 
-    private void launchCreateFileIntent() {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TITLE, "job1.nc");
-        createFileLauncher.launch(intent);
-    }
-
-    private void writeGcodeToUri(Uri uri, String gcodeData) {
-        try {
-            ParcelFileDescriptor pfd = requireActivity()
-                    .getContentResolver().openFileDescriptor(uri, "w");
-            if (pfd != null) {
-                FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor());
-                fos.write(gcodeData.getBytes());
-                fos.close();
-                pfd.close();
-                EventBus.getDefault().post(new UiToastEvent(
-                        "File salvato: " + uri.getLastPathSegment(), true, true));
-            }
-        } catch (IOException e) {
+    private void saveGcodeToAppFolder(String gcodeData) {
+        File appDir = requireActivity().getExternalFilesDir(null);
+        if (appDir == null) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Errore scrittura file: " + e.getMessage(), true, true));
+                    "Errore: cartella app non disponibile", true, true));
+            return;
+        }
+
+        File jobFile = new File(appDir, "job.nc");
+
+        // FIX: Ripristinata la corretta chiusura del blocco try-catch-resources
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(jobFile)) {
+            fos.write(gcodeData.getBytes());
+            fos.flush();
+
+            FileSenderListener.getInstance().setGcodeFile(jobFile);
+            FileSenderListener.getInstance().setElapsedTime("00:00:00");
+
+            EventBus.getDefault().post(new UiToastEvent(
+                    "job.nc salvato e caricato in File Sender", true, false));
+
+        } catch (java.io.IOException e) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Errore salvataggio: " + e.getMessage(), true, true));
         }
     }
 
@@ -435,10 +398,6 @@ public class CamTabFragment extends BaseFragment {
                 });
     }
 
-    /**
-     * Dialog generica per input decimale — elimina la duplicazione di codice
-     * presente nell'originale (6 metodi quasi identici → 1 metodo parametrico).
-     */
     private interface OnValueConfirmed { void onConfirmed(String value); }
 
     private void showDecimalDialog(String title, String message,
