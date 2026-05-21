@@ -385,6 +385,7 @@ public class FileSenderTabFragment extends BaseFragment
      * Carica un file GCode da percorso locale (cartella privata app).
      * Aggiorna FileSenderListener e avvia il conteggio righe in background.
      */
+
     private void loadFile(File file) {
         if (!file.exists()) {
             EventBus.getDefault().post(new UiToastEvent(

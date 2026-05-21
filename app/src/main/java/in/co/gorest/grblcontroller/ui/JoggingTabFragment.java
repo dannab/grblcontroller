@@ -65,6 +65,7 @@ import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
 import in.co.gorest.grblcontroller.helpers.RepeatListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
+import in.co.gorest.grblcontroller.util.GcodeLeveling;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
 
@@ -472,6 +473,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 return true;
 
             case R.id.do_leveling:
+               generaFileLivellato();
                 break;
 
             case R.id.custom_button_1:
@@ -547,7 +549,45 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .setNegativeButton(getString(R.string.text_no_confirm), null)
                 .show();
     }
+    private void generaFileLivellato() {
+        File appDir = requireActivity().getExternalFilesDir(null);
+        File pointsFile = new File(appDir, "points.txt");
 
+        // Recupera il file attualmente attivo (senza modificarne lo stato nell'app)
+        File currentGcodeFile = in.co.gorest.grblcontroller.listeners.FileSenderListener.getInstance().getGcodeFile();
+
+        if (currentGcodeFile == null) {
+            org.greenrobot.eventbus.EventBus.getDefault().post(
+                    new in.co.gorest.grblcontroller.events.UiToastEvent("Nessun file selezionato nel File Sender!", true, true));
+            return;
+        }
+
+        // Chiamata all'utility di calcolo
+        in.co.gorest.grblcontroller.util.GcodeLeveling.applyAutolevel(pointsFile, currentGcodeFile, new in.co.gorest.grblcontroller.util.GcodeLeveling.LevelingCallback() {
+            @Override
+            public void onSuccess(File leveledFile) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        // Notifica l'utente del completamento.
+                        // Ora potrà andare nel primo tab, fare "Seleziona File" e troverà il file pronto.
+                        org.greenrobot.eventbus.EventBus.getDefault().post(
+                                new in.co.gorest.grblcontroller.events.UiToastEvent(
+                                        "File compensato creato: " + leveledFile.getName(), true, false));
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        org.greenrobot.eventbus.EventBus.getDefault().post(
+                                new in.co.gorest.grblcontroller.events.UiToastEvent(error, true, true));
+                    });
+                }
+            }
+        });
+    }
     /**
      * Carica il contenuto del file points.txt in memoria all'avvio.
      * FIX: evita di perdere i punti precedenti quando il fragment
@@ -1037,73 +1077,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 return new String[]{"$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s", "$J=%sG91X-%sF%s", "$J=%sG91X%sF%s", "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s"};
         }
     }
-    // Metodo da chiamare al click del bottone nel JoggingFragment
-    private void checkAndApplyAutolevel() {
-        // 1. Recupera la cartella di lavoro
-        File appDir = requireActivity().getExternalFilesDir(null);
-        File pointsFile = new File(appDir, "points.txt");
 
-        if (!pointsFile.exists()) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    "File points.txt non trovato! Esegui prima il probing dei 3 punti.", true, true));
-            return;
-        }
-
-        // 2. Leggi e controlla STRETTAMENTE il numero di righe
-        double[][] points = new double[3][3];
-        int lineCount = 0;
-
-        try (BufferedReader br = new BufferedReader(new FileReader(pointsFile))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty()) continue; // Salta eventuali righe vuote
-
-                // Se troviamo una quarta riga, il file non è valido per il livellamento a 3 punti
-                if (lineCount >= 3) {
-                    lineCount++; // Incrementiamo per far fallire il controllo successivo
-                    break;
-                }
-
-                // Normalizza i separatori (spazi o virgole)
-                trimmed = trimmed.replaceAll(",", " ");
-                String[] parts = trimmed.split("\\s+");
-
-                if (parts.length >= 3) {
-                    points[lineCount][0] = Double.parseDouble(parts[0]); // X
-                    points[lineCount][1] = Double.parseDouble(parts[1]); // Y
-                    points[lineCount][2] = Double.parseDouble(parts[2]); // Z
-                    lineCount++;
-                }
-            }
-        } catch (Exception e) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    "Errore lettura points.txt: " + e.getMessage(), true, true));
-           return;
-        }
-
-        // Controllo tassativo: devono essere ESATTAMENTE 3 righe
-        if (lineCount != 3) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    "Errore: Il file points.txt contiene " + lineCount + " punti. Deve contenerne esattamente 3!" , true, true));
-            return;
-        }
-
-        // 3. Recupera il file G-Code attivo dal FileSender o dalla MainActivity
-        // (Adatta 'mainActivity.getCurrentGcodeFile()' in base a come memorizzi il file nella tua app)
-        File currentGcodeFile = ((FileSenderTabFragment.) requireActivity()).getCurrentGcodeFile();
-
-        if (currentGcodeFile == null) {
-            EventBus.getDefault().post(new UiToastEvent("Nessun file G-Code caricato nel sistema!", true,true);
-            return;
-        }
-
-        // 4. Se i controlli sono passati, mostra un caricamento e avvia il calcolo nativo
-        // (Assicurati di avere un overlay di caricamento nel layout o usa un ProgressDialog)
-        //if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
-
-        executeNativeAutolevel(points, currentGcodeFile);
-    }
 
     private void sendCommandIfIdle(String command) {
         if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
