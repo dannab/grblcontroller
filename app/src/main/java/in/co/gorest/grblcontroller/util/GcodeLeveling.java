@@ -69,25 +69,30 @@ public class GcodeLeveling {
                 return;
             }
 
-            // 2. Calcolo geometrico del piano (AX + BY + CZ + D = 0)
+
+// 2. Calcolo geometrico del piano inclinato (Equazione: Ax + By + Cz + D = 0)
             double x1 = points[0][0], y1 = points[0][1], z1 = points[0][2];
             double x2 = points[1][0], y2 = points[1][1], z2 = points[1][2];
             double x3 = points[2][0], y3 = points[2][1], z3 = points[2][2];
 
+// Vettori
             double v1x = x2 - x1, v1y = y2 - y1, v1z = z2 - z1;
             double v2x = x3 - x1, v2y = y3 - y1, v2z = z3 - z1;
 
-            double A = v1y * v2z - v1z * v2y;
-            double B = v1z * v2x - v1x * v2z;
-            double C = v1x * v2y - v1y * v2x;
+// Prodotto vettoriale per trovare la normale (A, B, C)
+            double A = (v1y * v2z) - (v1z * v2y);
+            double B = (v1z * v2x) - (v1x * v2z);
+            double C = (v1x * v2y) - (v1y * v2x);
+
+// Calcolo corretto del termine noto D
             double D = -(A * x1 + B * y1 + C * z1);
 
             if (Math.abs(C) < 0.000001) {
-                callback.onError("Errore geometrico: I 3 punti inseriti sono allineati!");
+                callback.onError("Errore geometrico: I 3 punti di probing sono allineati!");
                 return;
             }
 
-            // 3. Elaborazione delle coordinate G-Code
+// 3. Elaborazione e Iniezione G-Code
             List<String> outputLines = new ArrayList<>();
             Pattern patternX = Pattern.compile("X\\s*([-\\d.]+)");
             Pattern patternY = Pattern.compile("Y\\s*([-\\d.]+)");
@@ -95,38 +100,69 @@ public class GcodeLeveling {
 
             double currentX = 0.0;
             double currentY = 0.0;
+            double currentZ = 0.0; // Tiene traccia della Z di lavoro teorica
 
             try (BufferedReader br = new BufferedReader(new FileReader(gcodeFile))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     String upperLine = line.toUpperCase().trim();
 
+                    // Salta commenti e comandi speciali
                     if (upperLine.startsWith(";") || upperLine.startsWith("(") || upperLine.startsWith("M")) {
                         outputLines.add(line);
                         continue;
                     }
 
+                    // Intercettiamo i blocchi di movimento reali
                     if (upperLine.contains("G0") || upperLine.contains("G1") ||
-                            upperLine.contains("X")  || upperLine.contains("Y") ||
-                            upperLine.contains("Z")  || upperLine.contains("F")) {
+                            upperLine.contains("G2") || upperLine.contains("G3") ||
+                            upperLine.contains("X")  || upperLine.contains("Y")  ||
+                            upperLine.contains("Z")) {
 
                         Matcher mX = patternX.matcher(upperLine);
                         Matcher mY = patternY.matcher(upperLine);
                         Matcher mZ = patternZ.matcher(upperLine);
 
-                        if (mX.find()) currentX = Double.parseDouble(mX.group(1));
-                        if (mY.find()) currentY = Double.parseDouble(mY.group(1));
+                        boolean haX = mX.find();
+                        boolean haY = mY.find();
+                        boolean haZ = mZ.find();
 
-                        if (mZ.find()) {
-                            double originalZ = Double.parseDouble(mZ.group(1));
+                        // Aggiorna lo stato modale delle coordinate teoriche del file
+                        if (haX) currentX = Double.parseDouble(mX.group(1));
+                        if (haY) currentY = Double.parseDouble(mY.group(1));
+                        if (haZ) currentZ = Double.parseDouble(mZ.group(1));
 
-                            // Formula del piano inclinato
-                            double zCompensation = -(A * currentX + B * currentY + D) / C;
-                            double newZ = originalZ + zCompensation;
+                        // Calcola la quota del piano inclinato in questo specifico punto (X, Y)
+                        double zTargetPlane = -(A * currentX + B * currentY + D) / C;
 
-                            line = line.replaceAll("(?i)Z\\s*([-\\d.]+)", String.format(Locale.US, "Z%.3f", newZ));
+                        // La Z reale finale è la quota teorica del file + la pendenza del piano inclinato
+                        double realZ = currentZ + zTargetPlane;
+
+                        // --- RICOSTRUZIONE DELLA RIGA CON INIEZIONE ---
+                        // Puliamo la riga da un'eventuale Z vecchia per non duplicarla
+                        String cleanedLine = line.replaceAll("(?i)Z\\s*([-\\d.]+)", "").trim();
+
+                        // Cerchiamo dove inserire la nuova Z. La posizione ideale è dopo la X o dopo la Y.
+                        // Se la riga ha X o Y, inseriamo la Z subito dopo di loro.
+                        if (cleanedLine.matches(".*[XXYFillGg].*")) {
+                            // Troviamo l'ultima coordinata (X o Y) e appendiamo la Z compensata
+                            if (cleanedLine.contains("Y") || cleanedLine.contains("y")) {
+                                cleanedLine = cleanedLine.replaceAll("(?i)(Y\\s*[-\\d.]+)", "$1 " + String.format(Locale.US, "Z%.3f", realZ));
+                            } else if (cleanedLine.contains("X") || cleanedLine.contains("x")) {
+                                cleanedLine = cleanedLine.replaceAll("(?i)(X\\s*[-\\d.]+)", "$1 " + String.format(Locale.US, "Z%.3f", realZ));
+                            } else {
+                                // Se è un comando di movimento (es. G00/G01) senza X e Y ma con cambio Z
+                                cleanedLine = cleanedLine + " " + String.format(Locale.US, "Z%.3f", realZ);
+                            }
+                        } else {
+                            // Fallback di sicurezza se la riga è strana
+                            cleanedLine = cleanedLine + " " + String.format(Locale.US, "Z%.3f", realZ);
                         }
+
+                        // Rimuove eventuali doppi spazi generati dalla pulizia
+                        line = cleanedLine.replaceAll("\\s+", " ");
                     }
+
                     outputLines.add(line);
                 }
 

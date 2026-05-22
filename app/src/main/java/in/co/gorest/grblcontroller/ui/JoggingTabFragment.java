@@ -247,10 +247,11 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         }
 
         for (int resourceId : new Integer[]{
-                R.id.jog_cancel,
+                R.id.jog_cancel,R.id.wpos_g54,
                 R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero,
                 R.id.get_point,R.id.run_homing_cycle,R.id.do_leveling}) {
             IconButton iconButton = view.findViewById(resourceId);
+            iconButton.setOnClickListener(this);
             iconButton.setOnLongClickListener(this);
         }
 
@@ -291,25 +292,25 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             }
         }
 
-        TableRow wposLayout = view.findViewById(R.id.wpos_layout);
-        for (int i = 0; i < wposLayout.getChildCount(); i++) {
-            View wposLayoutView = wposLayout.getChildAt(i);
-            if (wposLayoutView instanceof Button) {
-                wposLayoutView.setOnClickListener(view13 -> {
-                    if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
-                        sendCommandIfIdle(view13.getTag().toString());
-                        sendCommandIfIdle(GrblUtils.GRBL_VIEW_PARSER_STATE_COMMAND);
-                        EventBus.getDefault().post(new UiToastEvent(
-                                getString(R.string.text_selected_coordinate_system)
-                                        + view13.getTag().toString()));
-                    } else {
-                        EventBus.getDefault().post(new UiToastEvent(
-                                getString(R.string.text_machine_not_idle), true, true));
-                    }
-                });
-                wposLayoutView.setOnLongClickListener(this);
-            }
-        }
+//        TableRow wposLayout = view.findViewById(R.id.wpos_layout);
+//        for (int i = 0; i < wposLayout.getChildCount(); i++) {
+//            View wposLayoutView = wposLayout.getChildAt(i);
+//            if (wposLayoutView instanceof Button) {
+//                wposLayoutView.setOnClickListener(view13 -> {
+//                    if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
+//                        sendCommandIfIdle(view13.getTag().toString());
+//                        sendCommandIfIdle(GrblUtils.GRBL_VIEW_PARSER_STATE_COMMAND);
+//                        EventBus.getDefault().post(new UiToastEvent(
+//                                getString(R.string.text_selected_coordinate_system)
+//                                        + view13.getTag().toString()));
+//                    } else {
+//                        EventBus.getDefault().post(new UiToastEvent(
+//                                getString(R.string.text_machine_not_idle), true, true));
+//                    }
+//                });
+//                wposLayoutView.setOnLongClickListener(this);
+//            }
+//        }
 
         return view;
     }
