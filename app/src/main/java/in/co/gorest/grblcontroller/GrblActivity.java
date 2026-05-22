@@ -271,6 +271,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         viewPager.setPageTransformer(false, new ReaderViewPagerTransformer(ReaderViewPagerTransformer.TransformType.DEPTH));
         viewPager.setOffscreenPageLimit(4);
 
+
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
