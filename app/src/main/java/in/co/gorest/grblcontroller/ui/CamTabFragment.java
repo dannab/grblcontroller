@@ -271,8 +271,15 @@ public class CamTabFragment extends BaseFragment {
     // Salvataggio GCode nella cartella privata dell'app
     // -------------------------------------------------------------------------
 
+    private File getAppMediaDir() {
+        File[] dirs = requireActivity().getExternalMediaDirs();
+        if (dirs == null || dirs.length == 0 || dirs[0] == null) return null;
+        if (!dirs[0].exists()) dirs[0].mkdirs();
+        return dirs[0];
+    }
+
     private void saveGcodeToAppFolder(String gcodeData) {
-        File appDir = requireActivity().getExternalFilesDir(null);
+        File appDir = getAppMediaDir();
         if (appDir == null) {
             EventBus.getDefault().post(new UiToastEvent(
                     "Errore: cartella app non disponibile", true, true));
@@ -288,6 +295,7 @@ public class CamTabFragment extends BaseFragment {
 
             FileSenderListener.getInstance().setGcodeFile(jobFile);
             FileSenderListener.getInstance().setElapsedTime("00:00:00");
+            new FileSenderTabFragment.ReadFileAsyncTask().execute(jobFile);
 
             EventBus.getDefault().post(new UiToastEvent(
                     "job.nc salvato e caricato in File Sender", true, false));

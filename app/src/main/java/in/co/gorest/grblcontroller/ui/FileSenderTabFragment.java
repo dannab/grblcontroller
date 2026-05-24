@@ -198,9 +198,9 @@ public class FileSenderTabFragment extends BaseFragment
 
     /**
      * Mostra un dialog con due opzioni:
-     * 1. Browser interno — lista i file GCode dalla cartella privata dell'app
-     *    (/Android/data/in.co.gorest.grblcontroller/files/)
-     *    Nessun permesso richiesto, funziona su qualsiasi versione Android.
+     * 1. Browser interno — lista i file GCode dalla cartella media dell'app
+     *    (/Android/media/[package]/)
+     *    Nessun permesso richiesto, visibile via file manager e MTP/USB.
      *    Usare per file trasferiti da PC via USB, WiFi, FTP ecc.
      *
      * 2. SAF fallback — picker di sistema per file da qualsiasi percorso
@@ -222,13 +222,20 @@ public class FileSenderTabFragment extends BaseFragment
                 .show();
     }
 
+    private File getAppMediaDir() {
+        File[] dirs = requireActivity().getExternalMediaDirs();
+        if (dirs == null || dirs.length == 0 || dirs[0] == null) return null;
+        if (!dirs[0].exists()) dirs[0].mkdirs();
+        return dirs[0];
+    }
+
     /**
-     * Browser interno — lista i file GCode trovati nella cartella privata dell'app.
+     * Browser interno — lista i file GCode trovati nella cartella media dell'app.
      * L'utente ci trasferisce i file dal PC prima di usare l'app.
-     * Percorso: /Android/data/in.co.gorest.grblcontroller/files/
+     * Percorso: /Android/media/[package]/
      */
     private void showInternalFileBrowser() {
-        File appDir = requireActivity().getExternalFilesDir(null);
+        File appDir = getAppMediaDir();
         if (appDir == null || !appDir.exists()) {
             EventBus.getDefault().post(new UiToastEvent(
                     "Cartella app non disponibile", true, true));
@@ -311,8 +318,8 @@ public class FileSenderTabFragment extends BaseFragment
         String fileName = getFileNameFromUri(uri);
         if (fileName == null) fileName = "gcode_import.nc";
 
-        // Copia nella cartella privata dell'app
-        File destDir = requireActivity().getExternalFilesDir(null);
+        // Copia nella cartella media dell'app
+        File destDir = getAppMediaDir();
         if (destDir == null) {
             EventBus.getDefault().post(new UiToastEvent(
                     "Errore: cartella app non disponibile", true, true));
@@ -538,15 +545,28 @@ public class FileSenderTabFragment extends BaseFragment
         else if (id == R.id.rapid_override_medium)          sendRealTimeCommand(Overrides.CMD_RAPID_OVR_MEDIUM);
         else if (id == R.id.rapid_overrides_reset)          sendRealTimeCommand(Overrides.CMD_RAPID_OVR_RESET);
         else if (id == R.id.toggle_spindle)                 sendRealTimeCommand(Overrides.CMD_TOGGLE_SPINDLE);
-        else if (id == R.id.toggle_flood_coolant)           sendRealTimeCommand(Overrides.CMD_TOGGLE_FLOOD_COOLANT);
+        else if (id == R.id.toggle_flood_coolant) {
+            sendRealTimeCommand(Overrides.CMD_TOGGLE_FLOOD_COOLANT);
+            optimisticToggleCoolant(!machineStatus.getAccessoryStates().flood,
+                    machineStatus.getAccessoryStates().mist);
+        }
         else if (id == R.id.toggle_mist_coolant) {
             if (machineStatus.getCompileTimeOptions().mistCoolant) {
                 sendRealTimeCommand(Overrides.CMD_TOGGLE_MIST_COOLANT);
+                optimisticToggleCoolant(machineStatus.getAccessoryStates().flood,
+                        !machineStatus.getAccessoryStates().mist);
             } else {
                 EventBus.getDefault().post(new UiToastEvent(
                         getString(R.string.text_mist_disabled), true, true));
             }
         }
+    }
+
+    private void optimisticToggleCoolant(boolean flood, boolean mist) {
+        MachineStatusListener.AccessoryStates cur = machineStatus.getAccessoryStates();
+        String state = (flood ? "F" : "") + (mist ? "M" : "")
+                + (cur.spindleCW ? "S" : "") + (cur.spindleCCW ? "C" : "");
+        machineStatus.setAccessoryStates(state.isEmpty() ? " " : state);
     }
 
     private void sendRealTimeCommand(Overrides overrides) {
@@ -560,7 +580,7 @@ public class FileSenderTabFragment extends BaseFragment
     // Conteggio righe file (AsyncTask)
     // -------------------------------------------------------------------------
 
-    private static class ReadFileAsyncTask extends AsyncTask<File, Integer, Integer> {
+    static class ReadFileAsyncTask extends AsyncTask<File, Integer, Integer> {
 
         protected void onPreExecute() {
             FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_READING);
@@ -589,7 +609,7 @@ public class FileSenderTabFragment extends BaseFragment
                             cancel(true);
                         }
                     }
-                    if (lines % 2500 == 0) publishProgress(lines);
+                    if (lines > 0 && lines % 2500 == 0) publishProgress(lines);
                 }
                 reader.close();
             } catch (IOException e) {
@@ -606,6 +626,15 @@ public class FileSenderTabFragment extends BaseFragment
 
         public void onPostExecute(Integer lines) {
             FileSenderListener.getInstance().setRowsInFile(lines);
+            FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_IDLE);
+        }
+
+        @Override
+        protected void onCancelled(Integer lines) {
+            // Task cancellato (riga >= 79 chars) — mostra comunque le righe contate finora
+            if (lines != null && lines > 0) {
+                FileSenderListener.getInstance().setRowsInFile(lines);
+            }
             FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_IDLE);
         }
 

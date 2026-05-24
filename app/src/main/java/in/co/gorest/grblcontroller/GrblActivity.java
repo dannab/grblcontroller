@@ -138,17 +138,6 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
     }
 
-    private boolean hasPaidVersion() {
-        PackageManager pm = getPackageManager();
-        try {
-            pm.getPackageInfo("in.co.gorest.grblcontroller.plus", PackageManager.GET_ACTIVITIES);
-            return true;
-        } catch (PackageManager.NameNotFoundException ignored) {}
-
-        return false;
-    }
-
-
     @Override
     public void onDestroy(){
         super.onDestroy();

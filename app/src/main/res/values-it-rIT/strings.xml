@@ -31,9 +31,6 @@
     <string name="text_grbl_soft_reset">Reset software Grbl!</string>
     <string name="text_grbl_soft_reset_desc">vuoi effettuare un reset software della macchina?</string>
     <string name="text_unknown">Sconosciuto</string>
-    <string name="text_buy_app">Aggiorna a Grbl Controller +</string>
-    <string name="text_buy_app_summary">supporta lo sviluppo | ottieni più funzionalità</string>
-
     <string name="text_app_share">Condividi</string>
     <string name="text_app_about">Informazioni</string>
     <string name="text_settings">Impostazioni</string>

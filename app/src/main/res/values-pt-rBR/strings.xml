@@ -53,9 +53,6 @@
     <string name="text_grbl_soft_reset">Grbl soft reset!</string>
     <string name="text_grbl_soft_reset_desc">do you want to soft reset the machine?</string>
     <string name="text_unknown">Unknown</string>
-    <string name="text_buy_app">Upgrade to Grbl Controller +</string>
-    <string name="text_buy_app_summary">support development | get more features</string>
-
     <!-- Settings -->
     <string name="text_app_share">Share</string>
     <string name="text_app_about">About</string>

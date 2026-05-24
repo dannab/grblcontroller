@@ -48,8 +48,6 @@
     <string name="text_button_4_behaviour">настройте функцию пользовательской кнопки 4</string>
     <string name="text_button_label">Ярлык кнопки</string>
     <string name="text_button_label_desc">отображаемое название кнопки, максимум 3 символа.</string>
-    <string name="text_buy_app">Обновить до Grbl Controller +</string>
-    <string name="text_buy_app_summary">поддержать разработчика | больше функций</string>
     <string name="text_cancel">Отмена</string>
     <string name="text_cancel_tlo">G49: отменить смещение длины инструмента</string>
     <string name="text_cancel_tlo_desc">Вы хотите отменить текущий TLO</string>

@@ -334,7 +334,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     }
 
     /**
-     * Disegna i tre assi XYZ nell'origine (punto zero macchina).
+     * Disegna i tre assi XYZ nell'origine
      * X = rosso, Y = verde, Z = blu — identico a renderAxes() del VisualizerCanvas.
      * La lunghezza degli assi è proporzionale all'oggetto caricato.
      */
@@ -343,7 +343,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         float axisLen = maxSide * 0.15f;
         if (axisLen == 0) axisLen = 0.05f;
 
-        // Origine = work position (zero pezzo, non zero macchina)
+        // Origine = work position (zero pezzo)
         float ox = (float) workX;
         float oy = (float) workY;
         float oz = (float) workZ;
@@ -412,6 +412,9 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
             float x = 0, y = 0, z = 0;
             boolean isAbsolute = true;
             int lineNum = 0;
+            // Flag: salta il primo "segmento" implicito dall'origine (0,0,0)
+            // al primo punto del file, che non corrisponde a nessun movimento reale.
+            boolean firstPositionSet = false;
 
             // Stato modale: persiste tra le righe come da spec GCode
             int modalMotion = 0; // 0=G0 rapid, 1=G1 linear, 2=G2 arc CW, 3=G3 arc CCW
@@ -454,20 +457,34 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
 
                 if (!isAbsolute) { nx += x; ny += y; nz += z; }
 
-                // Crea segmento se c'è movimento esplicito o coordinate cambiate
+                // Crea segmento se c'è movimento esplicito o coordinate cambiate.
+                // hasNonMotionG: la riga contiene un G-code che NON è G0/G1/G2/G3/G90/G91
+                // (es. G28, G53, G4, G17...). In quel caso le coordinate sono parametri
+                // del comando, non destinazioni di movimento → nessun segmento.
                 boolean hasCoords = (line.contains("X") || line.contains("Y") || line.contains("Z"));
                 boolean posChanged = (nx != x || ny != y || nz != z);
+                boolean hasNonMotionG = line.contains("G")
+                        && !hasG0 && !hasG1 && !hasG2 && !hasG3
+                        && !hasG90 && !hasG91;
 
-                if ((hasG0 || hasG1 || hasG2 || hasG3) || (hasCoords && posChanged)) {
-                    Segment seg = new Segment();
-                    seg.x1 = x; seg.y1 = y; seg.z1 = z;
-                    seg.x2 = nx; seg.y2 = ny; seg.z2 = nz;
-                    seg.isFastTraverse = (modalMotion == 0);
-                    seg.isArc          = (modalMotion == 2 || modalMotion == 3);
-                    seg.isZMove        = (nz != z && nx == x && ny == y);
-                    seg.lineNumber     = lineNum;
-                    segments.add(seg);
-                    updateExtremes(nx, ny, nz);
+                if ((hasG0 || hasG1 || hasG2 || hasG3) || (!hasNonMotionG && hasCoords && posChanged)) {
+                    if (!firstPositionSet) {
+                        // Prima coordinata reale del file: la usiamo come punto di
+                        // partenza senza disegnare il segmento (0,0,0) → primo punto,
+                        // che non esiste nel programma GCode.
+                        firstPositionSet = true;
+                        updateExtremes(nx, ny, nz); // il punto fa parte del bounding box
+                    } else {
+                        Segment seg = new Segment();
+                        seg.x1 = x; seg.y1 = y; seg.z1 = z;
+                        seg.x2 = nx; seg.y2 = ny; seg.z2 = nz;
+                        seg.isFastTraverse = (modalMotion == 0);
+                        seg.isArc          = (modalMotion == 2 || modalMotion == 3);
+                        seg.isZMove        = (nz != z && nx == x && ny == y);
+                        seg.lineNumber     = lineNum;
+                        segments.add(seg);
+                        updateExtremes(nx, ny, nz);
+                    }
                 }
 
                 x = nx; y = ny; z = nz;
@@ -476,6 +493,36 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         } catch (IOException e) {
             Log.e(TAG, "Errore lettura file GCode: " + e.getMessage());
             return;
+        }
+
+        // --- Post-parse: rimuovi i rapidi di fine programma verso l'origine ---
+        // Il post-processor solitamente chiude con "G0 X0 Y0" (ritorno al parcheggio).
+        // Questo crea una lunga linea blu dall'ultimo punto di lavoro all'origine
+        // che appare come un artefatto speculare a quello iniziale.
+        // Condizone: ultimo segmento è un G0 rapido che finisce con X≈0 e Y≈0.
+        while (!segments.isEmpty()) {
+            Segment last = segments.get(segments.size() - 1);
+            if (last.isFastTraverse
+                    && Math.abs(last.x2) < 0.001f
+                    && Math.abs(last.y2) < 0.001f) {
+                segments.remove(segments.size() - 1);
+            } else {
+                break;
+            }
+        }
+
+        if (segments.isEmpty()) {
+            Log.w(TAG, "Nessun segmento valido nel file GCode dopo la pulizia.");
+            return;
+        }
+
+        // Ricalcola il bounding box dai segmenti definitivi.
+        // Include sia il punto di inizio (x1) sia quello di fine (x2) di ogni segmento
+        // in modo che il centro e la scala siano corretti senza includere l'origine.
+        resetExtremes();
+        for (Segment seg : segments) {
+            updateExtremes(seg.x1, seg.y1, seg.z1);
+            updateExtremes(seg.x2, seg.y2, seg.z2);
         }
 
         // Calcola centro e scala

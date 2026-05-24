@@ -30,7 +30,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.RelativeLayout;
+import android.widget.SeekBar;
 import android.widget.TableRow;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SwitchCompat;
@@ -129,6 +131,11 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     /** true se è attivo un jog continuo — serve per mandare cancel al rilascio */
     private boolean jogContinuousActive = false;
 
+    /** true = modalità continuo (press = jog immediato, release = stop) */
+    private boolean continuousModeEnabled = false;
+
+    private IconButton jogCancelButton;
+
     public JoggingTabFragment() {}
 
     public static JoggingTabFragment newInstance() {
@@ -155,24 +162,41 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         super.onResume();
         SetCustomButtons(requireView());
 
-        String joggingPadRotateAngle = sharedPref.getString(
-                getString(R.string.preference_xy_jog_pad_rotation), "0");
-        String[] joggingPadTags = rotateJogPad(Integer.parseInt(joggingPadRotateAngle));
+        String[] jogTags = {"$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s",
+                "$J=%sG91X-%sF%s", "$J=%sG91X%sF%s",
+                "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s"};
         int jogPadIndex = 0;
         for (int resourceId : new Integer[]{
                 R.id.jog_xy_top_left, R.id.jog_y_positive, R.id.jog_xy_top_right,
                 R.id.jog_x_negative, R.id.jog_x_positive,
                 R.id.jog_xy_bottom_left, R.id.jog_y_negative, R.id.jog_xy_bottom_right}) {
-            final IconButton jogButton = requireView().findViewById(resourceId);
-            jogButton.setTag(joggingPadTags[jogPadIndex]);
-            jogPadIndex++;
+            requireView().findViewById(resourceId).setTag(jogTags[jogPadIndex++]);
         }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isAdded() && fragmentInteractionListener != null
+                && machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
+            fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+        }
+        jogContinuousActive = false;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         EventBus.getDefault().unregister(this);
+    }
+
+    private void sendJogCancelRobust() {
+        fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+        requireView().postDelayed(() -> {
+            if (isAdded() && machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
+                fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+            }
+        }, 60);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -205,39 +229,33 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 switch (event.getAction()) {
 
                     case android.view.MotionEvent.ACTION_DOWN:
-                        // FIX: cancella qualsiasi postDelayed pendente dalla pressione
-                        // precedente — evita che un doppio tap rapido lanci un jog
-                        // continuo non voluto
                         iconButton.removeCallbacks(null);
                         jogPressTime = System.currentTimeMillis();
                         jogContinuousActive = false;
 
-                        // Avvia jog continuo dopo la soglia con un postDelayed
-                        iconButton.postDelayed(() -> {
-                            if (iconButton.isPressed()) {
-                                sendJogContinuous(iconButton.getTag().toString());
-                                jogContinuousActive = true;
-                            }
-                        }, JOG_CONTINUOUS_THRESHOLD_MS);
+                        if (continuousModeEnabled) {
+                            // Modalità continuo: jog immediato senza attesa
+                            sendJogContinuous(iconButton.getTag().toString());
+                            jogContinuousActive = true;
+                        } else {
+                            // Modalità step: continuo solo se tenuto premuto > soglia
+                            iconButton.postDelayed(() -> {
+                                if (iconButton.isPressed()) {
+                                    sendJogContinuous(iconButton.getTag().toString());
+                                    jogContinuousActive = true;
+                                }
+                            }, JOG_CONTINUOUS_THRESHOLD_MS);
+                        }
                         return false;
 
                     case android.view.MotionEvent.ACTION_UP:
                     case android.view.MotionEvent.ACTION_CANCEL:
-                        // FIX: cancella il postDelayed se il dito è rilasciato
-                        // prima della soglia — previene jog continuo fantasma
                         iconButton.removeCallbacks(null);
-
-                        long pressDuration = System.currentTimeMillis() - jogPressTime;
-
                         if (jogContinuousActive) {
-                            // Era jog continuo — manda cancel (due volte per sicurezza)
-                            fragmentInteractionListener.onGrblRealTimeCommandReceived(
-                                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
-                            fragmentInteractionListener.onGrblRealTimeCommandReceived(
-                                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+                            sendJogCancelRobust();
                             jogContinuousActive = false;
-                        } else if (pressDuration < JOG_CONTINUOUS_THRESHOLD_MS) {
-                            // Tap breve — jog passo singolo
+                        } else if (!continuousModeEnabled &&
+                                System.currentTimeMillis() - jogPressTime < JOG_CONTINUOUS_THRESHOLD_MS) {
                             sendJogCommand(iconButton.getTag().toString());
                         }
                         return false;
@@ -255,8 +273,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             iconButton.setOnLongClickListener(this);
         }
 
-        // jog_cancel: click breve = stop jog
-        view.findViewById(R.id.jog_cancel).setOnClickListener(this);
+        jogCancelButton = view.findViewById(R.id.jog_cancel);
 
         // btn_step_cycle: click breve = cicla step, long click = imposta 1.0
         btnStepCycle = view.findViewById(R.id.btn_step_cycle);
@@ -312,6 +329,32 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 //            }
 //        }
 
+        SeekBar feedSlider = view.findViewById(R.id.jog_feed_slider);
+        TextView feedValueLabel = view.findViewById(R.id.jog_feed_value_label);
+        Double maxFeed = sharedPref.getDouble(getString(R.string.preference_jogging_max_feed_rate), 2400.0);
+        feedSlider.setMax(maxFeed.intValue());
+        feedSlider.setProgress(machineStatus.getJogging().feed.intValue());
+        feedValueLabel.setText(String.valueOf(machineStatus.getJogging().feed.intValue()));
+        feedSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    feedValueLabel.setText(String.valueOf(progress));
+                    machineStatus.setJogging(
+                            machineStatus.getJogging().stepXY,
+                            machineStatus.getJogging().stepZ,
+                            (double) progress,
+                            sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                sharedPref.edit().putDouble(getString(R.string.preference_jogging_feed_rate),
+                        seekBar.getProgress()).commit();
+            }
+        });
+
         return view;
     }
 
@@ -356,16 +399,10 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 return;
 
             case R.id.jog_cancel:
-                if (machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
-                    fragmentInteractionListener.onGrblRealTimeCommandReceived(
-                            GrblUtils.GRBL_JOG_CANCEL_COMMAND);
-                }
-                if (customCommandsAsyncTask != null
-                        && customCommandsAsyncTask.getStatus() == AsyncTask.Status.RUNNING) {
-                    customCommandsAsyncTask.cancel(true);
-                    fragmentInteractionListener.onGrblRealTimeCommandReceived(
-                            GrblUtils.GRBL_RESET_COMMAND);
-                }
+                continuousModeEnabled = !continuousModeEnabled;
+                jogCancelButton.setText(continuousModeEnabled
+                        ? "{fa-arrows 22dp @color/colorAccent}"
+                        : "{fa-stop-circle-o 26dp @color/colorPrimary}");
                 break;
 
             case R.id.run_homing_cycle:
@@ -425,26 +462,13 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         switch (id) {
             case R.id.jog_cancel:
                 // Long click: homing cycle (spostato da run_homing_cycle)
-                if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
-                        || machineStatus.getState().equals(Constants.MACHINE_STATUS_ALARM)) {
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(getString(R.string.text_homing_cycle))
-                            .setMessage(getString(R.string.text_do_homing_cycle))
-                            .setPositiveButton(getString(R.string.text_yes_confirm),
-                                    (dialog, which) -> fragmentInteractionListener
-                                            .onGcodeCommandReceived(GrblUtils.GRBL_RUN_HOMING_CYCLE))
-                            .setNegativeButton(getString(R.string.text_no_confirm), null)
-                            .show();
-                } else {
-                    EventBus.getDefault().post(new UiToastEvent(
-                            getString(R.string.text_machine_not_idle), true, true));
-                }
+
                 return true;
 
             case R.id.wpos_g54:
-            case R.id.wpos_g55:
-            case R.id.wpos_g56:
-            case R.id.wpos_g57:
+            //case R.id.wpos_g55:
+            //case R.id.wpos_g56:
+            //case R.id.wpos_g57:
                 saveWPos((Button) view);
                 return true;
 
@@ -551,7 +575,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .show();
     }
     private void generaFileLivellato() {
-        File appDir = requireActivity().getExternalFilesDir(null);
+        File appDir = getAppMediaDir();
         File pointsFile = new File(appDir, "points.txt");
 
         // Recupera il file attualmente attivo (senza modificarne lo stato nell'app)
@@ -618,9 +642,16 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      * Restituisce il File per points.txt nella directory esterna dell'app.
      * Restituisce null se la directory non è disponibile.
      */
-    private File getPointsFile() {
+    private File getAppMediaDir() {
         if (getActivity() == null) return null;
-        File dir = getActivity().getExternalFilesDir(null);
+        File[] dirs = getActivity().getExternalMediaDirs();
+        if (dirs == null || dirs.length == 0 || dirs[0] == null) return null;
+        if (!dirs[0].exists()) dirs[0].mkdirs();
+        return dirs[0];
+    }
+
+    private File getPointsFile() {
+        File dir = getAppMediaDir();
         if (dir == null) return null;
         return new File(dir, POINTS_FILE_NAME);
     }
@@ -1066,18 +1097,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         dialog.show();
     }
 
-    private String[] rotateJogPad(int angle) {
-        switch (angle) {
-            case 90:
-                return new String[]{"$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91X-%sF%s", "$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s", "$J=%sG91X%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s"};
-            case 180:
-                return new String[]{"$J=%1$sG91X%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91X%sF%s", "$J=%sG91X-%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X-%2$sY%2$sF%3$s"};
-            case 270:
-                return new String[]{"$J=%1$sG91X%2$sY%2$sF%3$s", "$J=%sG91X%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91X-%sF%s", "$J=%1$sG91X-%2$sY-%2$sF%3$s"};
-            default:
-                return new String[]{"$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s", "$J=%sG91X-%sF%s", "$J=%sG91X%sF%s", "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s"};
-        }
-    }
 
 
     private void sendCommandIfIdle(String command) {

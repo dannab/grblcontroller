@@ -103,9 +103,18 @@ public class GcodeEditorFragment extends BaseFragment {
     }
 
     @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Reset degli stati legati alla view: quando il ViewPager ricrea il fragment
+        // questi devono ripartire da zero altrimenti l'editor resta vuoto
+        isEditorLoaded = false;
+        currentGcodeFile = null;
+        webView = null;
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
-        // Se l'utente ha cambiato file in un altro tab, lo rinfreschiamo al ritorno nel fragment
         if (isEditorLoaded) {
             checkAndLoadActiveFile();
         }
@@ -145,21 +154,27 @@ public class GcodeEditorFragment extends BaseFragment {
                     sb.append(line).append("\n");
                 }
                 String content = sb.toString();
+                String escaped = content.replace("\\", "\\\\")
+                        .replace("`", "\\`")
+                        .replace("$", "\\$");
 
-                // Iniettiamo i dati puliti via JS nel thread della UI
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        // Escapizziamo i caratteri speciali JS prima del passaggio passandolo in sicurezza
-                        String escaped = content.replace("\\", "\\\\")
-                                .replace("`", "\\`")
-                                .replace("$", "\\$");
-
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
                         webView.evaluateJavascript("setGcodeContent(`" + escaped + "`);", null);
                         loadingOverlay.setVisibility(View.GONE);
                     });
+                } else {
+                    // Fragment non più visibile durante il caricamento —
+                    // reset del file corrente così al prossimo onResume verrà ricaricato
+                    currentGcodeFile = null;
                 }
             } catch (IOException e) {
+                currentGcodeFile = null;
                 postUiToast("Errore lettura file: " + e.getMessage(), true);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() ->
+                            loadingOverlay.setVisibility(View.GONE));
+                }
             }
         }).start();
     }
@@ -193,16 +208,20 @@ public class GcodeEditorFragment extends BaseFragment {
                     try (BufferedWriter bw = new BufferedWriter(new FileWriter(currentGcodeFile))) {
                         bw.write(unescapedContent);
                         bw.flush();
-
-                        // Forza FileSenderListener a ricaricare lo stato del file modificato
-                        fileSender.setGcodeFile(currentGcodeFile);
-
                         postUiToast("File G-Code salvato e sincronizzato", false);
                     } catch (IOException e) {
                         postUiToast("Errore durante il salvataggio: " + e.getMessage(), true);
                     } finally {
-                        if (getActivity() != null) {
-                            getActivity().runOnUiThread(() -> loadingOverlay.setVisibility(View.GONE));
+                        if (isAdded()) {
+                            final File saved = currentGcodeFile;
+                            requireActivity().runOnUiThread(() -> {
+                                // setGcodeFile chiama notifyPropertyChanged — deve stare sul main thread
+                                FileSenderListener.getInstance().setGcodeFile(saved);
+                                FileSenderListener.getInstance().setElapsedTime("00:00:00");
+                                new FileSenderTabFragment.ReadFileAsyncTask().execute(saved);
+                                //fileSender.setGcodeFile(saved);
+                                loadingOverlay.setVisibility(View.GONE);
+                            });
                         }
                     }
                 }).start();
