@@ -22,12 +22,16 @@
 
 package in.co.gorest.grblcontroller.ui;
 
+import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -43,6 +47,8 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -72,9 +78,14 @@ public class ZAnalyzerTabFragment extends BaseFragment {
     // -------------------------------------------------------------------------
     // Viste
     // -------------------------------------------------------------------------
-    private ZChartView  zChartView;
-    private TextView    tvThreshold;
-    private TextView    tvZInfo;
+    private ZChartView         zChartView;
+    private ZHeatmapStripView  zHeatmap;
+    private TextView           tvThreshold;
+    private TextView           tvZInfo;
+    private TextView           tvVerdict;
+    private LinearLayout       llTopDrops;
+
+    private static final int TOP_DROPS_MAX = 10;
 
     // -------------------------------------------------------------------------
     // Callback FileSenderListener — nuovo file selezionato
@@ -137,8 +148,14 @@ public class ZAnalyzerTabFragment extends BaseFragment {
         View view = binding.getRoot();
 
         zChartView  = view.findViewById(R.id.zChartView);
+        zHeatmap    = view.findViewById(R.id.zHeatmap);
         tvThreshold = view.findViewById(R.id.tvThreshold);
         tvZInfo     = view.findViewById(R.id.tvZInfo);
+        tvVerdict   = view.findViewById(R.id.tvVerdict);
+        llTopDrops  = view.findViewById(R.id.llTopDrops);
+
+        // Tap sulla heatmap → centra il grafico principale sul punto toccato
+        zHeatmap.setOnSegmentTapListener(idx -> zChartView.centerOnIndex(idx));
 
         updateThresholdLabel();
 
@@ -218,8 +235,10 @@ public class ZAnalyzerTabFragment extends BaseFragment {
                 float x = 0, y = 0, z = 0;
                 boolean isAbsolute = true;
                 int modalMotion = 0;
+                int lineNo = 0;
 
                 while ((line = reader.readLine()) != null) {
+                    lineNo++;
                     line = line.trim().toUpperCase();
                     if (line.isEmpty()) continue;
 
@@ -253,10 +272,19 @@ public class ZAnalyzerTabFragment extends BaseFragment {
                         float dz = nz - z; // variazione Z (negativa = discesa)
                         result.zValues.add(nz);
                         result.dzValues.add(dz);
+                        result.lineNumbers.add(lineNo);
 
                         // Critico se discesa brusca (dz negativo oltre soglia)
                         if (dz < -threshold) {
-                            result.criticalIdx.add(result.zValues.size() - 1);
+                            int segIdx = result.zValues.size() - 1;
+                            result.criticalIdx.add(segIdx);
+                            CriticalDrop drop = new CriticalDrop();
+                            drop.segmentIdx = segIdx;
+                            drop.lineNumber = lineNo;
+                            drop.zBefore = z;
+                            drop.zAfter  = nz;
+                            drop.dz      = dz;
+                            result.drops.add(drop);
                         }
 
                         x = nx; y = ny; z = nz;
@@ -274,6 +302,9 @@ public class ZAnalyzerTabFragment extends BaseFragment {
         protected void onPostExecute(AnalyzeResult result) {
             if (result.zValues.isEmpty()) {
                 tvZInfo.setText("Nessun movimento trovato nel file.");
+                setVerdict(VerdictLevel.UNKNOWN, "Nessun movimento trovato nel file");
+                llTopDrops.removeAllViews();
+                zHeatmap.setData(null, threshold);
                 return;
             }
 
@@ -295,8 +326,105 @@ public class ZAnalyzerTabFragment extends BaseFragment {
                     dzMin, threshold, result.criticalIdx.size());
 
             tvZInfo.setText(info);
+
+            // --- Banner-semaforo: verdetto a colpo d'occhio ---
+            int nCrit = result.drops.size();
+            if (nCrit == 0) {
+                setVerdict(VerdictLevel.OK, String.format(Locale.US,
+                        "OK — nessuna discesa oltre %.1f mm", threshold));
+            } else {
+                float worst = Math.abs(dzMin);
+                boolean severe = worst >= 2f * threshold;
+                String msg = String.format(Locale.US,
+                        "%s — %d affond%s | discesa max: %.2f mm (soglia %.1f)",
+                        severe ? "AFFONDI CRITICI" : "Attenzione",
+                        nCrit, nCrit == 1 ? "o" : "i",
+                        worst, threshold);
+                setVerdict(severe ? VerdictLevel.CRITICAL : VerdictLevel.WARN, msg);
+            }
+
+            // --- Heatmap strip ---
+            zHeatmap.setData(result.dzValues, threshold);
+
+            // --- Lista top-N affondi peggiori ---
+            populateTopDrops(result.drops);
+
             zChartView.setData(result.zValues, result.dzValues,
                                result.criticalIdx, threshold);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Banner-semaforo
+    // -------------------------------------------------------------------------
+
+    private enum VerdictLevel { OK, WARN, CRITICAL, UNKNOWN }
+
+    private void setVerdict(VerdictLevel level, String message) {
+        if (tvVerdict == null) return;
+        int bg;
+        switch (level) {
+            case OK:        bg = Color.parseColor("#2E7D32"); break; // verde
+            case WARN:      bg = Color.parseColor("#F57C00"); break; // arancio
+            case CRITICAL:  bg = Color.parseColor("#C62828"); break; // rosso scuro
+            default:        bg = Color.parseColor("#9E9E9E"); break; // grigio
+        }
+        tvVerdict.setBackgroundColor(bg);
+        tvVerdict.setText(message);
+    }
+
+    // -------------------------------------------------------------------------
+    // Lista top-N affondi peggiori (tap → centra grafico)
+    // -------------------------------------------------------------------------
+
+    private void populateTopDrops(List<CriticalDrop> drops) {
+        llTopDrops.removeAllViews();
+        if (drops == null || drops.isEmpty()) return;
+
+        // Ordina per dz più negativo (più severo prima)
+        List<CriticalDrop> sorted = new ArrayList<>(drops);
+        Collections.sort(sorted, new Comparator<CriticalDrop>() {
+            @Override
+            public int compare(CriticalDrop a, CriticalDrop b) {
+                return Float.compare(a.dz, b.dz); // più negativo = prima
+            }
+        });
+
+        int n = Math.min(TOP_DROPS_MAX, sorted.size());
+
+        // Header
+        TextView header = new TextView(getContext());
+        header.setText(String.format(Locale.US,
+                "Top %d affondi (tap per centrare sul grafico)", n));
+        header.setTextColor(Color.parseColor("#555555"));
+        header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        header.setPadding(0, 2, 0, 4);
+        llTopDrops.addView(header);
+
+        for (int i = 0; i < n; i++) {
+            final CriticalDrop d = sorted.get(i);
+            TextView row = new TextView(getContext());
+            float worst = Math.abs(d.dz);
+            // Colore proporzionale alla severità
+            int fg;
+            if (worst >= 2f * threshold)      fg = Color.parseColor("#B71C1C");
+            else if (worst >= 1.5f * threshold) fg = Color.parseColor("#E65100");
+            else                              fg = Color.parseColor("#F9A825");
+
+            String txt = String.format(Locale.US,
+                    "%2d. riga %-5d  Z: %+7.2f → %+7.2f   ΔZ: %+6.2f mm",
+                    i + 1, d.lineNumber, d.zBefore, d.zAfter, d.dz);
+            row.setText(txt);
+            row.setTextColor(fg);
+            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            row.setTypeface(android.graphics.Typeface.MONOSPACE);
+            row.setPadding(8, 4, 8, 4);
+            row.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            row.setBackgroundResource(android.R.drawable.list_selector_background);
+            row.setClickable(true);
+            row.setFocusable(true);
+            row.setOnClickListener(v -> zChartView.centerOnIndex(d.segmentIdx));
+            llTopDrops.addView(row);
         }
     }
 
@@ -305,9 +433,22 @@ public class ZAnalyzerTabFragment extends BaseFragment {
     // -------------------------------------------------------------------------
 
     private static class AnalyzeResult {
-        final List<Float>   zValues     = new ArrayList<>();
-        final List<Float>   dzValues    = new ArrayList<>();
-        final List<Integer> criticalIdx = new ArrayList<>();
+        final List<Float>         zValues     = new ArrayList<>();
+        final List<Float>         dzValues    = new ArrayList<>();
+        final List<Integer>       lineNumbers = new ArrayList<>();
+        final List<Integer>       criticalIdx = new ArrayList<>();
+        final List<CriticalDrop>  drops       = new ArrayList<>();
+    }
+
+    /**
+     * Dettagli di un singolo affondo critico, usato dalla lista top-N.
+     */
+    private static class CriticalDrop {
+        int   segmentIdx;
+        int   lineNumber;
+        float zBefore;
+        float zAfter;
+        float dz;
     }
 
     // -------------------------------------------------------------------------

@@ -169,6 +169,35 @@ public class ZChartView extends View {
         invalidate();
     }
 
+    /**
+     * Centra la viewport sul segmento dato, applicando un buon livello di zoom
+     * per rendere il punto facilmente visibile. Usato dalla lista dei punti critici.
+     */
+    public void centerOnIndex(int idx) {
+        if (zValues == null || zValues.isEmpty()) return;
+        if (idx < 0) idx = 0;
+        if (idx >= zValues.size()) idx = zValues.size() - 1;
+
+        int n = zValues.size();
+        // Zoom: mostra circa 80 segmenti attorno al punto (o tutto se file piccolo)
+        float desiredVisible = Math.min(n, 80);
+        scaleX = n / desiredVisible;
+        scaleX = Math.max(1f, Math.min(50f, scaleX));
+
+        // Centra: vogliamo che `idx` sia a metà del chart visibile
+        float chartW = getWidth() - PADDING_LEFT - PADDING_RIGHT;
+        if (chartW <= 0) {
+            // Non ancora misurata: posticipa
+            final int finalIdx = idx;
+            post(() -> centerOnIndex(finalIdx));
+            return;
+        }
+        float stepX = (chartW * scaleX) / Math.max(n - 1, 1);
+        offsetX = chartW / 2f - idx * stepX;
+        clampOffset();
+        invalidate();
+    }
+
     // -------------------------------------------------------------------------
     // Touch
     // -------------------------------------------------------------------------

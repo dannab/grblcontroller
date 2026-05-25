@@ -30,9 +30,9 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
@@ -99,6 +99,8 @@ public class GcodeVisualizerFragment extends BaseFragment {
     private GLSurfaceView glSurfaceView;
     private ImageButton btnResetView;
     private ImageButton btnZoomFit;
+    private Button btnZoomIn;
+    private Button btnZoomOut;
 
     // -------------------------------------------------------------------------
     // Renderer OpenGL ES
@@ -106,10 +108,18 @@ public class GcodeVisualizerFragment extends BaseFragment {
     private GcodeRenderer renderer;
 
     // -------------------------------------------------------------------------
-    // Gesture
+    // Gesture: rotazione a 1 dito.
+    // Pinch zoom e pan a 2 dita rimossi su richiesta dell'utente (il pan a 2
+    // dita interferiva con lo swipe del ViewPager tra tab). Zoom ora gestito
+    // dai pulsanti +/- in alto. Pan rimosso del tutto: per cambiare la zona
+    // visibile si usa zoom fit e reset vista.
     // -------------------------------------------------------------------------
-    private ScaleGestureDetector scaleDetector;
     private float lastTouchX, lastTouchY;
+
+    /** Fattore di zoom applicato a ogni click del pulsante "+". */
+    private static final float ZOOM_STEP_IN = 1.25f;
+    /** Fattore di zoom applicato a ogni click del pulsante "-". Inverso esatto di IN. */
+    private static final float ZOOM_STEP_OUT = 1.0f / ZOOM_STEP_IN;
 
     // -------------------------------------------------------------------------
     // Factory method
@@ -174,6 +184,8 @@ public class GcodeVisualizerFragment extends BaseFragment {
         glSurfaceView = view.findViewById(R.id.glSurfaceView);
         btnResetView  = view.findViewById(R.id.btnResetView);
         btnZoomFit    = view.findViewById(R.id.btnZoomFit);
+        btnZoomIn     = view.findViewById(R.id.btnZoomIn);
+        btnZoomOut    = view.findViewById(R.id.btnZoomOut);
 
         // --- Configura GLSurfaceView ---
         glSurfaceView.setEGLContextClientVersion(2);
@@ -184,8 +196,7 @@ public class GcodeVisualizerFragment extends BaseFragment {
         glSurfaceView.setRenderer(renderer);
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
-        // --- Gesture ---
-        scaleDetector = new ScaleGestureDetector(requireContext(), new PinchZoomListener());
+        // --- Gesture: solo rotazione a 1 dito ---
         glSurfaceView.setOnTouchListener(this::onTouch);
 
         // --- Pulsanti ---
@@ -195,6 +206,14 @@ public class GcodeVisualizerFragment extends BaseFragment {
         });
         btnZoomFit.setOnClickListener(v -> {
             glSurfaceView.queueEvent(() -> renderer.zoomFit());
+            glSurfaceView.requestRender();
+        });
+        btnZoomIn.setOnClickListener(v -> {
+            glSurfaceView.queueEvent(() -> renderer.zoom(ZOOM_STEP_IN));
+            glSurfaceView.requestRender();
+        });
+        btnZoomOut.setOnClickListener(v -> {
+            glSurfaceView.queueEvent(() -> renderer.zoom(ZOOM_STEP_OUT));
             glSurfaceView.requestRender();
         });
 
@@ -239,44 +258,45 @@ public class GcodeVisualizerFragment extends BaseFragment {
 
     @SuppressWarnings("ClickableViewAccessibility")
     private boolean onTouch(View v, MotionEvent event) {
-        scaleDetector.onTouchEvent(event);
-
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_POINTER_DOWN:
+                // Chiediamo al parent (ViewPager) di NON intercettare il
+                // movimento orizzontale finché stiamo manipolando la vista 3D,
+                // altrimenti uno swipe laterale farebbe cambiare tab invece di
+                // ruotare il modello.
+                if (v.getParent() != null) {
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                }
                 lastTouchX = event.getX(0);
                 lastTouchY = event.getY(0);
                 break;
 
             case MotionEvent.ACTION_MOVE:
-                if (scaleDetector.isInProgress()) break;
+                // Solo rotazione a 1 dito. Touch multipli vengono ignorati:
+                // niente più pinch zoom (sostituito dai pulsanti +/-) né
+                // pan a 2 dita (rimosso per non interferire con il ViewPager).
+                if (event.getPointerCount() != 1) break;
 
                 float dx = event.getX(0) - lastTouchX;
                 float dy = event.getY(0) - lastTouchY;
 
-                if (event.getPointerCount() >= 2) {
-                    final float fdx = dx, fdy = dy;
-                    glSurfaceView.queueEvent(() -> renderer.pan(fdx, fdy));
-                } else {
-                    final float rx = dx * 0.5f, ry = dy * 0.5f;
-                    glSurfaceView.queueEvent(() -> renderer.rotate(rx, ry));
-                }
-
+                final float rx = dx * 0.5f, ry = dy * 0.5f;
+                glSurfaceView.queueEvent(() -> renderer.rotate(rx, ry));
                 glSurfaceView.requestRender();
+
                 lastTouchX = event.getX(0);
                 lastTouchY = event.getY(0);
                 break;
+
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                // Tocco finito: il ViewPager può tornare libero di intercettare
+                // gli swipe per cambiare tab.
+                if (v.getParent() != null) {
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                break;
         }
         return true;
-    }
-
-    private class PinchZoomListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
-        @Override
-        public boolean onScale(ScaleGestureDetector detector) {
-            float factor = detector.getScaleFactor();
-            glSurfaceView.queueEvent(() -> renderer.zoom(factor));
-            glSurfaceView.requestRender();
-            return true;
-        }
     }
 }

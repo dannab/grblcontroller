@@ -78,6 +78,21 @@
 
         </LinearLayout>
 
+        <!-- Banner semaforo: verde/giallo/rosso a seconda della gravità -->
+        <TextView
+            android:id="@+id/tvVerdict"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:gravity="center"
+            android:background="#9E9E9E"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:fontFamily="monospace"
+            android:text="Carica un file GCode e premi Analizza"
+            tools:ignore="HardcodedText" />
+
         <!-- Info riepilogativa -->
         <TextView
             android:id="@+id/tvZInfo"
@@ -88,8 +103,41 @@
             android:textSize="11sp"
             android:fontFamily="monospace"
             android:textColor="#333333"
-            android:text="Carica un file GCode e premi Analizza"
+            android:text=""
             tools:ignore="HardcodedText" />
+
+        <!-- Heatmap strip: mostra dove nel programma cadono gli affondi -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="4dp"
+            android:text="Mappa affondi (inizio → fine programma)"
+            android:textColor="#666666"
+            android:textSize="10sp"
+            tools:ignore="HardcodedText,RtlSymmetry" />
+
+        <in.co.gorest.grblcontroller.ui.ZHeatmapStripView
+            android:id="@+id/zHeatmap"
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_marginBottom="2dp" />
+
+        <!-- Lista top-N affondi (sostituita dinamicamente nel fragment) -->
+        <LinearLayout
+            android:id="@+id/llTopDrops"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FAFAFA"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            tools:ignore="RtlSymmetry" />
 
         <!-- Vista grafico custom — occupa tutto lo spazio rimasto -->
         <in.co.gorest.grblcontroller.ui.ZChartView

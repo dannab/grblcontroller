@@ -59,6 +59,38 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Zoom adatta" />
 
+            <!-- Pulsante zoom out (-) -->
+            <Button
+                android:id="@+id/btnZoomOut"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="−"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:contentDescription="Zoom out"
+                tools:ignore="HardcodedText" />
+
+            <!-- Pulsante zoom in (+) -->
+            <Button
+                android:id="@+id/btnZoomIn"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:contentDescription="Zoom in"
+                tools:ignore="HardcodedText" />
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
