@@ -116,17 +116,22 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     private IconButton btnStepCycle;
 
     /**
-     * Soglia ms per distinguere tap breve (passo singolo) da pressione lunga (jog continuo).
-     */
-    private static final long JOG_CONTINUOUS_THRESHOLD_MS = 200;
-
-    /**
      * Distanza grande per jog continuo: GRBL si muove fino al jog cancel (0x85).
+     * Usata solo in modalità continuo.
      */
     private static final double JOG_CONTINUOUS_DISTANCE = 9999.0;
 
-    /** Timestamp pressione tasto */
-    private long jogPressTime = 0;
+    /**
+     * Ritardo (ms) prima che inizi la ripetizione automatica degli step
+     * quando il pulsante viene tenuto premuto. Dopo questo ritardo viene
+     * inviato un nuovo step ogni STEP_REPEAT_INTERVAL_MS.
+     */
+    private static final long STEP_REPEAT_INITIAL_DELAY_MS = 400;
+
+    /**
+     * Intervallo (ms) tra step ripetuti quando il pulsante è tenuto premuto.
+     */
+    private static final long STEP_REPEAT_INTERVAL_MS = 100;
 
     /** true se è attivo un jog continuo — serve per mandare cancel al rilascio */
     private boolean jogContinuousActive = false;
@@ -164,12 +169,14 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
         String[] jogTags = {"$J=%1$sG91X-%2$sY%2$sF%3$s", "$J=%sG91Y%sF%s", "$J=%1$sG91X%2$sY%2$sF%3$s",
                 "$J=%sG91X-%sF%s", "$J=%sG91X%sF%s",
-                "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s"};
+                "$J=%1$sG91X-%2$sY-%2$sF%3$s", "$J=%sG91Y-%sF%s", "$J=%1$sG91X%2$sY-%2$sF%3$s",
+                "$J=%sG91A-%sF%s", "$J=%sG91A%sF%s"};
         int jogPadIndex = 0;
         for (int resourceId : new Integer[]{
                 R.id.jog_xy_top_left, R.id.jog_y_positive, R.id.jog_xy_top_right,
                 R.id.jog_x_negative, R.id.jog_x_positive,
-                R.id.jog_xy_bottom_left, R.id.jog_y_negative, R.id.jog_xy_bottom_right}) {
+                R.id.jog_xy_bottom_left, R.id.jog_y_negative, R.id.jog_xy_bottom_right,
+                R.id.jog_a_negative, R.id.jog_a_positive}) {
             requireView().findViewById(resourceId).setTag(jogTags[jogPadIndex++]);
         }
     }
@@ -217,12 +224,18 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 R.id.jog_y_positive, R.id.jog_x_positive, R.id.jog_z_positive,
                 R.id.jog_xy_top_left, R.id.jog_xy_top_right,
                 R.id.jog_xy_bottom_left, R.id.jog_xy_bottom_right,
-                R.id.jog_y_negative, R.id.jog_x_negative, R.id.jog_z_negative}) {
+                R.id.jog_y_negative, R.id.jog_x_negative, R.id.jog_z_negative,
+                R.id.jog_a_positive, R.id.jog_a_negative}) {
 
             final IconButton iconButton = view.findViewById(resourceId);
 
-            // Rimosso RepeatListener — gestione manuale con ACTION_DOWN/UP
-            // per distinguere tap breve (passo singolo) da pressione lunga (jog continuo)
+            // Comportamento:
+            //  - Modalità STEP (default): tap = 1 step singolo, hold = ripetizione
+            //    automatica dello stesso step finché il tasto resta premuto.
+            //    Niente più soglia temporale: lo step parte sempre al DOWN,
+            //    poi si ripete da solo dopo STEP_REPEAT_INITIAL_DELAY_MS e
+            //    successivamente ogni STEP_REPEAT_INTERVAL_MS.
+            //  - Modalità CONTINUO: press = jog continuo, release = jog cancel.
             iconButton.setOnTouchListener((v, event) -> {
                 if (!isAdded()) return false;
 
@@ -230,7 +243,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
                     case android.view.MotionEvent.ACTION_DOWN:
                         iconButton.removeCallbacks(null);
-                        jogPressTime = System.currentTimeMillis();
                         jogContinuousActive = false;
 
                         if (continuousModeEnabled) {
@@ -238,13 +250,20 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                             sendJogContinuous(iconButton.getTag().toString());
                             jogContinuousActive = true;
                         } else {
-                            // Modalità step: continuo solo se tenuto premuto > soglia
-                            iconButton.postDelayed(() -> {
-                                if (iconButton.isPressed()) {
-                                    sendJogContinuous(iconButton.getTag().toString());
-                                    jogContinuousActive = true;
+                            // Modalità step: invia subito uno step, poi avvia
+                            // la ripetizione automatica finché il tasto è premuto.
+                            final String tag = iconButton.getTag().toString();
+                            sendJogCommand(tag);
+
+                            iconButton.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (iconButton.isPressed() && isAdded()) {
+                                        sendJogCommand(tag);
+                                        iconButton.postDelayed(this, STEP_REPEAT_INTERVAL_MS);
+                                    }
                                 }
-                            }, JOG_CONTINUOUS_THRESHOLD_MS);
+                            }, STEP_REPEAT_INITIAL_DELAY_MS);
                         }
                         return false;
 
@@ -254,9 +273,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                         if (jogContinuousActive) {
                             sendJogCancelRobust();
                             jogContinuousActive = false;
-                        } else if (!continuousModeEnabled &&
-                                System.currentTimeMillis() - jogPressTime < JOG_CONTINUOUS_THRESHOLD_MS) {
-                            sendJogCommand(iconButton.getTag().toString());
                         }
                         return false;
                 }
@@ -266,7 +282,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
         for (int resourceId : new Integer[]{
                 R.id.jog_cancel,R.id.wpos_g54,
-                R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero,
+                R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero, R.id.goto_a_zero,
                 R.id.get_point,R.id.run_homing_cycle,R.id.do_leveling}) {
             IconButton iconButton = view.findViewById(resourceId);
             iconButton.setOnClickListener(this);
@@ -445,6 +461,20 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 saveCurrentPoint();
                 break;
 
+            case R.id.goto_a_zero: {
+                // Click breve: azzera WPos asse A nella posizione corrente
+                // Stessa logica di goto_x/y/z_zero nel reset_zero_layout
+                final String tag = view.getTag().toString();
+                new AlertDialog.Builder(getActivity())
+                        .setTitle(getString(R.string.text_zero_selected_axis))
+                        .setMessage(getString(R.string.text_set_axis_location_in_current_wpos) + tag)
+                        .setPositiveButton(getString(R.string.text_yes_confirm),
+                                (dialog, which) -> sendCommandIfIdle(tag))
+                        .setNegativeButton(getString(R.string.text_no_confirm), null)
+                        .show();
+                break;
+            }
+
             case R.id.custom_button_1:
             case R.id.custom_button_2:
             case R.id.custom_button_3:
@@ -482,6 +512,10 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
             case R.id.goto_z_zero:
                 gotoAxisZero("Z");
+                return true;
+
+            case R.id.goto_a_zero:
+                gotoAxisZero("A");
                 return true;
 
             case R.id.get_point:
@@ -674,10 +708,11 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     }
 
     /**
-     * Applica il valore step a XY e Z e aggiorna MachineStatus e SharedPreferences.
+     * Applica il valore step a XY, Z e A e aggiorna MachineStatus e SharedPreferences.
      */
     private void applyStep(double step) {
         machineStatus.setJogging(
+                step,
                 step,
                 step,
                 machineStatus.getJogging().feed,
@@ -686,6 +721,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         sharedPref.edit()
                 .putDouble(getString(R.string.preference_jogging_step_size), step)
                 .putDouble(getString(R.string.preference_jogging_step_size_z), step)
+                .putDouble(getString(R.string.preference_jogging_step_size_a), step)
                 .commit();
 
         updateStepCycleButton();
@@ -863,9 +899,15 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 jogFeed = jogFeed / 25.4;
             }
 
-            Double stepSize = tag.toUpperCase().contains("Z")
-                    ? machineStatus.getJogging().stepZ
-                    : machineStatus.getJogging().stepXY;
+            String upperTag = tag.toUpperCase();
+            Double stepSize;
+            if (upperTag.contains("A")) {
+                stepSize = machineStatus.getJogging().stepA;
+            } else if (upperTag.contains("Z")) {
+                stepSize = machineStatus.getJogging().stepZ;
+            } else {
+                stepSize = machineStatus.getJogging().stepXY;
+            }
 
             String jog = String.format(tag, units, stepSize, jogFeed);
             EventBus.getDefault().post(new JogCommandEvent(jog));

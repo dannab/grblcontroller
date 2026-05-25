@@ -154,6 +154,32 @@
 
                             <View
                                 android:layout_width="fill_parent"
+                                android:layout_height="0.05dp"
+                                android:layout_marginTop="2dp"
+                                android:layout_marginBottom="2dp"
+                                android:layout_weight="1"
+                                android:background="@color/colorDivider" />
+                        </TableRow>
+
+                        <TableRow>
+
+                            <TextView
+                                android:text="A"
+                                android:textColor="@{machineStatus.enabledPins.a ? @color/colorPrimary : @android:color/tertiary_text_dark}"
+                                tools:ignore="HardcodedText" />
+
+                            <TextView android:text='@{String.format("%.3f", machineStatus.machinePosition.cordA)}' />
+
+                            <com.joanzapata.iconify.widget.IconTextView
+                                android:gravity="end" android:id="@+id/wpos_edit_a" android:tag="A"
+                                android:text='@{String.format("%.3f {fa-edit 16sp}", machineStatus.workPosition.cordA)}' />
+
+                        </TableRow>
+
+                        <TableRow>
+
+                            <View
+                                android:layout_width="fill_parent"
                                 android:layout_height="0.2dp"
                                 android:layout_marginTop="4dp"
                                 android:layout_marginBottom="4dp"

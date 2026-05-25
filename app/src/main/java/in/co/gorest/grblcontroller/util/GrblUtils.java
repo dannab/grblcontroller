@@ -162,16 +162,19 @@ public class GrblUtils {
         return response.toLowerCase().startsWith("alarm:");
     }
 
-    public static final Pattern machinePattern = Pattern.compile("(?<=MPos:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)");
-    public static final Pattern workPattern = Pattern.compile("(?<=WPos:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)");
-    public static final Pattern wcoPattern = Pattern.compile("(?<=WCO:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)");
+    public static final Pattern machinePattern = Pattern.compile("(?<=MPos:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)(?:,(-?\\d*\\..\\d*))?");
+    public static final Pattern workPattern = Pattern.compile("(?<=WPos:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)(?:,(-?\\d*\\..\\d*))?");
+    public static final Pattern wcoPattern = Pattern.compile("(?<=WCO:)(-?\\d*\\..\\d*),(-?\\d*\\..\\d*),(-?\\d*\\..\\d*)(?:,(-?\\d*\\..\\d*))?");
     public static Position getPositionFromStatusString(final String status, final Pattern pattern) {
         Matcher matcher = pattern.matcher(status);
         if (matcher.find()) {
+            String aGroup = matcher.group(4);
+            double a = (aGroup != null) ? Double.parseDouble(aGroup) : 0.0;
             return new Position(
                     Double.parseDouble(Objects.requireNonNull(matcher.group(1))),
                     Double.parseDouble(Objects.requireNonNull(matcher.group(2))),
-                    Double.parseDouble(Objects.requireNonNull(matcher.group(3)))
+                    Double.parseDouble(Objects.requireNonNull(matcher.group(3))),
+                    a
             );
         }
         return null;

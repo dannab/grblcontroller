@@ -120,7 +120,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             return true;
         });
 
-        for(int resourceId: new Integer[]{R.id.wpos_edit_x, R.id.wpos_edit_y, R.id.wpos_edit_z}){
+        for(int resourceId: new Integer[]{R.id.wpos_edit_x, R.id.wpos_edit_y, R.id.wpos_edit_z, R.id.wpos_edit_a}){
             IconTextView positionTextView = findViewById(resourceId);
             positionTextView.setOnClickListener(v -> setWorkPosition(v.getTag().toString()));
         }
@@ -213,6 +213,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         machineStatus = MachineStatusListener.getInstance();
         machineStatus.setJogging(sharedPref.getDouble(getString(R.string.preference_jogging_step_size), 1.00),
                 sharedPref.getDouble(getString(R.string.preference_jogging_step_size_z), 0.1),
+                sharedPref.getDouble(getString(R.string.preference_jogging_step_size_a), 1.0),
                 sharedPref.getDouble(getString(R.string.preference_jogging_feed_rate), 2400.0),
                 sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
         machineStatus.setVerboseOutput(sharedPref.getBoolean(getString(R.string.preference_console_verbose_mode), false));
@@ -287,6 +288,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         if(axisLabel.equalsIgnoreCase("X")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordX()));
         if(axisLabel.equalsIgnoreCase("Y")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordY()));
         if(axisLabel.equalsIgnoreCase("Z")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordZ()));
+        if(axisLabel.equalsIgnoreCase("A")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordA()));
         editText.setSelection(editText.getText().length());
 
         alertDialogBuilder.setCancelable(true)

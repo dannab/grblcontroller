@@ -33,7 +33,7 @@
                 <com.joanzapata.iconify.widget.IconTextView
                     android:id="@+id/jogging_step_feed"
                     android:layout_alignParentEnd="true"
-                    android:text='@{"XY:" + machineStatus.jogging.stepXY.toString() + " | Z:" + machineStatus.jogging.stepZ.toString() + " | F:" + machineStatus.jogging.feed.toString() + " {fa-edit 16dp}"}'
+                    android:text='@{"XY:" + machineStatus.jogging.stepXY.toString() + " | Z:" + machineStatus.jogging.stepZ.toString() + " | A:" + machineStatus.jogging.stepA.toString() + " | F:" + machineStatus.jogging.feed.toString() + " {fa-edit 16dp}"}'
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
 
@@ -187,6 +187,46 @@
                         android:layout_width="0dp"
                         android:layout_height="65dp"
                         android:text="{fa-caret-down 32dp}"
+                        tools:ignore="HardcodedText" />
+
+                </TableRow>
+
+                <TableRow>
+
+                    <TextView
+                        android:layout_weight="0.22"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content" />
+
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
+                        android:id="@+id/jog_a_negative"
+                        android:tag="$J=%sG91A-%sF%s"
+                        android:layout_weight="0.22"
+                        android:layout_width="0dp"
+                        android:layout_height="65dp"
+                        android:text="A {fa-caret-left 26dp}"
+                        tools:ignore="HardcodedText" />
+
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
+                        android:id="@+id/jog_a_positive"
+                        android:tag="$J=%sG91A%sF%s"
+                        android:layout_weight="0.22"
+                        android:layout_width="0dp"
+                        android:layout_height="65dp"
+                        android:text="A {fa-caret-right 26dp}"
+                        tools:ignore="HardcodedText" />
+
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:id="@+id/goto_a_zero"
+                        android:layout_weight="0.22"
+                        android:text="A {fa-dot-circle-o 18dp}"
+                        android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
+                        android:tag="G10 L20 P0 A0"
+                        android:layout_height="65dp"
+                        android:gravity="center"
+                        android:layout_width="0dp"
                         tools:ignore="HardcodedText" />
 
                 </TableRow>

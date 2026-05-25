@@ -213,7 +213,7 @@ public class CamTabFragment extends BaseFragment {
             double camToolDiaVal = parseSignedDouble(camToolDia);
             double stepOver = parseSignedDouble(camStepOver);
 
-            if (camZStepVal < camZDeepVal) {
+            if (camZStepVal > camZDeepVal) {
                 EventBus.getDefault().post(new UiToastEvent(
                         getString(R.string.error_z_step_greater_than_z_deep), true, true));
                 return;

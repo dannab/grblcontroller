@@ -55,7 +55,7 @@ public class MachineStatusListener extends BaseObservable {
     private Position machinePosition = new Position(0.00, 0.00, 0.00);
     private Position workPosition = new Position(0.00, 0.00, 0.00);
     private Position workCoordsOffset = new Position(0.00, 0.00, 0.00);
-    private Jogging jogging = new Jogging(0.00, 0.00, DEFAULT_FEED_RATE, false);
+    private Jogging jogging = new Jogging(0.00, 0.00, 0.00, DEFAULT_FEED_RATE, false);
     private OverridePercents overridePercents = new OverridePercents(100, 100, 100);
     private EnabledPins enabledPins = new EnabledPins(emptyString);
     private AccessoryStates accessoryStates = new AccessoryStates(emptyString);
@@ -217,7 +217,10 @@ public class MachineStatusListener extends BaseObservable {
     @Bindable
     public Jogging getJogging(){ return this.jogging; }
     public void setJogging(double stepXY, double stepZ, double feed, boolean inches){
-        Jogging jogging = new Jogging(stepXY, stepZ, feed, inches);
+        setJogging(stepXY, stepZ, this.jogging.stepA, feed, inches);
+    }
+    public void setJogging(double stepXY, double stepZ, double stepA, double feed, boolean inches){
+        Jogging jogging = new Jogging(stepXY, stepZ, stepA, feed, inches);
         if(this.jogging.hasChanged(jogging)){
             this.jogging = jogging;
             notifyPropertyChanged(BR.jogging);
@@ -298,15 +301,22 @@ public class MachineStatusListener extends BaseObservable {
     public static class Jogging{
         public final Double stepXY;
         public final Double stepZ;
+        public final Double stepA;
         public final Double feed;
         public final Boolean inches;
 
         public Jogging(double stepXY, double stepZ, double f, boolean i){
-            this.stepXY = stepXY; this.stepZ = stepZ; this.feed = f; this.inches = i;
+            this(stepXY, stepZ, stepZ, f, i);
+        }
+
+        public Jogging(double stepXY, double stepZ, double stepA, double f, boolean i){
+            this.stepXY = stepXY; this.stepZ = stepZ; this.stepA = stepA; this.feed = f; this.inches = i;
         }
 
         public boolean hasChanged(Jogging jogging){
-            boolean stepChanged = ((jogging.stepXY.compareTo(this.stepXY) != 0) || (jogging.stepZ.compareTo(this.stepZ) != 0));
+            boolean stepChanged = ((jogging.stepXY.compareTo(this.stepXY) != 0)
+                    || (jogging.stepZ.compareTo(this.stepZ) != 0)
+                    || (jogging.stepA.compareTo(this.stepA) != 0));
             boolean feedChanged = (jogging.feed.compareTo(this.feed) != 0);
             boolean inchesChanged = (jogging.inches.compareTo(this.inches) != 0);
 
@@ -356,6 +366,7 @@ public class MachineStatusListener extends BaseObservable {
         final public boolean x;
         final public boolean y;
         final public boolean z;
+        final public boolean a;
         final public boolean probe;
         final public boolean door;
         final public boolean hold;
@@ -367,6 +378,7 @@ public class MachineStatusListener extends BaseObservable {
             x = enabledUpper.contains("X");
             y = enabledUpper.contains("Y");
             z = enabledUpper.contains("Z");
+            a = enabledUpper.contains("A");
             probe = enabledUpper.contains("P");
             door = enabledUpper.contains("D");
             hold = enabledUpper.contains("H");
@@ -378,13 +390,14 @@ public class MachineStatusListener extends BaseObservable {
             boolean xChanged = (enabledPins.x != this.x);
             boolean yChanged = (enabledPins.y != this.y);
             boolean zChanged = (enabledPins.z != this.z);
+            boolean aChanged = (enabledPins.a != this.a);
             boolean probeChanged = (enabledPins.probe != this.probe);
             boolean doorChanged = (enabledPins.door != this.door);
             boolean holdChanged = (enabledPins.hold != this.hold);
             boolean softResetChanged = (enabledPins.softReset != this.softReset);
             boolean cycleStartChanged = (enabledPins.cycleStart != this.cycleStart);
 
-            return (xChanged || yChanged || zChanged || probeChanged || doorChanged || holdChanged || softResetChanged || cycleStartChanged);
+            return (xChanged || yChanged || zChanged || aChanged || probeChanged || doorChanged || holdChanged || softResetChanged || cycleStartChanged);
         }
 
     }
