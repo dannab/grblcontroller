@@ -33,6 +33,7 @@ import org.greenrobot.eventbus.EventBus;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
+import in.co.gorest.grblcontroller.service.HttpServerManager;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -86,6 +87,19 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             getPreferenceScreen().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+            updateHttpServerInfo();
+        }
+
+        private void updateHttpServerInfo() {
+            android.preference.Preference info = getPreferenceScreen().findPreference(getString(R.string.preference_http_server_info));
+            if (info == null) return;
+            String url = HttpServerManager.getInstance().getDisplayUrl();
+            if (url == null) {
+                info.setSummary("Server non attivo");
+            } else {
+                String ip = HttpServerManager.getLocalIpv4();
+                info.setSummary(url + (ip == null ? "  (nessuna rete WiFi rilevata)" : ""));
+            }
         }
 
         @Override
@@ -112,6 +126,12 @@ public class SettingsActivity extends AppCompatActivity {
                 EventBus.getDefault().post(new UiToastEvent("Application restart required", true, true));
             }
 
+            if(key.equals(getString(R.string.preference_http_server_enabled))
+                    || key.equals(getString(R.string.preference_http_server_port))
+                    || key.equals(getString(R.string.preference_http_server_password))){
+                HttpServerManager.getInstance().restart(getActivity().getApplicationContext());
+                updateHttpServerInfo();
+            }
         }
 
     }

@@ -194,14 +194,15 @@
                 <TableRow>
 
                     <com.joanzapata.iconify.widget.IconButton
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="0.25"
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
-                        android:gravity="center"
+                        android:id="@+id/btn_kill_alarm_lock"
                         android:tag="$X"
+                        android:layout_weight="0.22"
+                        android:layout_width="0dp"
+                        android:layout_height="65dp"
                         android:text='@{machineStatus.state.equals(machineStatus.STATE_ALARM) ? "{fa-bell 18dp @color/colorPrimary}" : "{fa-bell-slash-o 18dp}"}'
-                        tools:ignore="SpeakableTextPresentCheck" />
+
+                        tools:ignore="SpeakableTextPresentCheck"/>
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
@@ -312,11 +313,11 @@
 
                     <com.joanzapata.iconify.widget.IconButton
                         android:id="@+id/goto_a_zero"
-                        android:layout_weight="0.22"
+                        android:layout_weight="0.25"
                         android:text="A {fa-dot-circle-o 18dp}"
                         android:enabled="@{!machineStatus.state.equals(machineStatus.STATE_NOT_CONNECTED)}"
                         android:tag="G10 L20 P0 A0"
-                        android:layout_height="65dp"
+                        android:layout_height="wrap_content"
                         android:gravity="center"
                         android:layout_width="0dp"
                         tools:ignore="HardcodedText" />

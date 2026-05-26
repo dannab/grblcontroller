@@ -83,6 +83,20 @@
     <string name="preference_remember_last_file_location" translatable="false">remember_last_file_location</string>
     <string name="most_recent_selected_file" translatable="false">most_recent_selected_file</string>
     <string name="preference_single_step_mode" translatable="false">preference_single_step_mode</string>
+    <string name="preference_http_server_enabled" translatable="false">preference_http_server_enabled</string>
+    <string name="preference_http_server_port" translatable="false">preference_http_server_port</string>
+    <string name="preference_http_server_password" translatable="false">preference_http_server_password</string>
+    <string name="preference_http_server_info" translatable="false">preference_http_server_info</string>
+
+    <string name="text_http_server_section">File HTTP server</string>
+    <string name="text_http_server_section_desc">Trasferisci file G-code da/verso il PC via browser</string>
+    <string name="text_http_server_enabled">Abilita server HTTP</string>
+    <string name="text_http_server_enabled_desc">Quando attivo, dal PC apri http://ip-tablet:porta per scaricare/caricare file</string>
+    <string name="text_http_server_port">Porta TCP</string>
+    <string name="text_http_server_port_desc">Default 8888. Valori validi 1024-65535.</string>
+    <string name="text_http_server_password">Password (opzionale)</string>
+    <string name="text_http_server_password_desc">Se impostata, richiede autenticazione (user: grbl). Vuota = nessuna autenticazione.</string>
+    <string name="text_http_server_info">Stato server</string>
 
 
 

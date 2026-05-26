@@ -394,6 +394,42 @@
 
     </PreferenceScreen>
 
+    <PreferenceScreen
+        android:key="http_server_flashcard"
+        android:icon="@drawable/ic_device_hub_black_24dp"
+        android:title="@string/text_http_server_section"
+        android:summary="@string/text_http_server_section_desc">
+
+        <SwitchPreference
+            android:icon="@drawable/ic_device_hub_black_24dp"
+            android:defaultValue="false"
+            android:key="@string/preference_http_server_enabled"
+            android:title="@string/text_http_server_enabled"
+            android:summary="@string/text_http_server_enabled_desc" />
+
+        <EditTextPreference
+            android:icon="@drawable/ic_format_list_numbered_black_24dp"
+            android:key="@string/preference_http_server_port"
+            android:title="@string/text_http_server_port"
+            android:summary="@string/text_http_server_port_desc"
+            android:inputType="number"
+            android:defaultValue="8888" />
+
+        <EditTextPreference
+            android:icon="@drawable/ic_font_download_black_24dp"
+            android:key="@string/preference_http_server_password"
+            android:title="@string/text_http_server_password"
+            android:summary="@string/text_http_server_password_desc"
+            android:defaultValue="" />
+
+        <Preference
+            android:key="@string/preference_http_server_info"
+            android:icon="@drawable/ic_settings_input_hdmi_black_24dp"
+            android:title="@string/text_http_server_info"
+            android:selectable="false" />
+
+    </PreferenceScreen>
+
     <SwitchPreference
         android:icon="@drawable/ic_power_settings_new_black_24dp"
         android:defaultValue="true"

@@ -283,18 +283,18 @@ public class BluetoothConnectionActivity extends GrblActivity {
     private void onBluetoothStateChange(int currentState){
         switch (currentState){
             case GrblBluetoothSerialService.STATE_CONNECTED:
-                if(getSupportActionBar() != null) getSupportActionBar().setSubtitle((mConnectedDeviceName != null) ? mConnectedDeviceName : getString(R.string.text_connected));
+                applySubtitle((mConnectedDeviceName != null) ? mConnectedDeviceName : getString(R.string.text_connected));
                 invalidateOptionsMenu();
                 break;
             case GrblBluetoothSerialService.STATE_CONNECTING:
-                if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_connecting));
+                applySubtitle(getString(R.string.text_connecting));
                 break;
             case GrblBluetoothSerialService.STATE_LISTEN:
                 break;
             case GrblBluetoothSerialService.STATE_NONE:
                 EventBus.getDefault().post(new BluetoothDisconnectEvent(getString(R.string.text_connection_lost)));
                 MachineStatusListener.getInstance().setState(Constants.MACHINE_STATUS_NOT_CONNECTED);
-                if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_not_connected));
+                applySubtitle(getString(R.string.text_not_connected));
                 invalidateOptionsMenu();
                 break;
         }

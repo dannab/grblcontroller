@@ -3,7 +3,7 @@
  * Part of Universal Gcode Sender (UGS)
  * https://github.com/winder/Universal-G-Code-Sender
  *
- * Android porting and modifications Copyright (C) 2026 Daniele Cicchinelli
+ * Android porting and modifications Copyright (C) 2024-2026 Daniele Cicchinelli
  * Based on GRBLController by zeevy
  * https://github.com/zeevy/grblcontroller
  *

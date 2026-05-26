@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2024-2026 Daniele Cicchinelli
+ *
+ * Based on GRBLController by zeevy
+ * https://github.com/zeevy/grblcontroller
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * <http://www.gnu.org/licenses/>
+ */
 package in.co.gorest.grblcontroller.ui;
 
 import android.annotation.SuppressLint;
@@ -14,6 +35,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.Observable;
 
 import com.joanzapata.iconify.widget.IconButton;
 
@@ -26,11 +48,13 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import in.co.gorest.grblcontroller.BR;
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentGcodeEditorBinding;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
+import in.co.gorest.grblcontroller.model.Constants;
 
 public class GcodeEditorFragment extends BaseFragment {
 
@@ -39,9 +63,17 @@ public class GcodeEditorFragment extends BaseFragment {
 
     private WebView webView;
     private TextView fileNameText;
+    private IconButton btnSave;
     private RelativeLayout loadingOverlay;
     private File currentGcodeFile;
     private boolean isEditorLoaded = false;
+
+    /**
+     * Callback registrato su MachineStatusListener: ogni cambio di stato
+     * macchina riapplica la policy "editing solo in IDLE".
+     * Riferimento tenuto per poterlo deregistrare in onDestroyView.
+     */
+    private Observable.OnPropertyChangedCallback machineStateCallback;
 
     public GcodeEditorFragment() {}
 
@@ -80,7 +112,9 @@ public class GcodeEditorFragment extends BaseFragment {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 isEditorLoaded = true;
-                // Una volta che la pagina HTML è pronta, carichiamo il file GCode attivo
+                // Una volta che la pagina HTML è pronta, applica subito la policy
+                // di sola lettura in base allo stato corrente, poi carica il file.
+                applyReadOnlyForCurrentState();
                 checkAndLoadActiveFile();
             }
         });
@@ -96,26 +130,71 @@ public class GcodeEditorFragment extends BaseFragment {
             }
         });
 
-        IconButton btnSave = view.findViewById(R.id.btn_editor_save);
+        btnSave = view.findViewById(R.id.btn_editor_save);
         btnSave.setOnClickListener(v -> saveCurrentGcode());
 
+        // Osserva i cambi di stato macchina per aggiornare la sola lettura
+        machineStateCallback = new Observable.OnPropertyChangedCallback() {
+            @Override
+            public void onPropertyChanged(Observable sender, int propertyId) {
+                if (propertyId == BR.state || propertyId == BR._all) {
+                    applyReadOnlyForCurrentState();
+                }
+            }
+        };
+        machineStatus.addOnPropertyChangedCallback(machineStateCallback);
+
         return view;
+    }
+
+    /**
+     * Editing permesso solo quando lo stato macchina è IDLE.
+     * Aggiorna la WebView (Ace) e il pulsante Save, e mostra "(R/O)" davanti
+     * al nome file quando il salvataggio è bloccato.
+     */
+    private void applyReadOnlyForCurrentState() {
+        if (webView == null) return;
+        boolean idle = isMachineIdle();
+        webView.evaluateJavascript("setEditorReadOnly(" + (!idle) + ");", null);
+
+        if (btnSave != null) {
+            btnSave.setEnabled(idle);
+            btnSave.setAlpha(idle ? 1.0f : 0.4f);
+        }
+        if (fileNameText != null) {
+            String base = currentGcodeFile != null
+                    ? currentGcodeFile.getName()
+                    : "Nessun file nel File Sender";
+            fileNameText.setText(idle ? base : "(R/O) " + base);
+        }
+    }
+
+    private boolean isMachineIdle() {
+        return machineStatus != null
+                && Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState());
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (machineStateCallback != null && machineStatus != null) {
+            machineStatus.removeOnPropertyChangedCallback(machineStateCallback);
+            machineStateCallback = null;
+        }
         // Reset degli stati legati alla view: quando il ViewPager ricrea il fragment
         // questi devono ripartire da zero altrimenti l'editor resta vuoto
         isEditorLoaded = false;
         currentGcodeFile = null;
         webView = null;
+        btnSave = null;
+        fileNameText = null;
     }
 
     @Override
     public void onResume() {
         super.onResume();
         if (isEditorLoaded) {
+            applyReadOnlyForCurrentState();
             checkAndLoadActiveFile();
         }
     }
@@ -129,12 +208,12 @@ public class GcodeEditorFragment extends BaseFragment {
         if (activeFile != null) {
             if (currentGcodeFile == null || !currentGcodeFile.getAbsolutePath().equals(activeFile.getAbsolutePath())) {
                 currentGcodeFile = activeFile;
-                fileNameText.setText(currentGcodeFile.getName());
+                applyReadOnlyForCurrentState(); // setta anche il testo del nome file con eventuale prefisso (R/O)
                 loadGcodeFileAsync(currentGcodeFile);
             }
         } else {
             currentGcodeFile = null;
-            fileNameText.setText("Nessun file nel File Sender");
+            applyReadOnlyForCurrentState();
             if (isEditorLoaded) {
                 webView.evaluateJavascript("setGcodeContent('');", null);
             }
@@ -186,6 +265,13 @@ public class GcodeEditorFragment extends BaseFragment {
     private void saveCurrentGcode() {
         if (currentGcodeFile == null || !isEditorLoaded) {
             postUiToast("Nessun file da salvare", true);
+            return;
+        }
+
+        // Salvataggio bloccato se la macchina non è IDLE — il file potrebbe essere
+        // in lettura dal FileSender e modificarlo durante un job è pericoloso.
+        if (!isMachineIdle()) {
+            postUiToast(getString(R.string.text_machine_not_idle), true);
             return;
         }
 

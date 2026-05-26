@@ -1,11 +1,11 @@
 /*
  * Copyright (C) 2017 Grbl Controller Contributors (zeevy)
  * https://github.com/zeevy/grblcontroller
- * Modifications Copyright (C) 2026 Daniele Cicchinelli
+ * Modifications Copyright (C) 2024-2026 Daniele Cicchinelli
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -39,7 +39,6 @@ import androidx.appcompat.widget.SwitchCompat;
 import androidx.databinding.DataBindingUtil;
 
 import com.joanzapata.iconify.widget.IconButton;
-import com.joanzapata.iconify.widget.IconToggleButton;
 import com.warkiz.widget.IndicatorSeekBar;
 import com.warkiz.widget.OnSeekChangeListener;
 import com.warkiz.widget.SeekParams;
@@ -280,13 +279,33 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             });
         }
 
+        // Pulsanti registrati esplicitamente per ID — ognuno con il proprio
+        // short/long click. Niente più registrazione "per contenitore", così
+        // spostare i tasti nel layout non li scollega più dalle funzioni.
         for (int resourceId : new Integer[]{
-                R.id.jog_cancel,R.id.wpos_g54,
-                R.id.goto_x_zero, R.id.goto_y_zero, R.id.goto_z_zero, R.id.goto_a_zero,
-                R.id.get_point,R.id.run_homing_cycle,R.id.do_leveling}) {
+                R.id.jog_cancel, R.id.wpos_g54,
+                R.id.get_point, R.id.run_homing_cycle, R.id.do_leveling}) {
             IconButton iconButton = view.findViewById(resourceId);
             iconButton.setOnClickListener(this);
             iconButton.setOnLongClickListener(this);
+        }
+
+        // Set-zero per asse: short-click = azzera WPos qui (con dialog), long-click = goto axis zero
+        bindZeroAxisButton(view, R.id.goto_x_zero);
+        bindZeroAxisButton(view, R.id.goto_y_zero);
+        bindZeroAxisButton(view, R.id.goto_z_zero);
+        bindZeroAxisButton(view, R.id.goto_a_zero);
+
+        // Kill alarm lock ($X) — prima era agganciato iterando reset_zero_layout,
+        // ora ha un ID dedicato e listener proprio.
+        IconButton btnKillAlarmLock = view.findViewById(R.id.btn_kill_alarm_lock);
+        if (btnKillAlarmLock != null) {
+            btnKillAlarmLock.setOnClickListener(v -> {
+                if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_RUN)) {
+                    fragmentInteractionListener.onGcodeCommandReceived(
+                            GrblUtils.GRBL_KILL_ALARM_LOCK_COMMAND);
+                }
+            });
         }
 
         jogCancelButton = view.findViewById(R.id.jog_cancel);
@@ -300,30 +319,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             applyStep(STEP_CYCLE[stepCycleIndex]);
             return true;
         });
-
-        TableRow resetZeroLayout = view.findViewById(R.id.reset_zero_layout);
-        for (int i = 0; i < resetZeroLayout.getChildCount(); i++) {
-            View resetZeroLayoutView = resetZeroLayout.getChildAt(i);
-            if (resetZeroLayoutView instanceof IconButton
-                    || resetZeroLayoutView instanceof IconToggleButton) {
-                resetZeroLayoutView.setOnClickListener(view12 -> {
-                    final String tag = view12.getTag().toString();
-                    if (tag.equals(GrblUtils.GRBL_KILL_ALARM_LOCK_COMMAND)) {
-                        if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_RUN)) {
-                            fragmentInteractionListener.onGcodeCommandReceived(tag);
-                        }
-                        return;
-                    }
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(getString(R.string.text_zero_selected_axis))
-                            .setMessage(getString(R.string.text_set_axis_location_in_current_wpos) + tag)
-                            .setPositiveButton(getString(R.string.text_yes_confirm),
-                                    (dialog, which) -> sendCommandIfIdle(tag))
-                            .setNegativeButton(getString(R.string.text_no_confirm), null)
-                            .show();
-                });
-            }
-        }
 
 //        TableRow wposLayout = view.findViewById(R.id.wpos_layout);
 //        for (int i = 0; i < wposLayout.getChildCount(); i++) {
@@ -460,20 +455,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                  */
                 saveCurrentPoint();
                 break;
-
-            case R.id.goto_a_zero: {
-                // Click breve: azzera WPos asse A nella posizione corrente
-                // Stessa logica di goto_x/y/z_zero nel reset_zero_layout
-                final String tag = view.getTag().toString();
-                new AlertDialog.Builder(getActivity())
-                        .setTitle(getString(R.string.text_zero_selected_axis))
-                        .setMessage(getString(R.string.text_set_axis_location_in_current_wpos) + tag)
-                        .setPositiveButton(getString(R.string.text_yes_confirm),
-                                (dialog, which) -> sendCommandIfIdle(tag))
-                        .setNegativeButton(getString(R.string.text_no_confirm), null)
-                        .show();
-                break;
-            }
 
             case R.id.custom_button_1:
             case R.id.custom_button_2:
@@ -855,6 +836,31 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             CURRENT_RX_SERIAL_BUFFER += commandSize;
             fragmentInteractionListener.onGcodeCommandReceived(gcodeCommand);
         }
+    }
+
+    /**
+     * Aggancia un pulsante "azzera asse" cercandolo per ID dentro view.
+     * Short-click: chiede conferma e invia il G10 L20 P0 X/Y/Z/A0 letto dal tag.
+     * Long-click:  delega a {@link #onLongClick(View)} che chiama gotoAxisZero(...).
+     *
+     * Versione esplicita per-ID: prima era gestita iterando i figli di
+     * reset_zero_layout, ma spostare i pulsanti nel layout li sganciava
+     * silenziosamente dalla funzione.
+     */
+    private void bindZeroAxisButton(View parent, int buttonId) {
+        IconButton button = parent.findViewById(buttonId);
+        if (button == null) return;
+        button.setOnClickListener(v -> {
+            final String tag = v.getTag().toString();
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(getString(R.string.text_zero_selected_axis))
+                    .setMessage(getString(R.string.text_set_axis_location_in_current_wpos) + tag)
+                    .setPositiveButton(getString(R.string.text_yes_confirm),
+                            (dialog, which) -> sendCommandIfIdle(tag))
+                    .setNegativeButton(getString(R.string.text_no_confirm), null)
+                    .show();
+        });
+        button.setOnLongClickListener(this);
     }
 
     private void gotoAxisZero(final String axis) {

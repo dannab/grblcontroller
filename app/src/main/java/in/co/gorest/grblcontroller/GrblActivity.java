@@ -78,6 +78,7 @@ import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.service.FileStreamerIntentService;
+import in.co.gorest.grblcontroller.service.HttpServerManager;
 import in.co.gorest.grblcontroller.service.GrblBluetoothSerialService;
 import in.co.gorest.grblcontroller.ui.BaseFragment;
 import in.co.gorest.grblcontroller.ui.GrblFragmentPagerAdapter;
@@ -97,6 +98,25 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public static boolean isAppRunning;
 
     private Toast lastToast;
+    private CharSequence lastBaseSubtitle = null;
+
+    /** Sets the toolbar subtitle, automatically appending the HTTP server URL when active. */
+    protected void applySubtitle(CharSequence base) {
+        lastBaseSubtitle = base;
+        if (getSupportActionBar() == null) return;
+        String url = HttpServerManager.getInstance().getDisplayUrl();
+        if (url == null) {
+            getSupportActionBar().setSubtitle(base);
+        } else {
+            CharSequence b = (base == null) ? "" : base;
+            getSupportActionBar().setSubtitle(b + "  |  " + url);
+        }
+    }
+
+    /** Re-applies the last subtitle, picking up server state changes. */
+    protected void refreshSubtitle() {
+        if (lastBaseSubtitle != null) applySubtitle(lastBaseSubtitle);
+    }
 
     @SuppressLint("SourceLockedOrientationActivity")
     @Override
@@ -109,7 +129,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_not_connected));
+        applySubtitle(getString(R.string.text_not_connected));
 
         applicationSetup();
         binding.setMachineStatus(machineStatus);
@@ -136,6 +156,12 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
 
 
+    }
+
+    @Override
+    protected void onResume(){
+        super.onResume();
+        refreshSubtitle();
     }
 
     @Override

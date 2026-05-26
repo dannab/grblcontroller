@@ -21,8 +21,9 @@
     var editor = ace.edit("editor");
     editor.setTheme("ace/theme/tomorrow_night");
     editor.session.setMode("ace/mode/gcode");
-    editor.setReadOnly(false);
-    
+    // Parte in read-only: Android abilita l'editing solo quando la macchina è IDLE
+    editor.setReadOnly(true);
+
     // Ottimizzazioni per performance estreme con >100k righe
     editor.setOption("useWorker", false); // Disattiva i controlli sintattici in background per evitare lag
     editor.session.setUseWrapMode(false); // Disattiva il wrapping per velocizzare il rendering verticale
@@ -38,6 +39,11 @@
 
     function openSearch() {
         editor.execCommand("find");
+    }
+
+    // Toggle modalità sola lettura: chiamata da Android in base allo stato macchina
+    function setEditorReadOnly(flag) {
+        editor.setReadOnly(!!flag);
     }
 </script>
 </body>

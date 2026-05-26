@@ -85,6 +85,7 @@ dependencies {
     implementation 'com.github.nbsp-team:MaterialFilePicker:85292dceb0'
     implementation 'com.github.satyan:sugar:1.5'
     implementation 'com.github.GrenderG:Toasty:1.5.2'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     annotationProcessor 'androidx.databinding:databinding-compiler:8.10.0'
 
