@@ -442,6 +442,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
 
             // Stato modale: persiste tra le righe come da spec GCode
             int modalMotion = 0; // 0=G0 rapid, 1=G1 linear, 2=G2 arc CW, 3=G3 arc CCW
+            int plane       = 17; // 17=XY (default), 18=XZ, 19=YZ — piano per archi G2/G3
 
             while ((line = reader.readLine()) != null) {
                 line = line.trim().toUpperCase();
@@ -462,11 +463,17 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                 boolean hasG1  = containsGCode(line, 1);
                 boolean hasG2  = containsGCode(line, 2);
                 boolean hasG3  = containsGCode(line, 3);
+                boolean hasG17 = containsGCode(line, 17);
+                boolean hasG18 = containsGCode(line, 18);
+                boolean hasG19 = containsGCode(line, 19);
                 boolean hasG90 = containsGCode(line, 90);
                 boolean hasG91 = containsGCode(line, 91);
 
                 if (hasG90) isAbsolute = true;
                 if (hasG91) isAbsolute = false;
+                if (hasG17) plane = 17;
+                if (hasG18) plane = 18;
+                if (hasG19) plane = 19;
 
                 // Aggiorna stato modale
                 if      (hasG0) modalMotion = 0;
@@ -490,14 +497,26 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                 if (xInLine) xSpecified = true;
                 if (yInLine) ySpecified = true;
 
+                // Parametri arco: I/J/K = offset incrementale dal punto
+                // iniziale verso il centro dell'arco. Se assenti default 0
+                // (standard GCode). Servono solo per G2/G3.
+                float iVal = parseCoord(line, 'I', 0f);
+                float jVal = parseCoord(line, 'J', 0f);
+                float kVal = parseCoord(line, 'K', 0f);
+                boolean hasIJK = line.indexOf('I') >= 0
+                              || line.indexOf('J') >= 0
+                              || line.indexOf('K') >= 0;
+
                 // Crea segmento se c'è movimento esplicito o coordinate cambiate.
-                // hasNonMotionG: la riga contiene un G-code che NON è G0/G1/G2/G3/G90/G91
-                // (es. G28, G53, G4, G17...). In quel caso le coordinate sono parametri
-                // del comando, non destinazioni di movimento → nessun segmento.
+                // hasNonMotionG: la riga contiene un G-code che NON è
+                // G0/G1/G2/G3/G17/G18/G19/G90/G91 (es. G28, G53, G4...).
+                // In quel caso le coordinate sono parametri del comando,
+                // non destinazioni di movimento → nessun segmento.
                 boolean hasCoords = (xInLine || yInLine || line.contains("Z"));
                 boolean posChanged = (nx != x || ny != y || nz != z);
                 boolean hasNonMotionG = line.contains("G")
                         && !hasG0 && !hasG1 && !hasG2 && !hasG3
+                        && !hasG17 && !hasG18 && !hasG19
                         && !hasG90 && !hasG91;
 
                 if ((hasG0 || hasG1 || hasG2 || hasG3) || (!hasNonMotionG && hasCoords && posChanged)) {
@@ -513,15 +532,28 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                             firstPositionSet = true;
                             updateExtremes(nx, ny, nz);
                         } else {
-                            Segment seg = new Segment();
-                            seg.x1 = x; seg.y1 = y; seg.z1 = z;
-                            seg.x2 = nx; seg.y2 = ny; seg.z2 = nz;
-                            seg.isFastTraverse = (modalMotion == 0);
-                            seg.isArc          = (modalMotion == 2 || modalMotion == 3);
-                            seg.isZMove        = (nz != z && nx == x && ny == y);
-                            seg.lineNumber     = lineNum;
-                            segments.add(seg);
-                            updateExtremes(nx, ny, nz);
+                            boolean isArcMotion = (modalMotion == 2 || modalMotion == 3);
+                            if (isArcMotion && hasIJK) {
+                                // Tessellazione arco G2/G3 in N segmenti
+                                // rettilinei. updateExtremes() viene chiamato
+                                // per ciascun segmento intermedio (gli archi
+                                // possono uscire dal bbox start/end).
+                                appendArcSegments(x, y, z, nx, ny, nz,
+                                                  iVal, jVal, kVal,
+                                                  modalMotion == 2, plane, lineNum);
+                            } else {
+                                Segment seg = new Segment();
+                                seg.x1 = x; seg.y1 = y; seg.z1 = z;
+                                seg.x2 = nx; seg.y2 = ny; seg.z2 = nz;
+                                seg.isFastTraverse = (modalMotion == 0);
+                                // Se è G2/G3 ma manca I/J/K, fallback a corda
+                                // (visivamente sbagliato ma evita di scartare).
+                                seg.isArc          = isArcMotion;
+                                seg.isZMove        = (nz != z && nx == x && ny == y);
+                                seg.lineNumber     = lineNum;
+                                segments.add(seg);
+                                updateExtremes(nx, ny, nz);
+                            }
                         }
                     }
                 }
@@ -579,6 +611,128 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
 
         Log.i(TAG, String.format("GCode caricato: %d segmenti, X(%.2f,%.2f) Y(%.2f,%.2f) Z(%.2f,%.2f)",
                 segments.size(), minX, maxX, minY, maxY, minZ, maxZ));
+    }
+
+    // =========================================================================
+    // Tessellazione archi G2/G3
+    // =========================================================================
+
+    /** ~6° per segmento, ovvero ~60 segmenti per cerchio completo. */
+    private static final double ARC_ANG_STEP = Math.PI / 30.0;
+
+    /**
+     * Approssima un arco G2/G3 con una sequenza di piccoli segmenti rettilinei.
+     * Supporta i tre piani standard:
+     *   G17 (XY): centro = (x+I, y+J), Z elicoidale
+     *   G18 (XZ): centro = (x+I, z+K), Y elicoidale
+     *   G19 (YZ): centro = (y+J, z+K), X elicoidale
+     *
+     * Se i parametri portano a un arco degenere (raggio ≈ 0), ricade su una corda
+     * rettilinea per non perdere il movimento dal file.
+     */
+    private void appendArcSegments(float x1, float y1, float z1,
+                                   float x2, float y2, float z2,
+                                   float iVal, float jVal, float kVal,
+                                   boolean cw, int plane, int lineNum) {
+
+        // Proietta sul piano 2D scelto e individua l'asse elicoidale.
+        float ax1, ay1, ax2, ay2, ah1, ah2, ioff, joff;
+        switch (plane) {
+            case 18: // XZ
+                ax1 = x1; ay1 = z1; ax2 = x2; ay2 = z2;
+                ah1 = y1; ah2 = y2;
+                ioff = iVal; joff = kVal;
+                break;
+            case 19: // YZ
+                ax1 = y1; ay1 = z1; ax2 = y2; ay2 = z2;
+                ah1 = x1; ah2 = x2;
+                ioff = jVal; joff = kVal;
+                break;
+            default: // 17 = XY
+                ax1 = x1; ay1 = y1; ax2 = x2; ay2 = y2;
+                ah1 = z1; ah2 = z2;
+                ioff = iVal; joff = jVal;
+                break;
+        }
+
+        float cx = ax1 + ioff;
+        float cy = ay1 + joff;
+        float r  = (float) Math.hypot(ax1 - cx, ay1 - cy);
+
+        // Arco degenere → fallback a corda dritta (con isArc=true per il colore).
+        if (r < 1e-5f) {
+            Segment seg = new Segment();
+            seg.x1 = x1; seg.y1 = y1; seg.z1 = z1;
+            seg.x2 = x2; seg.y2 = y2; seg.z2 = z2;
+            seg.isArc = true;
+            seg.lineNumber = lineNum;
+            segments.add(seg);
+            updateExtremes(x2, y2, z2);
+            return;
+        }
+
+        double startAng = Math.atan2(ay1 - cy, ax1 - cx);
+        double endAng   = Math.atan2(ay2 - cy, ax2 - cx);
+        double sweep    = endAng - startAng;
+
+        boolean closedLoop = Math.abs(ax1 - ax2) < 1e-5f
+                          && Math.abs(ay1 - ay2) < 1e-5f;
+
+        if (cw) {
+            // G2 sweep negativo
+            if (sweep > 1e-9) sweep -= 2 * Math.PI;
+            if (closedLoop)   sweep  = -2 * Math.PI;
+        } else {
+            // G3 sweep positivo
+            if (sweep < -1e-9) sweep += 2 * Math.PI;
+            if (closedLoop)    sweep  = 2 * Math.PI;
+        }
+
+        int n = Math.max(4, (int) Math.ceil(Math.abs(sweep) / ARC_ANG_STEP));
+        double dAng = sweep / n;
+        float  dh   = (ah2 - ah1) / n; // interp lineare sull'asse elicoidale
+
+        float prevAx = ax1, prevAy = ay1, prevAh = ah1;
+
+        for (int i = 1; i <= n; i++) {
+            double ang = startAng + i * dAng;
+            float newAx = cx + r * (float) Math.cos(ang);
+            float newAy = cy + r * (float) Math.sin(ang);
+            float newAh = ah1 + i * dh;
+
+            // Forza l'ultimo vertice ad essere esattamente il target richiesto
+            // dal file, per evitare drift numerico cumulato sui cos/sin.
+            if (i == n) {
+                newAx = ax2; newAy = ay2; newAh = ah2;
+            }
+
+            // Riproietta in 3D in base al piano.
+            float sx1, sy1, sz1, sx2, sy2, sz2;
+            switch (plane) {
+                case 18: // XZ → x=ax, z=ay, y=ah
+                    sx1 = prevAx; sy1 = prevAh; sz1 = prevAy;
+                    sx2 = newAx;  sy2 = newAh;  sz2 = newAy;
+                    break;
+                case 19: // YZ → y=ax, z=ay, x=ah
+                    sx1 = prevAh; sy1 = prevAx; sz1 = prevAy;
+                    sx2 = newAh;  sy2 = newAx;  sz2 = newAy;
+                    break;
+                default: // 17 XY → x=ax, y=ay, z=ah
+                    sx1 = prevAx; sy1 = prevAy; sz1 = prevAh;
+                    sx2 = newAx;  sy2 = newAy;  sz2 = newAh;
+                    break;
+            }
+
+            Segment seg = new Segment();
+            seg.x1 = sx1; seg.y1 = sy1; seg.z1 = sz1;
+            seg.x2 = sx2; seg.y2 = sy2; seg.z2 = sz2;
+            seg.isArc = true;
+            seg.lineNumber = lineNum; // tutti i mini-segmenti condividono la riga origine
+            segments.add(seg);
+            updateExtremes(sx2, sy2, sz2);
+
+            prevAx = newAx; prevAy = newAy; prevAh = newAh;
+        }
     }
 
     // =========================================================================

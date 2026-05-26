@@ -590,31 +590,31 @@ public class FileSenderTabFragment extends BaseFragment
         protected Integer doInBackground(File... file) {
             Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
             Integer lines = 0;
-            try {
-                BufferedReader reader = new BufferedReader(new FileReader(file[0]));
+            try (BufferedReader reader = new BufferedReader(new FileReader(file[0]))) {
                 String sCurrentLine;
                 GcodeCommand gcodeCommand = new GcodeCommand();
                 while ((sCurrentLine = reader.readLine()) != null) {
+                    if (isCancelled()) break;
                     gcodeCommand.setCommand(sCurrentLine);
                     if (gcodeCommand.getCommandString().length() > 0) {
                         lines++;
                         if (gcodeCommand.getCommandString().length() >= 79) {
+                            // Riga troppo lunga: posta UN solo toast, cancella e
+                            // termina subito. setStatus/initFileSenderListener
+                            // sono gestiti in onCancelled() sul main thread —
+                            // chiamarli qui (BG thread) faceva esplodere la UI
+                            // con file pieni di righe lunghe (CAM esterni).
                             EventBus.getDefault().post(new UiToastEvent(
                                     GrblController.getInstance().getString(
                                             R.string.text_gcode_length_warning)
                                             + sCurrentLine, true, true));
-                            initFileSenderListener();
-                            FileSenderListener.getInstance().setStatus(
-                                    FileSenderListener.STATUS_IDLE);
                             cancel(true);
+                            return lines;
                         }
                     }
                     if (lines > 0 && lines % 2500 == 0) publishProgress(lines);
                 }
-                reader.close();
             } catch (IOException e) {
-                initFileSenderListener();
-                FileSenderListener.getInstance().setStatus(FileSenderListener.STATUS_IDLE);
                 Log.e("FileSenderTabFragment", e.getMessage(), e);
             }
             return lines;
