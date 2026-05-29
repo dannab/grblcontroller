@@ -177,6 +177,19 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 getString(R.string.preference_active_wpos), WPOS_SYSTEMS[0]);
         activeWpos = isValidWpos(saved) ? saved : WPOS_SYSTEMS[0];
 
+        // Stato di default all'avvio dell'app: stepping a 1mm su entrambi i gruppi
+        // (XY+A e Z), modalità step (non continuous). Solo al primo onCreate —
+        // se il fragment viene ricreato dopo una rotazione/config change rispettiamo
+        // lo stato precedente.
+        if (savedInstanceState == null) {
+            stepCycleIndexXYA = 0;
+            stepCycleIndexZ = 0;
+            continuousModeXYA = false;
+            continuousModeZ = false;
+            applyStepXYA(STEP_CYCLE[0]);
+            applyStepZ(STEP_CYCLE[0]);
+        }
+
         // FIX: carica il file esistente in memoria all'avvio
         // così i punti precedenti non vengono persi se il fragment
         // viene ricreato (es. rotazione schermo, cambio tab)
@@ -718,18 +731,33 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     /**
      * Cicla lo step di XY+A tra 1.0 → 0.1 → 0.01 → 1.0.
+     * Se è attiva la modalità CONTINUOUS, il click la disattiva e riporta
+     * direttamente a stepping 1mm (uscita "di emergenza" intuitiva: tocco il
+     * pulsante centrale e torno in stato sicuro/predefinito).
      * Z resta indipendente (gestito da {@link #cycleStepZ()}).
      */
     private void cycleStepXYA() {
-        stepCycleIndexXYA = (stepCycleIndexXYA + 1) % STEP_CYCLE.length;
+        if (continuousModeXYA) {
+            continuousModeXYA = false;
+            stepCycleIndexXYA = 0;
+        } else {
+            stepCycleIndexXYA = (stepCycleIndexXYA + 1) % STEP_CYCLE.length;
+        }
         applyStepXYA(STEP_CYCLE[stepCycleIndexXYA]);
     }
 
     /**
      * Cicla lo step di Z tra 1.0 → 0.1 → 0.01 → 1.0.
+     * Stesso comportamento di {@link #cycleStepXYA()}: click in continuous
+     * torna a stepping 1mm.
      */
     private void cycleStepZ() {
-        stepCycleIndexZ = (stepCycleIndexZ + 1) % STEP_CYCLE.length;
+        if (continuousModeZ) {
+            continuousModeZ = false;
+            stepCycleIndexZ = 0;
+        } else {
+            stepCycleIndexZ = (stepCycleIndexZ + 1) % STEP_CYCLE.length;
+        }
         applyStepZ(STEP_CYCLE[stepCycleIndexZ]);
     }
 
