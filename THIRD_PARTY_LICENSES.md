@@ -53,6 +53,7 @@ These libraries are pulled in via Gradle (see `app/build.gradle`):
 | EventBus | Markus Junginger / greenrobot | Apache License 2.0 |
 | IndicatorSeekBar | Chuang Guangquan (warkiz) | Apache License 2.0 |
 | UsbSerial | Felipe Herranz (felHR85) | MIT License |
+| NanoHTTPD | Jarno Elonen, Paul S. Hawke and contributors | BSD 3-Clause License |
 | MaterialFilePicker | nbsp-team | Apache License 2.0 |
 | Sugar ORM | satyan | MIT License |
 | Toasty | GrenderG | GNU Lesser General Public License v3.0 |
