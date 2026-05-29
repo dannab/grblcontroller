@@ -33,6 +33,7 @@
     <string name="preference_jogging_step_size_a" translatable="false">jogging_step_size_a</string>
     <string name="preference_jogging_feed_rate" translatable="false">jogging_feed_rate</string>
     <string name="preference_jogging_in_inches" translatable="false">jogging_in_inches</string>
+    <string name="preference_active_wpos" translatable="false">active_wpos</string>
     <string name="preference_jogging_max_step_size" translatable="false">jogging_max_step_size</string>
     <string name="preference_jogging_max_step_size_z" translatable="false">jogging_max_step_size_z</string>
     <string name="preference_jogging_max_step_size_a" translatable="false">jogging_max_step_size_a</string>
@@ -97,6 +98,7 @@
     <string name="text_http_server_password">Password (opzionale)</string>
     <string name="text_http_server_password_desc">Se impostata, richiede autenticazione (user: grbl). Vuota = nessuna autenticazione.</string>
     <string name="text_http_server_info">Stato server</string>
+    <string name="text_http_server_off">Server HTTP non attivo</string>
 
 
 
@@ -312,7 +314,6 @@
 
     <!-- Jogging Tab -->
 
-    <string name="text_steps_feed">Step Size | Jog Feed</string>
     <string name="text_zero_selected_axis">Zero selected axis</string>
     <string name="text_set_axis_location_in_current_wpos">set selected axis location in current coordinate system to zero | </string>
     <string name="text_selected_coordinate_system">"Selected coordinate system "</string>
@@ -330,6 +331,7 @@
     <string name="text_move">Move</string>
     <string name="text_axis_to_zero_position">axis to zero position?</string>
     <string name="text_go_to_zero_position">goto axis zero position in current coordinate system | G0</string>
+    <string name="text_select_coordinate_system">Coordinate system</string>
     <string name="text_save_coordinate_system">Save coordinate system</string>
     <string name="text_save_coordinate_system_desc">save current position to coordinate system</string>
     <string name="text_jogging_step_and_feed">Jogging step and feed</string>

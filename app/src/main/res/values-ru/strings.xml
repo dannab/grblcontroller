@@ -185,7 +185,6 @@
     <string name="text_spindle_on_large">Шпиндель {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_start_probe">Зонд</string>
     <string name="text_starting_streaming">Начинается трансляция GCODE</string>
-    <string name="text_steps_feed">Шаг | Подача</string>
     <string name="text_straight_probe">G38.3: Прямое контактное измерение</string>
     <string name="text_streaming_stop_button_behaviour">Функции кнопки остановки трансляции</string>
     <string name="text_time_elapsed">Время работы</string>

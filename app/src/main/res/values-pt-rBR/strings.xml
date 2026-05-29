@@ -244,7 +244,6 @@
         <item>270</item>
     </string-array>
 
-    <string name="text_steps_feed">Step Size | Jog Feed</string>
     <string name="text_zero_selected_axis">Zero selected axis</string>
     <string name="text_set_axis_location_in_current_wpos">set selected axis location in current coordinate system to zero | </string>
     <string name="text_selected_coordinate_system">"Selected coordinate system "</string>

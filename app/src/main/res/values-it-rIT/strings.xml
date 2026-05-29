@@ -209,7 +209,6 @@
         <item>270 gradi in senso orario</item>
     </string-array>
 
-    <string name="text_steps_feed">Dimensione Passo | Avanzamento Jog</string>
     <string name="text_zero_selected_axis">Azzerra l\'asse selezionato</string>
     <string name="text_set_axis_location_in_current_wpos">imposta la posizione dell\'asse selezionato a zero nel sistema di coordinate corrente | </string>
     <string name="text_selected_coordinate_system">"Sistema di coordinate selezionato "</string>
@@ -227,6 +226,7 @@
     <string name="text_move">Muovi</string>
     <string name="text_axis_to_zero_position">asse in posizione zero?</string>
     <string name="text_go_to_zero_position">vai alla posizione zero dell\'asse nel sistema di coordinate corrente | G0</string>
+    <string name="text_select_coordinate_system">Sistema di coordinate</string>
     <string name="text_save_coordinate_system">Salva il sistema di coordinate</string>
     <string name="text_save_coordinate_system_desc">salva la posizione corrente nel sistema di coordinate</string>
     <string name="text_jogging_step_and_feed">Passo e avanzamento Jogging</string>

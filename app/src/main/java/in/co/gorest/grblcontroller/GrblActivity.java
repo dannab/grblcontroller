@@ -42,6 +42,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -99,18 +100,19 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
     private Toast lastToast;
     private CharSequence lastBaseSubtitle = null;
+    private TextView toolbarTitleView = null;
+    private TextView toolbarSubtitleView = null;
 
-    /** Sets the toolbar subtitle, automatically appending the HTTP server URL when active. */
+    /**
+     * Sets the connection/machine label (toolbar line 1) and refreshes the
+     * server URL on line 2 if the HTTP server is active.
+     */
     protected void applySubtitle(CharSequence base) {
         lastBaseSubtitle = base;
-        if (getSupportActionBar() == null) return;
+        if (toolbarTitleView == null || toolbarSubtitleView == null) return;
+        toolbarTitleView.setText(base == null ? "" : base);
         String url = HttpServerManager.getInstance().getDisplayUrl();
-        if (url == null) {
-            getSupportActionBar().setSubtitle(base);
-        } else {
-            CharSequence b = (base == null) ? "" : base;
-            getSupportActionBar().setSubtitle(b + "  |  " + url);
-        }
+        toolbarSubtitleView.setText(url == null ? getString(R.string.text_http_server_off) : url);
     }
 
     /** Re-applies the last subtitle, picking up server state changes. */
@@ -129,6 +131,9 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
+        toolbarTitleView = findViewById(R.id.toolbar_title);
+        toolbarSubtitleView = findViewById(R.id.toolbar_subtitle);
         applySubtitle(getString(R.string.text_not_connected));
 
         applicationSetup();

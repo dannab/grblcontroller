@@ -28,20 +28,14 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TableRow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.databinding.DataBindingUtil;
 
 import com.joanzapata.iconify.widget.IconButton;
-import com.warkiz.widget.IndicatorSeekBar;
-import com.warkiz.widget.OnSeekChangeListener;
-import com.warkiz.widget.SeekParams;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -97,6 +91,17 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     private CustomCommandsAsyncTask customCommandsAsyncTask;
 
     /**
+     * Sistema di coordinate (G54..G57) attualmente attivo lato app.
+     * È solo una memoria locale: l'unica fonte di verità su quale sia attivo
+     * davvero in GRBL è il parser state ($G), ma noi ci limitiamo a ricordare
+     * l'ultima scelta fatta dall'utente e a tenere il pulsante allineato.
+     */
+    private static final String[] WPOS_SYSTEMS = {"G54", "G55", "G56", "G57"};
+    private String activeWpos = WPOS_SYSTEMS[0];
+    /** Pulsante che mostra/permette di cambiare il coord system attivo. */
+    private IconButton btnWposSelect;
+
+    /**
      * Buffer in memoria delle coordinate salvate.
      * FIX: inizializzato a "" invece di null per evitare la riga "null"
      * all'inizio del file alla prima pressione del tasto.
@@ -106,13 +111,19 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     private String pointsCoords = "";
 
     /**
-     * Valori possibili per il ciclo step XY e Z.
+     * Valori possibili per il ciclo step.
      * Click breve cicla: 1.0 -> 0.1 -> 0.01 -> 1.0 ...
-     * Long click: imposta 1.0 direttamente.
+     * Il pulsante centrale del pad XY cicla per XY+A; il pulsante in colonna Z
+     * (tra Z+ e Z-) cicla per Z. Due indici separati per non far interferire i due gruppi.
      */
     private static final double[] STEP_CYCLE = {1.0, 0.1, 0.01};
-    private int stepCycleIndex = 0;
+    private int stepCycleIndexXYA = 0;
+    private int stepCycleIndexZ = 0;
+
+    /** Pulsante centrale pad XY — cicla step XY+A, long-click toggla continuous XY+A. */
     private IconButton btnStepCycle;
+    /** Pulsante in colonna Z (ex jog_cancel) — cicla step Z, long-click toggla continuous Z. */
+    private IconButton btnStepCycleZ;
 
     /**
      * Distanza grande per jog continuo: GRBL si muove fino al jog cancel (0x85).
@@ -135,10 +146,15 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     /** true se è attivo un jog continuo — serve per mandare cancel al rilascio */
     private boolean jogContinuousActive = false;
 
-    /** true = modalità continuo (press = jog immediato, release = stop) */
-    private boolean continuousModeEnabled = false;
-
-    private IconButton jogCancelButton;
+    /**
+     * Modalità continuous indipendenti per i due gruppi di assi:
+     *  - XYA: pad direzionale XY + tasti A+/A-
+     *  - Z:   solo Z+ / Z-
+     * In modalità continuous press = jog immediato verso il fondoscala,
+     * release = jog cancel.
+     */
+    private boolean continuousModeXYA = false;
+    private boolean continuousModeZ = false;
 
     public JoggingTabFragment() {}
 
@@ -155,10 +171,22 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 getString(R.string.shared_preference_key));
         EventBus.getDefault().register(this);
 
+        // Ripristina l'ultima scelta del sistema di coordinate. Default G54
+        // se non c'è ancora nulla salvato o se il valore salvato è corrotto.
+        String saved = sharedPref.getString(
+                getString(R.string.preference_active_wpos), WPOS_SYSTEMS[0]);
+        activeWpos = isValidWpos(saved) ? saved : WPOS_SYSTEMS[0];
+
         // FIX: carica il file esistente in memoria all'avvio
         // così i punti precedenti non vengono persi se il fragment
         // viene ricreato (es. rotazione schermo, cambio tab)
         loadPointsFromFile();
+    }
+
+    private boolean isValidWpos(String s) {
+        if (s == null) return false;
+        for (String w : WPOS_SYSTEMS) if (w.equals(s)) return true;
+        return false;
     }
 
     @Override
@@ -216,9 +244,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         binding.setMachineStatus(machineStatus);
         View view = binding.getRoot();
 
-        RelativeLayout joggingStepFeedView = view.findViewById(R.id.jogging_step_feed_view);
-        joggingStepFeedView.setOnClickListener(this);
-
         for (int resourceId : new Integer[]{
                 R.id.jog_y_positive, R.id.jog_x_positive, R.id.jog_z_positive,
                 R.id.jog_xy_top_left, R.id.jog_xy_top_right,
@@ -244,7 +269,14 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                         iconButton.removeCallbacks(null);
                         jogContinuousActive = false;
 
-                        if (continuousModeEnabled) {
+                        // Modalità continuous è per gruppo: il pulsante in colonna Z
+                        // controlla continuousModeZ, tutti gli altri (XY diagonali, A)
+                        // continuousModeXYA. Il discriminante è la lettera dell'asse nel tag.
+                        boolean useContinuous = isZAxisTag(iconButton.getTag().toString())
+                                ? continuousModeZ
+                                : continuousModeXYA;
+
+                        if (useContinuous) {
                             // Modalità continuo: jog immediato senza attesa
                             sendJogContinuous(iconButton.getTag().toString());
                             jogContinuousActive = true;
@@ -283,12 +315,21 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         // short/long click. Niente più registrazione "per contenitore", così
         // spostare i tasti nel layout non li scollega più dalle funzioni.
         for (int resourceId : new Integer[]{
-                R.id.jog_cancel, R.id.wpos_g54,
                 R.id.get_point, R.id.run_homing_cycle, R.id.do_leveling}) {
             IconButton iconButton = view.findViewById(resourceId);
             iconButton.setOnClickListener(this);
             iconButton.setOnLongClickListener(this);
         }
+
+        // Pulsante coordinate system (l'id è rimasto "wpos_g54" per compatibilità XML,
+        // ma ora rappresenta un selettore tra G54/G55/G56/G57):
+        //   short-click → dialog di selezione (single choice) e invio del G5x scelto
+        //   long-click  → salva WPos corrente nel sistema attivo (saveWPos)
+        btnWposSelect = view.findViewById(R.id.wpos_g54);
+        btnWposSelect.setText(activeWpos);
+        btnWposSelect.setTag(activeWpos);
+        btnWposSelect.setOnClickListener(v -> showWposSelectionDialog());
+        btnWposSelect.setOnLongClickListener(this);
 
         // Set-zero per asse: short-click = azzera WPos qui (con dialog), long-click = goto axis zero
         bindZeroAxisButton(view, R.id.goto_x_zero);
@@ -308,17 +349,31 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             });
         }
 
-        jogCancelButton = view.findViewById(R.id.jog_cancel);
-
-        // btn_step_cycle: click breve = cicla step, long click = imposta 1.0
+        // btn_step_cycle (centro pad XY): controlla XY + A
+        //   click       → cicla 1 → 0.1 → 0.01
+        //   long-click  → toggla modalità STEP ↔ CONTINUOUS (per XY+A)
         btnStepCycle = view.findViewById(R.id.btn_step_cycle);
-        updateStepCycleButton();
-        btnStepCycle.setOnClickListener(v -> cycleStep());
+        btnStepCycle.setOnClickListener(v -> cycleStepXYA());
         btnStepCycle.setOnLongClickListener(v -> {
-            stepCycleIndex = 0; // torna a 1.0
-            applyStep(STEP_CYCLE[stepCycleIndex]);
+            continuousModeXYA = !continuousModeXYA;
+            updateStepCycleButton();
             return true;
         });
+        updateStepCycleButton();
+
+        // jog_cancel (in colonna Z, tra Z+ e Z-): stesso ruolo di btn_step_cycle ma solo per Z
+        //   click       → cicla 1 → 0.1 → 0.01 (asse Z)
+        //   long-click  → toggla modalità STEP ↔ CONTINUOUS (asse Z)
+        // NOTA: l'ID resta "jog_cancel" per non rompere il layout, ma la funzione
+        //       di toggle-globale-continuous che aveva prima è stata sostituita.
+        btnStepCycleZ = view.findViewById(R.id.jog_cancel);
+        btnStepCycleZ.setOnClickListener(v -> cycleStepZ());
+        btnStepCycleZ.setOnLongClickListener(v -> {
+            continuousModeZ = !continuousModeZ;
+            updateStepCycleZButton();
+            return true;
+        });
+        updateStepCycleZButton();
 
 //        TableRow wposLayout = view.findViewById(R.id.wpos_layout);
 //        for (int i = 0; i < wposLayout.getChildCount(); i++) {
@@ -405,17 +460,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         int id = view.getId();
 
         switch (id) {
-            case R.id.jogging_step_feed_view:
-                this.setJoggingStepAndFeed();
-                return;
-
-            case R.id.jog_cancel:
-                continuousModeEnabled = !continuousModeEnabled;
-                jogCancelButton.setText(continuousModeEnabled
-                        ? "{fa-arrows 22dp @color/colorAccent}"
-                        : "{fa-stop-circle-o 26dp @color/colorPrimary}");
-                break;
-
             case R.id.run_homing_cycle:
                 // Long click: homing cycle (spostato da run_homing_cycle)
                 if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
@@ -471,16 +515,9 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         int id = view.getId();
 
         switch (id) {
-            case R.id.jog_cancel:
-                // Long click: homing cycle (spostato da run_homing_cycle)
-
-                return true;
-
             case R.id.wpos_g54:
-            //case R.id.wpos_g55:
-            //case R.id.wpos_g56:
-            //case R.id.wpos_g57:
-                saveWPos((Button) view);
+                // Long click: salva la WPos corrente nel sistema attivo lato app
+                saveWPos(activeWpos);
                 return true;
 
             case R.id.goto_x_zero:
@@ -680,28 +717,39 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     // -------------------------------------------------------------------------
 
     /**
-     * Cicla il valore step tra 1.0 -> 0.1 -> 0.01 -> 1.0
-     * Aggiorna XY e Z insieme e aggiorna il testo del pulsante.
+     * Cicla lo step di XY+A tra 1.0 → 0.1 → 0.01 → 1.0.
+     * Z resta indipendente (gestito da {@link #cycleStepZ()}).
      */
-    private void cycleStep() {
-        stepCycleIndex = (stepCycleIndex + 1) % STEP_CYCLE.length;
-        applyStep(STEP_CYCLE[stepCycleIndex]);
+    private void cycleStepXYA() {
+        stepCycleIndexXYA = (stepCycleIndexXYA + 1) % STEP_CYCLE.length;
+        applyStepXYA(STEP_CYCLE[stepCycleIndexXYA]);
     }
 
     /**
-     * Applica il valore step a XY, Z e A e aggiorna MachineStatus e SharedPreferences.
+     * Cicla lo step di Z tra 1.0 → 0.1 → 0.01 → 1.0.
      */
-    private void applyStep(double step) {
+    private void cycleStepZ() {
+        stepCycleIndexZ = (stepCycleIndexZ + 1) % STEP_CYCLE.length;
+        applyStepZ(STEP_CYCLE[stepCycleIndexZ]);
+    }
+
+    /**
+     * Applica step a XY e A lasciando Z invariato. Persiste su SharedPreferences
+     * (stepXY e stepA condividono il valore — il pad XY e i tasti A+/A- usano lo
+     * stesso ciclo).
+     */
+    private void applyStepXYA(double step) {
+        boolean inches = sharedPref.getBoolean(
+                getString(R.string.preference_jogging_in_inches), false);
         machineStatus.setJogging(
                 step,
-                step,
+                machineStatus.getJogging().stepZ,
                 step,
                 machineStatus.getJogging().feed,
-                sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
+                inches);
 
         sharedPref.edit()
                 .putDouble(getString(R.string.preference_jogging_step_size), step)
-                .putDouble(getString(R.string.preference_jogging_step_size_z), step)
                 .putDouble(getString(R.string.preference_jogging_step_size_a), step)
                 .commit();
 
@@ -709,21 +757,68 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     }
 
     /**
-     * Aggiorna il testo del pulsante centrale con il valore step corrente.
-     * Mostra il numero senza zeri inutili: 1, 0.1, 0.01
+     * Applica step solo a Z, lasciando XY e A invariati.
+     */
+    private void applyStepZ(double step) {
+        boolean inches = sharedPref.getBoolean(
+                getString(R.string.preference_jogging_in_inches), false);
+        machineStatus.setJogging(
+                machineStatus.getJogging().stepXY,
+                step,
+                machineStatus.getJogging().stepA,
+                machineStatus.getJogging().feed,
+                inches);
+
+        sharedPref.edit()
+                .putDouble(getString(R.string.preference_jogging_step_size_z), step)
+                .commit();
+
+        updateStepCycleZButton();
+    }
+
+    /**
+     * Aggiorna il pulsante centrale XY:
+     *  - in modalità STEP: mostra il valore corrente (1 / 0.1 / 0.01)
+     *  - in modalità CONTINUOUS: mostra l'icona frecce quadridirezionali in colore accent
      */
     private void updateStepCycleButton() {
         if (btnStepCycle == null) return;
-        double step = STEP_CYCLE[stepCycleIndex];
-        String label;
-        if (step >= 1.0) {
-            label = "1";
-        } else if (step >= 0.1) {
-            label = "0.1";
+        if (continuousModeXYA) {
+            btnStepCycle.setText("{fa-arrows 22dp @color/colorAccent}");
         } else {
-            label = "0.01";
+            btnStepCycle.setText(formatStepLabel(STEP_CYCLE[stepCycleIndexXYA]));
         }
-        btnStepCycle.setText(label);
+    }
+
+    /**
+     * Aggiorna il pulsante centrale Z (ex jog_cancel):
+     *  - in modalità STEP: mostra "Z " + valore (Z1 / Z0.1 / Z0.01) — il prefisso
+     *    chiarisce a colpo d'occhio che il pulsante riguarda l'asse Z
+     *  - in modalità CONTINUOUS: mostra l'icona frecce verticali in colore accent
+     */
+    private void updateStepCycleZButton() {
+        if (btnStepCycleZ == null) return;
+        if (continuousModeZ) {
+            btnStepCycleZ.setText("{fa-arrows-v 22dp @color/colorAccent}");
+        } else {
+            btnStepCycleZ.setText("Z" + formatStepLabel(STEP_CYCLE[stepCycleIndexZ]));
+        }
+    }
+
+    /** "1", "0.1", "0.01" senza zeri inutili. */
+    private String formatStepLabel(double step) {
+        if (step >= 1.0) return "1";
+        if (step >= 0.1) return "0.1";
+        return "0.01";
+    }
+
+    /**
+     * True se il tag del pulsante muove l'asse Z. Il tag è il template GRBL
+     * passato a String.format, quindi cerco la lettera asse — uppercase per
+     * insensibilità a maiuscole/minuscole nel template.
+     */
+    private boolean isZAxisTag(String tag) {
+        return tag != null && tag.toUpperCase().contains("Z");
     }
 
     private void customButton(int resourceId, boolean isLongClick) {
@@ -874,14 +969,19 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .show();
     }
 
-    private void saveWPos(Button button) {
-        String wpos = button.getTag().toString();
+    /**
+     * Mostra il dialog di conferma e, se accettato, salva la WPos corrente
+     * nello slot G10 corrispondente al coord system passato.
+     * Mappatura: G54→P1, G55→P2, G56→P3, G57→P4.
+     */
+    private void saveWPos(String wpos) {
         final String slot;
         switch (wpos) {
             case "G54": slot = "P1"; break;
+            case "G55": slot = "P2"; break;
             case "G56": slot = "P3"; break;
             case "G57": slot = "P4"; break;
-            default:    slot = "P2"; break;
+            default:    slot = "P1"; break;
         }
         new AlertDialog.Builder(getActivity())
                 .setTitle(R.string.text_save_coordinate_system)
@@ -889,6 +989,52 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .setPositiveButton(getString(R.string.text_yes_confirm),
                         (dialog, which) -> sendCommandIfIdle(
                                 String.format("G10 L20 %s X0Y0Z0", slot)))
+                .setNegativeButton(getString(R.string.text_no_confirm), null)
+                .show();
+    }
+
+    /**
+     * Dialog di selezione del sistema di coordinate.
+     * Mostra G54/G55/G56/G57 con quello attivo pre-selezionato.
+     * Alla conferma invia il G5x scelto + un $G per riallineare il parser state,
+     * salva la nuova scelta in SharedPreferences e aggiorna il pulsante.
+     * Bloccato se la macchina non è in IDLE (sendCommandIfIdle se ne occupa).
+     */
+    private void showWposSelectionDialog() {
+        int currentIdx = 0;
+        for (int i = 0; i < WPOS_SYSTEMS.length; i++) {
+            if (WPOS_SYSTEMS[i].equals(activeWpos)) { currentIdx = i; break; }
+        }
+        // Holder per la selezione provvisoria — single click sulla riga aggiorna
+        // questo array; il commit avviene solo se l'utente preme OK.
+        final int[] chosen = { currentIdx };
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.text_select_coordinate_system)
+                .setSingleChoiceItems(WPOS_SYSTEMS, currentIdx,
+                        (dialog, which) -> chosen[0] = which)
+                .setPositiveButton(getString(R.string.text_yes_confirm), (dialog, which) -> {
+                    String selected = WPOS_SYSTEMS[chosen[0]];
+                    if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
+                        EventBus.getDefault().post(new UiToastEvent(
+                                getString(R.string.text_machine_not_idle), true, true));
+                        return;
+                    }
+                    fragmentInteractionListener.onGcodeCommandReceived(selected);
+                    fragmentInteractionListener.onGcodeCommandReceived(
+                            GrblUtils.GRBL_VIEW_PARSER_STATE_COMMAND);
+
+                    activeWpos = selected;
+                    sharedPref.edit()
+                            .putString(getString(R.string.preference_active_wpos), selected)
+                            .commit();
+                    if (btnWposSelect != null) {
+                        btnWposSelect.setText(selected);
+                        btnWposSelect.setTag(selected);
+                    }
+                    EventBus.getDefault().post(new UiToastEvent(
+                            getString(R.string.text_selected_coordinate_system) + selected));
+                })
                 .setNegativeButton(getString(R.string.text_no_confirm), null)
                 .show();
     }
@@ -951,201 +1097,6 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         String jog = String.format(tag, units, JOG_CONTINUOUS_DISTANCE, jogFeed);
         EventBus.getDefault().post(new JogCommandEvent(jog));
     }
-
-    @SuppressLint("NonConstantResourceId")
-    private void setJoggingStepAndFeed() {
-        LayoutInflater inflater = LayoutInflater.from(getActivity());
-        View view = inflater.inflate(R.layout.dialog_step_and_feed, null, false);
-
-        final IndicatorSeekBar jogStepSeekBarXY = view.findViewById(R.id.jog_xy_step_seek_bar);
-        jogStepSeekBarXY.setProgress(machineStatus.getJogging().stepXY.floatValue());
-        jogStepSeekBarXY.setMax(sharedPref.getInt(getString(R.string.preference_jogging_max_step_size), 10));
-        jogStepSeekBarXY.setIndicatorTextFormat("XY: ${PROGRESS}");
-        jogStepSeekBarXY.setDecimalScale(3);
-
-        for (final int resourceId : new Integer[]{
-                R.id.jog_xy_step_small, R.id.jog_xy_step_medium, R.id.jog_xy_step_high}) {
-            final IconButton iconButton = view.findViewById(resourceId);
-
-            iconButton.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(getActivity())
-                        .setTitle("Save Quick Button Value")
-                        .setMessage("do you want to save the quick button value as "
-                                + jogStepSeekBarXY.getProgressFloat())
-                        .setPositiveButton(getString(R.string.text_yes_confirm), (dialog, which) -> {
-                            EnhancedSharedPreferences.Editor editor = sharedPref.edit();
-                            editor.putString(iconButton.getTag().toString(),
-                                    Float.toString(jogStepSeekBarXY.getProgressFloat())).commit();
-                        })
-                        .setNegativeButton(getString(R.string.text_no_confirm), null)
-                        .show();
-                return true;
-            });
-
-            iconButton.setOnClickListener(v -> {
-                if (isAdded()) {
-                    String stepValue = sharedPref.getString(iconButton.getTag().toString(), "0");
-                    if (stepValue.equals("0")) {
-                        switch (resourceId) {
-                            case R.id.jog_xy_step_small:  stepValue = "0.01"; break;
-                            case R.id.jog_xy_step_medium: stepValue = "0.1";  break;
-                            case R.id.jog_xy_step_high:   stepValue = "1";    break;
-                        }
-                    }
-                    if (stepValue.length() > 0) {
-                        float step_value = Float.parseFloat(stepValue);
-                        if (step_value > jogStepSeekBarXY.getMax()) {
-                            EventBus.getDefault().post(new UiToastEvent(
-                                    "Value is grater than the bar size", true, true));
-                            return;
-                        }
-                        jogStepSeekBarXY.setProgress(step_value);
-                        EventBus.getDefault().post(new UiToastEvent(
-                                "XY Axis step value is set to " + step_value));
-                        sharedPref.edit().putDouble(getString(R.string.preference_jogging_step_size),
-                                Double.parseDouble(Float.toString(step_value))).commit();
-                    } else {
-                        EventBus.getDefault().post(new UiToastEvent(
-                                "Invalid step size value, please check settings", true, true));
-                    }
-                }
-            });
-        }
-
-        jogStepSeekBarXY.setOnSeekChangeListener(new OnSeekChangeListener() {
-            @Override
-            public void onSeeking(SeekParams seekParams) {
-                machineStatus.setJogging(
-                        Double.parseDouble(Float.toString(seekParams.progressFloat)),
-                        machineStatus.getJogging().stepZ,
-                        machineStatus.getJogging().feed,
-                        sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
-            }
-            @Override public void onStartTrackingTouch(IndicatorSeekBar seekBar) {}
-            @Override
-            public void onStopTrackingTouch(IndicatorSeekBar seekBar) {
-                sharedPref.edit().putDouble(getString(R.string.preference_jogging_step_size),
-                        Double.parseDouble(Float.toString(seekBar.getProgressFloat()))).commit();
-            }
-        });
-
-        final IndicatorSeekBar jogStepSeekBarZ = view.findViewById(R.id.jog_z_step_seek_bar);
-        jogStepSeekBarZ.setProgress(machineStatus.getJogging().stepZ.floatValue());
-        jogStepSeekBarZ.setMax(sharedPref.getInt(
-                getString(R.string.preference_jogging_max_step_size_z), 5));
-        jogStepSeekBarZ.setIndicatorTextFormat("Z: ${PROGRESS}");
-        jogStepSeekBarZ.setDecimalScale(3);
-
-        for (final int resourceId : new Integer[]{
-                R.id.jog_z_step_small, R.id.jog_z_step_medium, R.id.jog_z_step_high}) {
-            final IconButton iconButton = view.findViewById(resourceId);
-
-            iconButton.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(getActivity())
-                        .setTitle("Save Quick Button Value")
-                        .setMessage("do you want to save the quick button value as "
-                                + jogStepSeekBarZ.getProgressFloat())
-                        .setPositiveButton(getString(R.string.text_yes_confirm), (dialog, which) -> {
-                            sharedPref.edit().putString(iconButton.getTag().toString(),
-                                    Float.toString(jogStepSeekBarZ.getProgressFloat())).commit();
-                        })
-                        .setNegativeButton(getString(R.string.text_no_confirm), null)
-                        .show();
-                return true;
-            });
-
-            iconButton.setOnClickListener(v -> {
-                if (isAdded()) {
-                    String stepValue = sharedPref.getString(iconButton.getTag().toString(), "0");
-                    if (stepValue.equals("0")) {
-                        switch (resourceId) {
-                            case R.id.jog_z_step_small:  stepValue = "0.01"; break;
-                            case R.id.jog_z_step_medium: stepValue = "0.1";  break;
-                            case R.id.jog_z_step_high:   stepValue = "1";    break;
-                        }
-                    }
-                    if (stepValue.length() > 0) {
-                        float step_value = Float.parseFloat(stepValue);
-                        if (step_value > jogStepSeekBarZ.getMax()) {
-                            EventBus.getDefault().post(new UiToastEvent(
-                                    "Value is grater than the bar size", true, true));
-                            return;
-                        }
-                        jogStepSeekBarZ.setProgress(step_value);
-                        EventBus.getDefault().post(new UiToastEvent(
-                                "Z Axis step value is set to " + step_value));
-                        sharedPref.edit().putDouble(getString(R.string.preference_jogging_step_size_z),
-                                Double.parseDouble(Float.toString(step_value))).commit();
-                    } else {
-                        EventBus.getDefault().post(new UiToastEvent(
-                                "Invalid step size value, please check settings", true, true));
-                    }
-                }
-            });
-        }
-
-        jogStepSeekBarZ.setOnSeekChangeListener(new OnSeekChangeListener() {
-            @Override
-            public void onSeeking(SeekParams seekParams) {
-                machineStatus.setJogging(
-                        machineStatus.getJogging().stepXY,
-                        Double.parseDouble(Float.toString(seekParams.progressFloat)),
-                        machineStatus.getJogging().feed,
-                        sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
-            }
-            @Override public void onStartTrackingTouch(IndicatorSeekBar seekBar) {}
-            @Override
-            public void onStopTrackingTouch(IndicatorSeekBar seekBar) {
-                sharedPref.edit().putDouble(getString(R.string.preference_jogging_step_size_z),
-                        Double.parseDouble(Float.toString(seekBar.getProgressFloat()))).commit();
-            }
-        });
-
-        IndicatorSeekBar jogFeedSeekBar = view.findViewById(R.id.jog_feed_seek_bar);
-        jogFeedSeekBar.setProgress(machineStatus.getJogging().feed.floatValue());
-        Double maxFeedRate = sharedPref.getDouble(
-                getString(R.string.preference_jogging_max_feed_rate), 2400.00);
-        jogFeedSeekBar.setMax(Float.parseFloat(maxFeedRate.toString()));
-        jogFeedSeekBar.setIndicatorTextFormat("Feed: ${PROGRESS}");
-
-        jogFeedSeekBar.setOnSeekChangeListener(new OnSeekChangeListener() {
-            @Override
-            public void onSeeking(SeekParams seekParams) {
-                machineStatus.setJogging(
-                        machineStatus.getJogging().stepXY,
-                        machineStatus.getJogging().stepZ,
-                        seekParams.progress,
-                        sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
-            }
-            @Override public void onStartTrackingTouch(IndicatorSeekBar seekBar) {}
-            @Override
-            public void onStopTrackingTouch(IndicatorSeekBar seekBar) {
-                sharedPref.edit().putDouble(getString(R.string.preference_jogging_feed_rate),
-                        seekBar.getProgress()).commit();
-            }
-        });
-
-        SwitchCompat jogInches = view.findViewById(R.id.jog_inches);
-        jogInches.setChecked(sharedPref.getBoolean(
-                getString(R.string.preference_jogging_in_inches), false));
-        jogInches.setOnCheckedChangeListener((compoundButton, b) -> {
-            machineStatus.setJogging(machineStatus.getJogging().stepXY,
-                    machineStatus.getJogging().stepZ,
-                    machineStatus.getJogging().feed, b);
-            sharedPref.edit().putBoolean(
-                    getString(R.string.preference_jogging_in_inches), b).commit();
-        });
-
-        AlertDialog dialog = new AlertDialog.Builder(getActivity())
-                .setView(view)
-                .setCancelable(false)
-                .setPositiveButton(getString(R.string.text_ok), (d, id) -> {})
-                .create();
-        dialog.setCancelable(false);
-        dialog.show();
-    }
-
-
 
     private void sendCommandIfIdle(String command) {
         if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
