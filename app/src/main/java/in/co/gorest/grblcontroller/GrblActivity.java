@@ -50,8 +50,15 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.Observable;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager.widget.ViewPager;
+
+import java.io.File;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.google.android.material.tabs.TabLayout;
 import com.joanzapata.iconify.IconDrawable;
@@ -64,6 +71,7 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import es.dmoral.toasty.Toasty;
+import in.co.gorest.grblcontroller.BR;
 import in.co.gorest.grblcontroller.databinding.ActivityMainBinding;
 import in.co.gorest.grblcontroller.events.ConsoleMessageEvent;
 import in.co.gorest.grblcontroller.events.GrblAlarmEvent;
@@ -83,6 +91,7 @@ import in.co.gorest.grblcontroller.service.HttpServerManager;
 import in.co.gorest.grblcontroller.service.GrblBluetoothSerialService;
 import in.co.gorest.grblcontroller.ui.BaseFragment;
 import in.co.gorest.grblcontroller.ui.GrblFragmentPagerAdapter;
+import in.co.gorest.grblcontroller.util.GcodeDropChecker;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
 public abstract class GrblActivity extends AppCompatActivity implements BaseFragment.OnFragmentInteractionListener{
@@ -102,6 +111,27 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     private CharSequence lastBaseSubtitle = null;
     private TextView toolbarTitleView = null;
     private TextView toolbarSubtitleView = null;
+
+    // ------------------------------------------------------------------
+    // Controllo affondi Z al caricamento file (vedi GcodeDropChecker)
+    // ------------------------------------------------------------------
+    private ExecutorService zDropExecutor;
+    private File lastZDropChecked = null;
+    private final Observable.OnPropertyChangedCallback gcodeFileCallback =
+            new Observable.OnPropertyChangedCallback() {
+                @Override
+                public void onPropertyChanged(Observable sender, int propertyId) {
+                    if (propertyId == BR.gcodeFile) {
+                        File f = FileSenderListener.getInstance().getGcodeFile();
+                        // Evita doppi check sullo stesso file (es. CamTabFragment
+                        // imposta lo stesso file più volte di seguito)
+                        if (f != null && f.exists() && !f.equals(lastZDropChecked)) {
+                            lastZDropChecked = f;
+                            runZDropCheckIfEnabled(f);
+                        }
+                    }
+                }
+            };
 
     /**
      * Sets the connection/machine label (toolbar line 1) and refreshes the
@@ -154,6 +184,10 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         setupTabLayout();
         checkPowerManagement();
 
+        // Ascolta il caricamento di nuovi file GCode per il check affondi Z
+        FileSenderListener.getInstance().addOnPropertyChangedCallback(gcodeFileCallback);
+        zDropExecutor = Executors.newSingleThreadExecutor();
+
         //preference cam z step and deep to are set to zero to ensure that
         // there are no unwanted z-dips in onboard cam operations
         sharedPref.edit().putString(getString(R.string.preference_cam_z_step), "0").apply();
@@ -172,6 +206,9 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     @Override
     public void onDestroy(){
         super.onDestroy();
+
+        FileSenderListener.getInstance().removeOnPropertyChangedCallback(gcodeFileCallback);
+        if (zDropExecutor != null) { zDropExecutor.shutdownNow(); zDropExecutor = null; }
 
         stopService(new Intent(this, FileStreamerIntentService.class));
         ConsoleLoggerListener.resetClass();
@@ -265,7 +302,6 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(32)));       // Visualizzatore 3D
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_line_chart).colorRes(R.color.colorAccent).sizeDp(32))); // Analisi Z
 
             // NUOVO: Tab Editor di codice per Tablet
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(32)));       // Editor GCode
@@ -277,7 +313,6 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(21)));       // Visualizzatore 3D
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_line_chart).colorRes(R.color.colorAccent).sizeDp(21))); // Analisi Z
 
             // NUOVO: Tab Editor di codice per Smartphone
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(21)));       // Editor GCode
@@ -465,6 +500,98 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         }
 
         return false;
+    }
+
+    // ----------------------------------------------------------------------
+    // Check affondi Z al caricamento file
+    // ----------------------------------------------------------------------
+
+    private void runZDropCheckIfEnabled(final File file) {
+        if (zDropExecutor == null || zDropExecutor.isShutdown()) return;
+
+        boolean enabled = sharedPref.getBoolean(
+                getString(R.string.preference_check_z_drop_enabled), false);
+        if (!enabled) return;
+
+        final float depthThresh = parseFloatPref(R.string.preference_check_z_drop_depth, 1.0f);
+        final float angleThresh = parseFloatPref(R.string.preference_check_z_drop_angle, 60f);
+
+        zDropExecutor.submit(() -> {
+            final List<GcodeDropChecker.DropWarning> warnings =
+                    GcodeDropChecker.check(file, depthThresh, angleThresh);
+            runOnUiThread(() -> showZDropDialog(file, warnings, depthThresh, angleThresh));
+        });
+    }
+
+    private float parseFloatPref(int keyResId, float defaultValue) {
+        try {
+            String raw = sharedPref.getString(getString(keyResId),
+                    String.valueOf(defaultValue));
+            if (raw == null || raw.isEmpty()) return defaultValue;
+            return Float.parseFloat(raw.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private void showZDropDialog(File file,
+                                 List<GcodeDropChecker.DropWarning> warnings,
+                                 float depthThresh, float angleThresh) {
+        if (isFinishing() || isDestroyed()) return;
+        if (warnings == null || warnings.isEmpty()) {
+            // Nessun affondo sospetto: feedback discreto, niente dialog
+            showToastMessage(String.format(Locale.US,
+                    "Check Z OK: nessun affondo > %.1f mm e > %.0f°",
+                    depthThresh, angleThresh), false, false);
+            return;
+        }
+
+        // Costruisce il body: lista delle prime 30 discese sospette
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(Locale.US,
+                "Soglie: profondità ≥ %.2f mm, angolo ≥ %.0f°\nFile: %s\n\n",
+                depthThresh, angleThresh, file.getName()));
+
+        // Trova la peggiore (più profonda + più ripida) per il titolo
+        GcodeDropChecker.DropWarning worst = warnings.get(0);
+        for (GcodeDropChecker.DropWarning w : warnings) {
+            if (w.dz < worst.dz) worst = w;
+        }
+        sb.append(String.format(Locale.US,
+                "Peggior affondo: ΔZ %.2f mm @ %.1f° (riga %d)\n\n",
+                worst.dz, worst.angleDeg, worst.lineNumber));
+
+        int max = Math.min(30, warnings.size());
+        sb.append(String.format(Locale.US, "Prime %d voci:\n", max));
+        for (int i = 0; i < max; i++) {
+            GcodeDropChecker.DropWarning w = warnings.get(i);
+            sb.append(String.format(Locale.US,
+                    "  riga %-5d  Z: %+7.2f → %+7.2f   ΔZ %+6.2f mm   @ %4.1f°\n",
+                    w.lineNumber, w.zBefore, w.zAfter, w.dz, w.angleDeg));
+        }
+        if (warnings.size() > max) {
+            sb.append(String.format(Locale.US,
+                    "\n…e altre %d voci non mostrate.", warnings.size() - max));
+        }
+
+        TextView body = new TextView(this);
+        body.setText(sb.toString());
+        body.setTypeface(android.graphics.Typeface.MONOSPACE);
+        body.setTextSize(11f);
+        body.setPadding(40, 20, 40, 20);
+        body.setHorizontallyScrolling(true);
+
+        android.widget.HorizontalScrollView hScroll = new android.widget.HorizontalScrollView(this);
+        hScroll.addView(body);
+        android.widget.ScrollView vScroll = new android.widget.ScrollView(this);
+        vScroll.addView(hScroll);
+
+        new AlertDialog.Builder(this)
+                .setTitle(String.format(Locale.US,
+                        "⚠ %d affondi Z sospetti", warnings.size()))
+                .setView(vScroll)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
 }
