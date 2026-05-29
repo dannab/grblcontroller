@@ -94,12 +94,13 @@ public class SettingsActivity extends AppCompatActivity {
             android.preference.Preference info = getPreferenceScreen().findPreference(getString(R.string.preference_http_server_info));
             if (info == null) return;
             String url = HttpServerManager.getInstance().getDisplayUrl();
-            if (url == null) {
-                info.setSummary("Server non attivo");
-            } else {
-                String ip = HttpServerManager.getLocalIpv4();
-                info.setSummary(url + (ip == null ? "  (nessuna rete WiFi rilevata)" : ""));
+            if (url != null) {
+                info.setSummary(url);
+                return;
             }
+            // Server not running: explain why (disabled vs missing password)
+            String reason = HttpServerManager.getStartBlockReason(getActivity());
+            info.setSummary(reason != null ? reason : getString(R.string.text_http_server_off));
         }
 
         @Override

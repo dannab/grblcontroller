@@ -195,6 +195,7 @@ public class UsbConnectionActivity extends GrblActivity{
             switch (intentAction) {
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_GRANTED: // USB PERMISSION GRANTED
                     applySubtitle(getString(R.string.text_connected));
+                    in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(getString(R.string.text_connected));
                     showToastMessage(getString(R.string.text_usb_device_connected));
                     break;
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_NOT_GRANTED: // USB PERMISSION NOT GRANTED
@@ -207,6 +208,7 @@ public class UsbConnectionActivity extends GrblActivity{
                     break;
                 case GrblUsbSerialService.ACTION_USB_DISCONNECTED: // USB DISCONNECTED
                     applySubtitle(getString(R.string.text_not_connected));
+                    in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(null);
                     MachineStatusListener.getInstance().setState(Constants.MACHINE_STATUS_NOT_CONNECTED);
                     if(FileStreamerIntentService.getIsServiceRunning()){
                         FileStreamerIntentService.setShouldContinue(false);

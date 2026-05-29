@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,81 +46,249 @@ public class GcodeHttpServer extends NanoHTTPD {
     private static final List<String> ALLOWED_EXT = Arrays.asList(
             "nc", "gcode", "gco", "tap", "cnc", "ngc", "txt");
 
+    /** Hard cap on a single upload request (declared via Content-Length). */
+    private static final long MAX_UPLOAD_BYTES = 50L * 1024 * 1024;
+
+    /** Sleep on failed authentication to throttle brute-force attempts. */
+    private static final long AUTH_FAIL_DELAY_MS = 500;
+
+    /** Cap on the no-overwrite rename loop. */
+    private static final int MAX_RENAME_ATTEMPTS = 999;
+
     private final File rootDir;
-    private final String basicAuthHeader;
+    private final byte[] expectedAuthBytes;
 
     public GcodeHttpServer(int port, File rootDir, String password) {
         super(port);
         this.rootDir = rootDir;
         if (password != null && !password.isEmpty()) {
             String creds = "grbl:" + password;
-            this.basicAuthHeader = "Basic " + Base64.encodeToString(
+            String header = "Basic " + Base64.encodeToString(
                     creds.getBytes(), Base64.NO_WRAP);
+            this.expectedAuthBytes = header.getBytes();
         } else {
-            this.basicAuthHeader = null;
+            this.expectedAuthBytes = null;
         }
     }
 
     @Override
     public Response serve(IHTTPSession session) {
-        if (basicAuthHeader != null) {
+        String reqUri = session.getUri();
+        Method reqMethod = session.getMethod();
+        Log.i(TAG, "REQ " + reqMethod + " " + reqUri + " from " + session.getRemoteIpAddress());
+
+        // Auth (constant-time compare, slow on failure to throttle brute force).
+        if (expectedAuthBytes != null) {
             String auth = session.getHeaders().get("authorization");
-            if (auth == null || !auth.equals(basicAuthHeader)) {
+            boolean hasAuth = auth != null;
+            boolean ok = hasAuth && constantTimeEquals(auth.getBytes(), expectedAuthBytes);
+            if (!ok) {
+                Log.i(TAG, "AUTH " + (hasAuth ? "MISMATCH" : "MISSING") + " for " + reqUri);
+                try { Thread.sleep(AUTH_FAIL_DELAY_MS); } catch (InterruptedException ignore) {}
                 Response r = newFixedLengthResponse(
                         Response.Status.UNAUTHORIZED, "text/plain", "Auth required");
                 r.addHeader("WWW-Authenticate", "Basic realm=\"GrblController\"");
-                return r;
+                return finalizeResponse(r);
             }
+            Log.i(TAG, "AUTH OK for " + reqUri);
         }
 
-        String uri = session.getUri();
-        Method method = session.getMethod();
+        String uri = reqUri;
+        Method method = reqMethod;
 
+        // Catch Throwable so a coding bug in renderIndex/handleUpload doesn't
+        // kill the NanoHTTPD worker mid-response (which surfaces as
+        // ERR_CONNECTION_RESET on the client).
         try {
+            Response resp;
             if (Method.GET.equals(method) && (uri.equals("/") || uri.equals("/index"))) {
-                return renderIndex();
-            }
-            if (Method.GET.equals(method) && uri.startsWith("/d/")) {
+                resp = renderIndex(session);
+            } else if (Method.GET.equals(method) && uri.startsWith("/d/")) {
                 String name = decode(uri.substring(3));
-                return serveDownload(name);
+                resp = serveDownload(name);
+            } else if (Method.POST.equals(method) && uri.equals("/upload")) {
+                resp = handleUpload(session);
+            } else {
+                resp = newFixedLengthResponse(
+                        Response.Status.NOT_FOUND, "text/plain", "Not found");
             }
-            if (Method.POST.equals(method) && uri.equals("/upload")) {
-                return handleUpload(session);
-            }
-            return newFixedLengthResponse(
-                    Response.Status.NOT_FOUND, "text/plain", "Not found");
-        } catch (Exception e) {
-            Log.e(TAG, "serve error", e);
-            return newFixedLengthResponse(
-                    Response.Status.INTERNAL_ERROR, "text/plain", "Server error: " + e.getMessage());
+            Log.i(TAG, "RESP " + resp.getStatus() + " for " + uri);
+            return finalizeResponse(resp);
+        } catch (Throwable t) {
+            Log.e(TAG, "serve error for " + uri, t);
+            Response r = newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR, "text/plain", "Server error");
+            return finalizeResponse(r);
         }
     }
 
-    private Response renderIndex() {
+    /**
+     * Applies security headers AND disables HTTP keep-alive on every response.
+     *
+     * Why no keep-alive: NanoHTTPD honours SOCKET_READ_TIMEOUT (5s) on idle
+     * connections; when it expires the server-side socket is closed, but if the
+     * client (Edge/Chrome aggressively pool connections) has not yet seen the
+     * FIN it will try to reuse the connection for its next request, the kernel
+     * answers with RST, and the user sees ERR_CONNECTION_RESET. Our traffic
+     * volume is tiny so the cost of TCP handshake per request is negligible.
+     */
+    private Response finalizeResponse(Response r) {
+        if (r == null) return null;
+        addSecurityHeaders(r);
+        try {
+            r.setKeepAlive(false);
+        } catch (Throwable ignore) {
+            // Older/forked NanoHTTPD without setKeepAlive: fall back to header.
+            r.addHeader("Connection", "close");
+        }
+        return r;
+    }
+
+    private Response renderIndex(IHTTPSession session) {
+        // Post-Redirect-Get: handleUpload redirects to /?ok=N on full success
+        // and the index then shows a modal banner. We clamp to a small range
+        // so a hand-crafted URL can't inject huge numbers into the markup.
+        int uploadedOk = 0;
+        try {
+            List<String> p = session.getParameters().get("ok");
+            if (p != null && !p.isEmpty()) {
+                int n = Integer.parseInt(p.get(0));
+                if (n > 0 && n < 10000) uploadedOk = n;
+            }
+        } catch (NumberFormatException ignore) {}
+
         List<File> files = listGcodeFiles();
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">")
+        long totalBytes = 0;
+        long lastModified = 0;
+        for (File f : files) {
+            totalBytes += f.length();
+            if (f.lastModified() > lastModified) lastModified = f.lastModified();
+        }
+        String machineName = HttpServerManager.getMachineName();
+
+        StringBuilder html = new StringBuilder(4096);
+        html.append("<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-                .append("<title>Grbl Controller - File</title>")
+                .append("<meta name=\"theme-color\" content=\"#d50000\">")
+                .append("<title>Grbl Controller — File</title>")
+                // Favicon: small SVG wrench emoji as data URI, no asset round-trip
+                .append("<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,")
+                .append("%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E")
+                .append("%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2712%27%20fill%3D%27%23d50000%27%2F%3E")
+                .append("%3Ctext%20x%3D%2750%25%27%20y%3D%2754%27%20font-size%3D%2742%27%20text-anchor%3D%27middle%27%20fill%3D%27white%27%20font-family%3D%27sans-serif%27%3E%E2%9A%99%3C%2Ftext%3E")
+                .append("%3C%2Fsvg%3E\">")
                 .append("<style>")
-                .append("body{font-family:sans-serif;max-width:720px;margin:1em auto;padding:0 1em;}")
-                .append("h1{font-size:1.3em;}")
-                .append("table{width:100%;border-collapse:collapse;}")
-                .append("th,td{text-align:left;padding:6px 4px;border-bottom:1px solid #ddd;}")
-                .append("td.size{text-align:right;white-space:nowrap;color:#666;}")
-                .append("form{margin:1.5em 0;padding:1em;background:#f4f4f4;border-radius:6px;}")
-                .append(".empty{color:#888;font-style:italic;}")
-                .append("</style></head><body>")
-                .append("<h1>Grbl Controller — File G-Code</h1>");
+                .append("*{box-sizing:border-box}")
+                .append("body{margin:0;background:#f5f5f5;color:#212121;")
+                .append("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;")
+                .append("font-size:15px;line-height:1.45}")
+                .append("header{background:#d50000;color:#fff;padding:18px 20px;")
+                .append("box-shadow:0 2px 4px rgba(0,0,0,.2)}")
+                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto}")
+                .append("header .logo{width:42px;height:42px;background:rgba(255,255,255,.15);")
+                .append("border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}")
+                .append("header h1{margin:0;font-size:1.15em;font-weight:500;letter-spacing:.2px}")
+                .append("header .sub{opacity:.85;font-size:.85em;margin-top:2px}")
+                .append("main{max-width:780px;margin:18px auto;padding:0 16px}")
+                .append(".card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);")
+                .append("margin-bottom:16px;overflow:hidden}")
+                .append(".card-head{padding:14px 18px;border-bottom:1px solid #eee;font-weight:500;color:#424242}")
+                .append(".card-body{padding:18px}")
+                .append("input[type=file]{display:block;width:100%;padding:10px;border:1px dashed #bdbdbd;")
+                .append("border-radius:6px;background:#fafafa;margin-bottom:12px}")
+                .append("button{background:#338a3e;color:#fff;border:0;border-radius:4px;")
+                .append("padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;")
+                .append("letter-spacing:.5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.2);")
+                .append("transition:background .15s,box-shadow .15s}")
+                .append("button:hover{background:#256029;box-shadow:0 2px 4px rgba(0,0,0,.25)}")
+                .append("button:active{background:#1b4220}")
+                .append(".hint{color:#757575;font-size:.85em;margin:0 0 10px}")
+                .append("table{width:100%;border-collapse:collapse}")
+                .append("th{text-align:left;padding:10px 18px;background:#fafafa;font-weight:500;")
+                .append("font-size:.8em;text-transform:uppercase;letter-spacing:.5px;color:#757575;")
+                .append("border-bottom:1px solid #eee}")
+                .append("th.size{text-align:right}")
+                .append("td{padding:12px 18px;border-bottom:1px solid #f0f0f0;vertical-align:middle}")
+                .append("td.size{text-align:right;white-space:nowrap;color:#616161;font-variant-numeric:tabular-nums}")
+                .append("tr:last-child td{border-bottom:0}")
+                .append("tr:hover td{background:#fafafa}")
+                .append("td a{color:#d50000;text-decoration:none;font-weight:500}")
+                .append("td a:hover{text-decoration:underline}")
+                .append(".empty{padding:30px 18px;text-align:center;color:#9e9e9e;font-style:italic}")
+                .append("footer{max-width:780px;margin:8px auto 20px;padding:0 18px;color:#757575;")
+                .append("font-size:.82em;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}")
+                .append("footer .stats{display:flex;gap:18px;flex-wrap:wrap}")
+                .append("footer .stats b{color:#424242;font-weight:600}")
+                // ----- Modal (upload success notification) -----
+                .append(".modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);")
+                .append("display:flex;align-items:center;justify-content:center;z-index:1000;")
+                .append("animation:fadeIn .2s ease-out;padding:20px}")
+                .append(".modal{background:#fff;border-radius:8px;max-width:420px;width:100%;")
+                .append("box-shadow:0 8px 24px rgba(0,0,0,.3);animation:slideUp .25s ease-out;overflow:hidden}")
+                .append("@keyframes fadeIn{from{opacity:0}to{opacity:1}}")
+                .append("@keyframes slideUp{from{transform:translateY(20px);opacity:0}")
+                .append("to{transform:translateY(0);opacity:1}}")
+                .append(".modal-body{padding:24px;display:flex;align-items:center;gap:18px}")
+                .append(".modal-ico{width:54px;height:54px;border-radius:50%;background:#338a3e;color:#fff;")
+                .append("display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;flex-shrink:0}")
+                .append(".modal-txt h2{margin:0 0 4px;font-size:1.15em;font-weight:500;color:#212121}")
+                .append(".modal-txt p{margin:0;color:#616161;font-size:.92em}")
+                .append(".modal-foot{padding:12px 24px;border-top:1px solid #eee;")
+                .append("display:flex;justify-content:flex-end;gap:8px;align-items:center}")
+                .append(".modal-foot .countdown{color:#9e9e9e;font-size:.85em;margin-right:auto}")
+                .append(".modal-foot button{background:transparent;color:#d50000;border:0;padding:8px 14px;")
+                .append("cursor:pointer;font-weight:500;text-transform:uppercase;font-size:.82em;")
+                .append("letter-spacing:.5px;border-radius:4px;box-shadow:none}")
+                .append(".modal-foot button:hover{background:#fff5f5;box-shadow:none}")
+                .append("</style></head><body>");
 
-        html.append("<form method=\"POST\" action=\"/upload\" enctype=\"multipart/form-data\">")
-                .append("<p><strong>Carica file dal PC</strong> (sovrascrive senza avviso se il nome esiste)</p>")
-                .append("<input type=\"file\" name=\"file\" multiple required>")
-                .append(" <button type=\"submit\">Carica</button>")
-                .append("</form>");
+        // ----- Header -----
+        html.append("<header><div class=\"row\">")
+                .append("<div class=\"logo\">⚙</div>")
+                .append("<div><h1>Grbl Controller</h1>")
+                .append("<div class=\"sub\">")
+                .append(machineName != null && !machineName.isEmpty()
+                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
+                        : "Nessuna macchina connessa")
+                .append("</div></div></div></header>");
 
+        html.append("<main>");
+
+        // ----- Upload card -----
+        html.append("<div class=\"card\">")
+                .append("<div class=\"card-head\">Carica file dal PC</div>")
+                .append("<div class=\"card-body\">")
+                .append("<form id=\"uploadForm\" method=\"POST\" action=\"/upload\" enctype=\"multipart/form-data\">")
+                .append("<p class=\"hint\">Se un file con lo stesso nome esiste, viene rinominato con un suffisso. ")
+                .append("Estensioni accettate: .nc .gcode .gco .tap .cnc .ngc .txt</p>")
+                .append("<input type=\"file\" id=\"filePicker\" name=\"file\" multiple required>")
+                .append("<button type=\"submit\">Carica</button>")
+                .append("</form></div></div>")
+                // JS: prima di inviare il form, aggiunge un hidden input "expected"
+                // per ogni file selezionato con valore "<nome>:<dimensione_in_byte>".
+                // Il server confronterà i byte effettivamente ricevuti con la
+                // dimensione dichiarata e rifiuterà i file troncati (es. a causa
+                // di una WiFi instabile a metà upload). Senza JS (curl, script)
+                // la verifica viene saltata silenziosamente.
+                .append("<script>(function(){")
+                .append("var form=document.getElementById('uploadForm');")
+                .append("var picker=document.getElementById('filePicker');")
+                .append("form.addEventListener('submit',function(){")
+                .append("form.querySelectorAll('input[name=\"expected\"]').forEach(function(i){i.remove();});")
+                .append("for(var i=0;i<picker.files.length;i++){")
+                .append("var f=picker.files[i];")
+                .append("var inp=document.createElement('input');")
+                .append("inp.type='hidden';inp.name='expected';inp.value=f.name+':'+f.size;")
+                .append("form.appendChild(inp);}")
+                .append("});")
+                .append("})();</script>");
+
+        // ----- File list card -----
+        html.append("<div class=\"card\">")
+                .append("<div class=\"card-head\">File G-code disponibili (")
+                .append(files.size()).append(")</div>");
         if (files.isEmpty()) {
-            html.append("<p class=\"empty\">Nessun file G-Code presente.</p>");
+            html.append("<div class=\"empty\">Nessun file G-code presente.<br>Caricane uno qui sopra per iniziare.</div>");
         } else {
             html.append("<table><thead><tr><th>Nome</th><th class=\"size\">Dimensione</th></tr></thead><tbody>");
             for (File f : files) {
@@ -129,31 +298,138 @@ public class GcodeHttpServer extends NanoHTTPD {
             }
             html.append("</tbody></table>");
         }
+        html.append("</div></main>");
+
+        // ----- Footer stats -----
+        html.append("<footer><div class=\"stats\">")
+                .append("<span><b>").append(files.size()).append("</b> file</span>")
+                .append("<span><b>").append(formatSize(totalBytes)).append("</b> totali</span>");
+        if (lastModified > 0) {
+            html.append("<span>ultimo aggiornamento: <b>")
+                    .append(formatRelativeTime(lastModified)).append("</b></span>");
+        }
+        html.append("</div><div>Grbl Controller</div></footer>");
+
+        // ----- Upload success modal (only when ?ok=N is in the URL) -----
+        if (uploadedOk > 0) {
+            String label = (uploadedOk == 1) ? " file caricato" : " file caricati";
+            html.append("<div class=\"modal-bg\" id=\"modalBg\" role=\"dialog\" aria-modal=\"true\">")
+                    .append("<div class=\"modal\">")
+                    .append("<div class=\"modal-body\">")
+                    .append("<div class=\"modal-ico\">✓</div>")
+                    .append("<div class=\"modal-txt\">")
+                    .append("<h2>Upload completato</h2>")
+                    .append("<p><b>").append(uploadedOk).append("</b>").append(label).append(" correttamente</p>")
+                    .append("</div></div>")
+                    .append("<div class=\"modal-foot\">")
+                    .append("<span class=\"countdown\" id=\"cd\">&nbsp;</span>")
+                    .append("<button type=\"button\" id=\"closeBtn\">OK</button>")
+                    .append("</div></div></div>")
+                    .append("<script>(function(){")
+                    .append("var s=4;")
+                    .append("var bg=document.getElementById('modalBg');")
+                    .append("var cd=document.getElementById('cd');")
+                    .append("var done=false;")
+                    .append("function close(){if(done)return;done=true;clearInterval(t);")
+                    .append("bg.style.display='none';")
+                    // Strip the ?ok=N from the URL so a refresh doesn't re-show the modal.
+                    .append("if(history.replaceState){history.replaceState({},'',location.pathname);}}")
+                    .append("var t=setInterval(function(){s--;if(s<=0){close();return;}")
+                    .append("cd.textContent='Chiude in '+s+'s';},1000);")
+                    .append("cd.textContent='Chiude in '+s+'s';")
+                    .append("document.getElementById('closeBtn').addEventListener('click',close);")
+                    .append("bg.addEventListener('click',function(e){if(e.target===bg)close();});")
+                    .append("document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});")
+                    .append("})();</script>");
+        }
+
         html.append("</body></html>");
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html.toString());
     }
 
+    private static String formatRelativeTime(long millis) {
+        long delta = System.currentTimeMillis() - millis;
+        if (delta < 60_000) return "ora";
+        if (delta < 3_600_000) return (delta / 60_000) + " min fa";
+        if (delta < 86_400_000) return (delta / 3_600_000) + " h fa";
+        if (delta < 7L * 86_400_000) return (delta / 86_400_000) + " g fa";
+        return new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.ITALY).format(new java.util.Date(millis));
+    }
+
     private Response serveDownload(String name) throws IOException {
         File target = safeResolve(name);
-        if (target == null || !target.isFile()) {
+        if (target == null || !target.isFile() || !hasAllowedExtension(target.getName())) {
             return newFixedLengthResponse(
                     Response.Status.NOT_FOUND, "text/plain", "File not found");
         }
         InputStream is = new FileInputStream(target);
         Response r = newFixedLengthResponse(
                 Response.Status.OK, "application/octet-stream", is, target.length());
-        r.addHeader("Content-Disposition",
-                "attachment; filename=\"" + target.getName().replace("\"", "_") + "\"");
+        // sanitizeFileName output already strips \r\n and slashes; double quote
+        // is the only meta-character to handle for the Content-Disposition value.
+        String safeName = target.getName().replace("\"", "_");
+        r.addHeader("Content-Disposition", "attachment; filename=\"" + safeName + "\"");
         return r;
     }
 
     private Response handleUpload(IHTTPSession session) throws IOException, ResponseException {
+        // Refuse oversized uploads up-front via Content-Length. Note that a
+        // chunked / mis-declared request can still exceed this; NanoHTTPD will
+        // spool to its own temp files which we delete after the fact.
+        String clenStr = session.getHeaders().get("content-length");
+        if (clenStr != null) {
+            try {
+                long clen = Long.parseLong(clenStr.trim());
+                if (clen > MAX_UPLOAD_BYTES) {
+                    return newFixedLengthResponse(
+                            Response.Status.BAD_REQUEST, "text/plain",
+                            "Upload troppo grande (max "
+                                    + (MAX_UPLOAD_BYTES / (1024 * 1024)) + " MB)");
+                }
+            } catch (NumberFormatException ignore) { /* fall through */ }
+        }
+
+        // CSRF defence: if an Origin header is present (browser cross-site
+        // fetch), it must match the Host we listened on. Missing Origin
+        // (curl, native clients, some same-origin form posts) is allowed.
+        if (!isSameOriginIfPresent(session)) {
+            return newFixedLengthResponse(
+                    Response.Status.FORBIDDEN, "text/plain", "Cross-origin upload denied");
+        }
+
         Map<String, String> tempFiles = new HashMap<>();
-        session.parseBody(tempFiles);
+        try {
+            session.parseBody(tempFiles);
+        } catch (IOException ioe) {
+            // Connection cut mid-upload (typical on a flaky WiFi). Nothing
+            // reliable was received — show a clear error instead of a silent
+            // 500 so the operator knows to retry.
+            Log.w(TAG, "upload interrupted before multipart parsing completed", ioe);
+            return renderUploadResult(0, new ArrayList<String>(),
+                    Collections.singletonList("Connessione interrotta durante l'upload"));
+        }
 
         Map<String, List<String>> params = session.getParameters();
+
+        // Map of <client filename> -> <byte size declared by the browser JS>.
+        // Used to detect truncated uploads where the multipart parser
+        // succeeded but the file part is short of what the client intended.
+        Map<String, Long> expectedSizes = new HashMap<>();
+        List<String> expectedList = params.get("expected");
+        if (expectedList != null) {
+            for (String s : expectedList) {
+                int colon = s.lastIndexOf(':');
+                if (colon <= 0 || colon == s.length() - 1) continue;
+                try {
+                    expectedSizes.put(s.substring(0, colon),
+                            Long.parseLong(s.substring(colon + 1)));
+                } catch (NumberFormatException ignore) {}
+            }
+        }
+
         int saved = 0;
-        StringBuilder rejected = new StringBuilder();
+        List<String> savedNames = new ArrayList<>();
+        List<String> rejected = new ArrayList<>();
 
         for (Map.Entry<String, String> e : tempFiles.entrySet()) {
             String fieldName = e.getKey();
@@ -167,33 +443,181 @@ public class GcodeHttpServer extends NanoHTTPD {
 
             String safeName = sanitizeFileName(originalName);
             if (!hasAllowedExtension(safeName)) {
-                if (rejected.length() > 0) rejected.append(", ");
-                rejected.append(escapeHtml(originalName));
+                rejected.add(originalName);
                 continue;
             }
             File dest = safeResolve(safeName);
             if (dest == null) {
-                if (rejected.length() > 0) rejected.append(", ");
-                rejected.append(escapeHtml(originalName));
+                rejected.add(originalName);
+                continue;
+            }
+            // Never overwrite: pick a free name if dest exists.
+            dest = pickNonExistingName(dest);
+            if (dest == null) {
+                rejected.add(originalName);
                 continue;
             }
             File tmp = new File(tmpPath);
             if (!copyAndReplace(tmp, dest)) {
-                if (rejected.length() > 0) rejected.append(", ");
-                rejected.append(escapeHtml(originalName));
+                rejected.add(originalName);
                 continue;
             }
+
+            // Integrity check: if the browser told us how many bytes it was
+            // sending (see the form's submit-time JS), verify that we wrote
+            // exactly that many. A short file is a truncated upload — common
+            // on weak WiFi mid-transfer — and on a CNC controller silently
+            // accepting a half-written G-code is genuinely dangerous: the job
+            // would stop mid-machining with the spindle still down. We delete
+            // the partial save and surface the error to the operator.
+            Long expected = expectedSizes.get(originalName);
+            if (expected != null && dest.length() != expected) {
+                Log.w(TAG, "size mismatch for " + originalName
+                        + ": declared=" + expected + " got=" + dest.length());
+                //noinspection ResultOfMethodCallIgnored
+                dest.delete();
+                rejected.add(originalName + " — file incompleto ("
+                        + dest.length() + " su " + expected + " byte ricevuti)");
+                continue;
+            }
+
             saved++;
+            savedNames.add(dest.getName());
         }
 
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">")
-                .append("<title>Upload</title></head><body>")
-                .append("<p>Caricati: ").append(saved).append(" file.</p>");
-        if (rejected.length() > 0) {
-            html.append("<p>Rifiutati (estensione non consentita): ").append(rejected).append("</p>");
+        // Full-success path: POST-Redirect-GET to the index so the user lands
+        // on the up-to-date file list with a non-blocking modal banner. The
+        // detailed result page is only shown when something went wrong, where
+        // the per-file list actually matters.
+        if (saved > 0 && rejected.isEmpty()) {
+            Response redirect = newFixedLengthResponse(
+                    Response.Status.REDIRECT_SEE_OTHER, "text/plain", "");
+            redirect.addHeader("Location", "/?ok=" + saved);
+            return redirect;
         }
-        html.append("<p><a href=\"/\">Torna alla lista</a></p></body></html>");
+        return renderUploadResult(saved, savedNames, rejected);
+    }
+
+    private Response renderUploadResult(int saved, List<String> savedNames, List<String> rejected) {
+        String machineName = HttpServerManager.getMachineName();
+        boolean allOk = rejected.isEmpty() && saved > 0;
+        boolean allFail = saved == 0 && !rejected.isEmpty();
+        String iconBg, iconChar, statusTitle, statusSub;
+        if (allOk) {
+            iconBg = "#338a3e"; iconChar = "✓";
+            statusTitle = "Upload completato";
+            statusSub = saved + (saved == 1 ? " file caricato" : " file caricati") + " correttamente";
+        } else if (allFail) {
+            iconBg = "#c62828"; iconChar = "✕";
+            statusTitle = "Upload non riuscito";
+            statusSub = "Nessun file accettato";
+        } else if (saved > 0) {
+            iconBg = "#ef6c00"; iconChar = "!";
+            statusTitle = "Upload parziale";
+            statusSub = saved + " caricati · " + rejected.size() + " rifiutati";
+        } else {
+            iconBg = "#9e9e9e"; iconChar = "?";
+            statusTitle = "Nessun file ricevuto";
+            statusSub = "Seleziona almeno un file e riprova";
+        }
+
+        StringBuilder html = new StringBuilder(2048);
+        html.append("<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\">")
+                .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
+                .append("<meta name=\"theme-color\" content=\"#d50000\">")
+                .append("<title>Esito upload — Grbl Controller</title>")
+                .append("<style>")
+                .append("*{box-sizing:border-box}")
+                .append("body{margin:0;background:#f5f5f5;color:#212121;")
+                .append("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;")
+                .append("font-size:15px;line-height:1.45}")
+                .append("header{background:#d50000;color:#fff;padding:18px 20px;box-shadow:0 2px 4px rgba(0,0,0,.2)}")
+                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto}")
+                .append("header .logo{width:42px;height:42px;background:rgba(255,255,255,.15);")
+                .append("border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}")
+                .append("header h1{margin:0;font-size:1.15em;font-weight:500;letter-spacing:.2px}")
+                .append("header .sub{opacity:.85;font-size:.85em;margin-top:2px}")
+                .append("main{max-width:780px;margin:18px auto;padding:0 16px}")
+                .append(".card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);margin-bottom:16px;overflow:hidden}")
+                .append(".status{padding:24px 20px;display:flex;align-items:center;gap:18px}")
+                .append(".status .ico{width:54px;height:54px;border-radius:50%;color:#fff;")
+                .append("display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;flex-shrink:0;")
+                .append("background:").append(iconBg).append("}")
+                .append(".status .txt h2{margin:0 0 4px;font-size:1.15em;font-weight:500;color:#212121}")
+                .append(".status .txt p{margin:0;color:#616161;font-size:.92em}")
+                .append(".section{padding:14px 20px;border-top:1px solid #eee}")
+                .append(".section h3{margin:0 0 10px;font-size:.78em;text-transform:uppercase;letter-spacing:.5px;color:#757575;font-weight:600}")
+                .append(".filelist{list-style:none;margin:0;padding:0}")
+                .append(".filelist li{padding:8px 0;border-bottom:1px solid #f0f0f0;color:#424242;")
+                .append("font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace;font-size:.92em;word-break:break-all}")
+                .append(".filelist li:last-child{border-bottom:0}")
+                .append(".filelist li.bad{color:#c62828}")
+                .append(".filelist li::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;")
+                .append("background:#338a3e;margin-right:10px;vertical-align:middle}")
+                .append(".filelist li.bad::before{background:#c62828}")
+                .append(".actions{padding:14px 20px;display:flex;gap:10px;flex-wrap:wrap}")
+                .append(".btn{display:inline-block;background:#d50000;color:#fff;border:0;border-radius:4px;")
+                .append("padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;")
+                .append("text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:background .15s,box-shadow .15s}")
+                .append(".btn:hover{background:#a30000;box-shadow:0 2px 4px rgba(0,0,0,.25)}")
+                .append(".btn.alt{background:#fff;color:#d50000;border:1px solid #d50000;box-shadow:none}")
+                .append(".btn.alt:hover{background:#fff5f5;box-shadow:0 1px 2px rgba(0,0,0,.1)}")
+                .append(".hint{padding:0 20px 16px;color:#757575;font-size:.85em}")
+                .append("</style></head><body>");
+
+        // Header (same as index)
+        html.append("<header><div class=\"row\">")
+                .append("<div class=\"logo\">⚙</div>")
+                .append("<div><h1>Grbl Controller</h1>")
+                .append("<div class=\"sub\">")
+                .append(machineName != null && !machineName.isEmpty()
+                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
+                        : "Nessuna macchina connessa")
+                .append("</div></div></div></header>");
+
+        html.append("<main>");
+
+        // Status card
+        html.append("<div class=\"card\">")
+                .append("<div class=\"status\">")
+                .append("<div class=\"ico\">").append(iconChar).append("</div>")
+                .append("<div class=\"txt\"><h2>").append(statusTitle).append("</h2>")
+                .append("<p>").append(statusSub).append("</p></div>")
+                .append("</div>");
+
+        if (!savedNames.isEmpty()) {
+            html.append("<div class=\"section\"><h3>File salvati (")
+                    .append(savedNames.size()).append(")</h3><ul class=\"filelist\">");
+            for (String n : savedNames) {
+                html.append("<li>").append(escapeHtml(n)).append("</li>");
+            }
+            html.append("</ul></div>");
+        }
+        if (!rejected.isEmpty()) {
+            html.append("<div class=\"section\"><h3>Rifiutati (")
+                    .append(rejected.size()).append(")</h3><ul class=\"filelist\">");
+            for (String n : rejected) {
+                html.append("<li class=\"bad\">").append(escapeHtml(n)).append("</li>");
+            }
+            html.append("</ul>")
+                    .append("<p class=\"hint\">Estensioni accettate: .nc .gcode .gco .tap .cnc .ngc .txt · ")
+                    .append("dimensione max ").append(MAX_UPLOAD_BYTES / (1024 * 1024)).append(" MB</p>")
+                    .append("</div>");
+        }
+
+        // Actions. The full-success case is handled server-side via a 303
+        // redirect to /?ok=N, so this page is only ever rendered when at least
+        // one file was rejected — no auto-dismiss here, the user reads the
+        // details and clicks back when ready.
+        html.append("<div class=\"actions\">")
+                .append("<a class=\"btn\" href=\"/\">Torna alla lista</a>");
+        if (!rejected.isEmpty() || saved == 0) {
+            html.append("<a class=\"btn alt\" href=\"/\">Riprova upload</a>");
+        }
+        html.append("</div></div>");
+        html.append("</main>");
+
+        html.append("</body></html>");
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html.toString());
     }
 
@@ -235,17 +659,107 @@ public class GcodeHttpServer extends NanoHTTPD {
         return f;
     }
 
+    /**
+     * If {@code dest} doesn't exist, return it. Otherwise return a sibling like
+     * {@code name (1).ext}, {@code name (2).ext}, ... up to a cap. Returns null
+     * if no slot is free or canonicalisation fails.
+     */
+    private File pickNonExistingName(File dest) throws IOException {
+        if (!dest.exists()) return dest;
+        String name = dest.getName();
+        int dot = name.lastIndexOf('.');
+        String base = (dot >= 0) ? name.substring(0, dot) : name;
+        String ext  = (dot >= 0) ? name.substring(dot)    : "";
+        for (int i = 1; i <= MAX_RENAME_ATTEMPTS; i++) {
+            File candidate = safeResolve(base + " (" + i + ")" + ext);
+            if (candidate == null) return null;
+            if (!candidate.exists()) return candidate;
+        }
+        return null;
+    }
+
     private boolean copyAndReplace(File src, File dest) {
         try (InputStream in = new FileInputStream(src);
              java.io.OutputStream out = new java.io.FileOutputStream(dest, false)) {
             byte[] buf = new byte[8192];
             int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            long written = 0;
+            while ((n = in.read(buf)) > 0) {
+                written += n;
+                if (written > MAX_UPLOAD_BYTES) {
+                    Log.w(TAG, "upload exceeded MAX_UPLOAD_BYTES, aborting");
+                    return false;
+                }
+                out.write(buf, 0, n);
+            }
             return true;
         } catch (IOException e) {
             Log.e(TAG, "copy failed", e);
             return false;
         }
+    }
+
+    /**
+     * Returns true when no Origin header is present, OR when its hostname
+     * matches the request Host hostname (port-insensitive). Ports are ignored
+     * because some clients drop the port from Host when it's the default for
+     * the scheme, and same-origin POSTs from the browser legitimately differ
+     * only by port encoding. The hostname-only check is sufficient defence
+     * against cross-site CSRF.
+     */
+    private boolean isSameOriginIfPresent(IHTTPSession session) {
+        String origin = session.getHeaders().get("origin");
+        // Treat the literal string "null" the same as a missing Origin: per
+        // the Fetch spec some browsers (notably Chrome mobile on multipart
+        // form POSTs) send Origin: null even for same-origin requests, e.g.
+        // when the form is inside a redirect chain or an opaque context.
+        // A "null" Origin gives us no information either way, so don't use it
+        // to deny — fall back to allowing (CSRF defence in depth still relies
+        // on the Authorization header being attached only to same-origin).
+        if (origin == null || origin.isEmpty() || "null".equalsIgnoreCase(origin)) return true;
+        String host = session.getHeaders().get("host");
+        if (host == null) {
+            Log.w(TAG, "CSRF reject: Origin=" + origin + " but Host missing");
+            return false;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(origin);
+            String oHost = uri.getHost();
+            if (oHost == null) {
+                Log.w(TAG, "CSRF reject: cannot parse Origin=" + origin);
+                return false;
+            }
+            String hHost = stripPort(host);
+            if (oHost.equalsIgnoreCase(hHost)) return true;
+            Log.w(TAG, "CSRF reject: Origin host=" + oHost + " != Host host=" + hHost);
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "CSRF reject: Origin parse exception: " + origin, e);
+            return false;
+        }
+    }
+
+    private static String stripPort(String hostHeader) {
+        int colon = hostHeader.lastIndexOf(':');
+        // Bracketed IPv6 host like [::1]:8888 — leave bracketed part intact.
+        if (hostHeader.startsWith("[")) {
+            int bracket = hostHeader.indexOf(']');
+            return (bracket > 0) ? hostHeader.substring(1, bracket) : hostHeader;
+        }
+        return (colon > 0) ? hostHeader.substring(0, colon) : hostHeader;
+    }
+
+    private static boolean constantTimeEquals(byte[] a, byte[] b) {
+        if (a == null || b == null) return a == b;
+        return MessageDigest.isEqual(a, b);
+    }
+
+    private static void addSecurityHeaders(Response r) {
+        if (r == null) return;
+        r.addHeader("X-Content-Type-Options", "nosniff");
+        r.addHeader("X-Frame-Options", "DENY");
+        r.addHeader("Referrer-Policy", "no-referrer");
+        r.addHeader("Cache-Control", "no-store");
     }
 
     private static String escapeHtml(String s) {

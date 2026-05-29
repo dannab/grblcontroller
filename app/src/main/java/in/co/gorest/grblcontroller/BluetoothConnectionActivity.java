@@ -284,6 +284,7 @@ public class BluetoothConnectionActivity extends GrblActivity {
         switch (currentState){
             case GrblBluetoothSerialService.STATE_CONNECTED:
                 applySubtitle((mConnectedDeviceName != null) ? mConnectedDeviceName : getString(R.string.text_connected));
+                in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(mConnectedDeviceName);
                 invalidateOptionsMenu();
                 break;
             case GrblBluetoothSerialService.STATE_CONNECTING:
@@ -295,6 +296,7 @@ public class BluetoothConnectionActivity extends GrblActivity {
                 EventBus.getDefault().post(new BluetoothDisconnectEvent(getString(R.string.text_connection_lost)));
                 MachineStatusListener.getInstance().setState(Constants.MACHINE_STATUS_NOT_CONNECTED);
                 applySubtitle(getString(R.string.text_not_connected));
+                in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(null);
                 invalidateOptionsMenu();
                 break;
         }

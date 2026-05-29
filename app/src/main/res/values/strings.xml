@@ -98,10 +98,15 @@
     <string name="text_http_server_enabled_desc">Quando attivo, dal PC apri http://ip-tablet:porta per scaricare/caricare file</string>
     <string name="text_http_server_port">Porta TCP</string>
     <string name="text_http_server_port_desc">Default 8888. Valori validi 1024-65535.</string>
-    <string name="text_http_server_password">Password (opzionale)</string>
-    <string name="text_http_server_password_desc">Se impostata, richiede autenticazione (user: grbl). Vuota = nessuna autenticazione.</string>
+    <string name="text_http_server_password">Password (obbligatoria)</string>
+    <string name="text_http_server_password_desc">Min 4 caratteri. User: grbl. Senza password il server non parte.</string>
     <string name="text_http_server_info">Stato server</string>
     <string name="text_http_server_off">Server HTTP non attivo</string>
+    <string name="text_http_server_no_password">Server non avviato: imposta una password di almeno 4 caratteri</string>
+    <string name="text_http_server_notif_title">GRBL HTTP server attivo</string>
+    <string name="text_http_server_notif_no_ip">In attesa di rete (porta %1$d)</string>
+    <string name="text_http_server_channel_name">Server HTTP</string>
+    <string name="text_http_server_channel_desc">Notifica persistente quando il server HTTP per il trasferimento file è attivo</string>
 
 
 
