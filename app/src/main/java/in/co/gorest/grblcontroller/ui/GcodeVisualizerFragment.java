@@ -107,6 +107,10 @@ public class GcodeVisualizerFragment extends BaseFragment {
     // -------------------------------------------------------------------------
     private GcodeRenderer renderer;
 
+    /** Path dell'ultimo file passato a loadFile(). Usato per evitare di
+     *  riparsare lo stesso file al rientro dall'app (onResume ricorrente). */
+    private String lastLoadedPath;
+
     // -------------------------------------------------------------------------
     // Gesture: rotazione a 1 dito.
     // Pinch zoom e pan a 2 dita rimossi su richiesta dell'utente (il pan a 2
@@ -145,26 +149,44 @@ public class GcodeVisualizerFragment extends BaseFragment {
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
-        fileSender.addOnPropertyChangedCallback(fileSenderCallback);
+        // NOTA: registrazione di fileSenderCallback spostata in onResume per
+        // evitare il parse pesante quando il fragment è solo pre-caricato dal
+        // ViewPager come tab adiacente (es. sei su CAM e il visualizer si
+        // mette a parsare 256k righe senza che tu lo veda).
     }
 
     @Override
     public void onStop() {
         super.onStop();
         EventBus.getDefault().unregister(this);
-        fileSender.removeOnPropertyChangedCallback(fileSenderCallback);
     }
 
     @Override
     public void onResume() {
         super.onResume();
         if (glSurfaceView != null) glSurfaceView.onResume();
+        fileSender.addOnPropertyChangedCallback(fileSenderCallback);
+
+        // Auto-load del file già selezionato: lo facciamo qui (non in
+        // onCreateView) perché con BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
+        // questo viene chiamato solo quando il tab è davvero visibile.
+        // Dedup via lastLoadedPath: evita re-parse al rientro dall'app.
+        if (fileSender.getGcodeFile() != null && fileSender.getGcodeFile().exists()) {
+            String path = fileSender.getGcodeFile().getAbsolutePath();
+            if (!path.equals(lastLoadedPath)) {
+                Log.d(TAG, "onResume: carico file " + path);
+                loadFile(path);
+            } else {
+                Log.d(TAG, "onResume: file già caricato, skip parse");
+            }
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         if (glSurfaceView != null) glSurfaceView.onPause();
+        fileSender.removeOnPropertyChangedCallback(fileSenderCallback);
     }
 
     @Nullable
@@ -218,13 +240,9 @@ public class GcodeVisualizerFragment extends BaseFragment {
         });
 
         // --- File già caricato in precedenza ---
-        if (fileSender.getGcodeFile() != null && fileSender.getGcodeFile().exists()) {
-            Log.d(TAG, "File già presente al momento della creazione: "
-                    + fileSender.getGcodeFile().getAbsolutePath());
-            loadFile(fileSender.getGcodeFile().getAbsolutePath());
-        } else {
-            Log.d(TAG, "Nessun file presente al momento della creazione");
-        }
+        // Spostato in onResume per evitare il parse pesante quando il fragment
+        // viene solo pre-creato dal ViewPager (vicino al tab corrente) senza
+        // essere effettivamente visibile.
 
         return view;
     }
@@ -245,6 +263,7 @@ public class GcodeVisualizerFragment extends BaseFragment {
 
     private void loadFile(String filePath) {
         Log.d(TAG, "loadFile chiamato con: " + filePath);
+        lastLoadedPath = filePath;
         glSurfaceView.queueEvent(() -> {
             Log.d(TAG, "queueEvent eseguito, avvio parsing: " + filePath);
             renderer.loadFile(filePath, false);

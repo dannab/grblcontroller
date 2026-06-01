@@ -34,7 +34,11 @@ public class GrblFragmentPagerAdapter extends FragmentPagerAdapter {
     public final int tabCount;
 
     public GrblFragmentPagerAdapter(FragmentManager fragmentManager, int tabCount) {
-        super(fragmentManager);
+        // BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT: i fragment vicini precaricati
+        // dal ViewPager restano in stato STARTED (non RESUMED) finché non
+        // diventano la pagina corrente. Evita che il visualizer GL parsi file
+        // pesanti solo perché sei sul tab adiacente.
+        super(fragmentManager, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT);
         this.tabCount = tabCount;
     }
 
