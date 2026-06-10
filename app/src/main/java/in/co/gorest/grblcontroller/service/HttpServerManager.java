@@ -53,6 +53,8 @@ public class HttpServerManager {
 
     public static final int DEFAULT_PORT = 8888;
     public static final int MIN_PASSWORD_LENGTH = 4;
+    /** Fixed Basic-auth username; only the password is user-configurable. */
+    public static final String USERNAME = "grbl";
 
     private static HttpServerManager instance;
 

@@ -62,7 +62,7 @@ public class GcodeHttpServer extends NanoHTTPD {
         super(port);
         this.rootDir = rootDir;
         if (password != null && !password.isEmpty()) {
-            String creds = "grbl:" + password;
+            String creds = HttpServerManager.USERNAME + ":" + password;
             String header = "Basic " + Base64.encodeToString(
                     creds.getBytes(), Base64.NO_WRAP);
             this.expectedAuthBytes = header.getBytes();

@@ -159,6 +159,8 @@ public class HttpServerService extends Service {
         String ip = HttpServerManager.getLocalIpv4();
         String url = (ip != null) ? ("http://" + ip + ":" + p)
                                   : getString(R.string.text_http_server_notif_no_ip, p);
+        String loginHint = getString(
+                R.string.text_http_server_login_hint, HttpServerManager.USERNAME);
 
         Intent open = new Intent(this, SettingsActivity.class);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -170,8 +172,8 @@ public class HttpServerService extends Service {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_device_hub_black_24dp)
                 .setContentTitle(getString(R.string.text_http_server_notif_title))
-                .setContentText(url)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(url))
+                .setContentText(url + " — " + loginHint)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(url + "\n" + loginHint))
                 .setContentIntent(pi)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)

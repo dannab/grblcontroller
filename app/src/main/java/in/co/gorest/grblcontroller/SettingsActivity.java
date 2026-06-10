@@ -95,7 +95,8 @@ public class SettingsActivity extends AppCompatActivity {
             if (info == null) return;
             String url = HttpServerManager.getInstance().getDisplayUrl();
             if (url != null) {
-                info.setSummary(url);
+                info.setSummary(url + "\n"
+                        + getString(R.string.text_http_server_login_hint, HttpServerManager.USERNAME));
                 return;
             }
             // Server not running: explain why (disabled vs missing password)

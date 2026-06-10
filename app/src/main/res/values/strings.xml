@@ -102,6 +102,7 @@
     <string name="text_http_server_password_desc">Min 4 caratteri. User: grbl. Senza password il server non parte.</string>
     <string name="text_http_server_info">Stato server</string>
     <string name="text_http_server_off">Server HTTP non attivo</string>
+    <string name="text_http_server_login_hint">utente: %1$s</string>
     <string name="text_http_server_no_password">Server non avviato: imposta una password di almeno 4 caratteri</string>
     <string name="text_http_server_notif_title">GRBL HTTP server attivo</string>
     <string name="text_http_server_notif_no_ip">In attesa di rete (porta %1$d)</string>
