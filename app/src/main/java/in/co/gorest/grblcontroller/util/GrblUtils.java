@@ -63,6 +63,15 @@ public class GrblUtils {
         return version && (getVersionDouble(response) != -1);
     }
 
+    /**
+     * FluidNC si presenta con un banner proprio (es. "FluidNC v3.x ..."), che
+     * non sempre inizia con "Grbl": se la riga contiene "FluidNC" la
+     * compatibilita col protocollo GRBL 1.1 e implicita.
+     */
+    public static boolean isFluidNcVersionString(final String response) {
+        return response.toLowerCase().contains("fluidnc");
+    }
+
     private final static String VERSION_DOUBLE_REGEX = "\\d*\\.\\d*";
     private final static Pattern VERSION_DOUBLE_PATTERN = Pattern.compile(VERSION_DOUBLE_REGEX);
     public static double getVersionDouble(final String response) {

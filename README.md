@@ -6,6 +6,7 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 > A Play Store release under the name **GRBL Machining** is in preparation.
 
 #### What's new in this fork
+- **FluidNC support** — works out of the box with [FluidNC](https://github.com/bdring/FluidNC) controllers (tested on real hardware): both the GRBL 1.1 and the FluidNC banners are auto-detected at connection, no custom init string needed.
 - **G-code visualizer** — OpenGL toolpath preview with pinch zoom and pan; while streaming, the already-executed path is grayed out in real time.
 - **3-point autolevel** — probe three points on the stock, the app computes the plane compensation and writes a `_leveled` copy of the G-code file.
 - **Z plunge analyzer** — scans the G-code before the job and flags suspicious deep/steep Z plunges (wrong zero, missing safe height), so you catch them before the bit does.

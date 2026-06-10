@@ -137,6 +137,11 @@ public abstract class SerialCommunicationHandler extends Handler {
                 EventBus.getDefault().post(new UiToastEvent(messageNotSupported));
                 EventBus.getDefault().post(new ConsoleMessageEvent(messageNotSupported));
             }
+        }else if(GrblUtils.isFluidNcVersionString(message)){
+            EventBus.getDefault().post(new ConsoleMessageEvent(message));
+            machineStatus.setBuildInfo(new MachineStatusListener.BuildInfo(1.1, 'f'));
+            isVersionString = true;
+
         }else{
             EventBus.getDefault().post(new ConsoleMessageEvent(message));
             Log.d(TAG, "MESSAGE NOT HANDLED: " + message);
