@@ -117,6 +117,10 @@ public class GcodeVisualizerFragment extends BaseFragment {
     private volatile GcodeRenderer.ParsedModel cachedModel;
     /** Path del file a cui si riferisce cachedModel (o il parse in corso). */
     private String cachedModelPath;
+    /** Impronta (lastModified + dimensione) del file al momento del parse:
+     *  l'import SAF e il CAM sovrascrivono lo STESSO percorso, quindi il solo
+     *  path non basta a capire se il contenuto e cambiato. */
+    private long cachedModelStamp;
     /** true se l'ISTANZA CORRENTE di renderer ha già ricevuto il modello.
      *  Va azzerato a ogni onCreateView (renderer nuovo = scena vuota). */
     private volatile boolean rendererHasModel;
@@ -202,8 +206,9 @@ public class GcodeVisualizerFragment extends BaseFragment {
         //    modello in cache, niente re-parse;
         //  - stesso file e renderer già popolato → niente da fare.
         if (fileSender.getGcodeFile() != null && fileSender.getGcodeFile().exists()) {
-            String path = fileSender.getGcodeFile().getAbsolutePath();
-            if (!path.equals(cachedModelPath)) {
+            java.io.File f = fileSender.getGcodeFile();
+            String path = f.getAbsolutePath();
+            if (!path.equals(cachedModelPath) || fileStamp(f) != cachedModelStamp) {
                 Log.d(TAG, "onResume: carico file " + path);
                 loadFile(path);
             } else if (!rendererHasModel && cachedModel != null) {
@@ -295,9 +300,15 @@ public class GcodeVisualizerFragment extends BaseFragment {
     // Caricamento file
     // -------------------------------------------------------------------------
 
+    /** Impronta del contenuto del file: cambia se il file viene sovrascritto. */
+    private static long fileStamp(java.io.File f) {
+        return f.lastModified() + 31L * f.length();
+    }
+
     private void loadFile(String filePath) {
         Log.d(TAG, "loadFile chiamato con: " + filePath);
         cachedModelPath = filePath;
+        cachedModelStamp = fileStamp(new java.io.File(filePath));
         cachedModel = null;
 
         // Parsing su thread background: il GL thread riceve solo i buffer
