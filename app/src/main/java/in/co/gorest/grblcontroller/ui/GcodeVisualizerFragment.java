@@ -44,6 +44,10 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import in.co.gorest.grblcontroller.BR;
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentGcodeVisualizerBinding;
@@ -111,6 +115,15 @@ public class GcodeVisualizerFragment extends BaseFragment {
      *  riparsare lo stesso file al rientro dall'app (onResume ricorrente). */
     private String lastLoadedPath;
 
+    /** Esegue il parsing GCode fuori dal GL thread, così la vista 3D non si
+     *  congela durante il load di file grandi. Single-thread: i load sono
+     *  serializzati. */
+    private ExecutorService parseExecutor;
+
+    /** Generazione del load: un parse terminato viene scartato se nel
+     *  frattempo è stato richiesto un file più recente. */
+    private final AtomicInteger loadGeneration = new AtomicInteger();
+
     // -------------------------------------------------------------------------
     // Gesture: rotazione a 1 dito.
     // Pinch zoom e pan a 2 dita rimossi su richiesta dell'utente (il pan a 2
@@ -143,6 +156,13 @@ public class GcodeVisualizerFragment extends BaseFragment {
         super.onCreate(savedInstanceState);
         machineStatus = MachineStatusListener.getInstance();
         fileSender    = FileSenderListener.getInstance();
+        parseExecutor = Executors.newSingleThreadExecutor();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (parseExecutor != null) parseExecutor.shutdownNow();
     }
 
     @Override
@@ -214,7 +234,7 @@ public class GcodeVisualizerFragment extends BaseFragment {
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         glSurfaceView.setPreserveEGLContextOnPause(true);
 
-        renderer = new GcodeRenderer(requireContext());
+        renderer = new GcodeRenderer();
         glSurfaceView.setRenderer(renderer);
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
@@ -264,10 +284,24 @@ public class GcodeVisualizerFragment extends BaseFragment {
     private void loadFile(String filePath) {
         Log.d(TAG, "loadFile chiamato con: " + filePath);
         lastLoadedPath = filePath;
-        glSurfaceView.queueEvent(() -> {
-            Log.d(TAG, "queueEvent eseguito, avvio parsing: " + filePath);
-            renderer.loadFile(filePath, false);
-            glSurfaceView.requestRender();
+
+        // Parsing su thread background: il GL thread riceve solo i buffer
+        // già pronti, quindi la vista resta fluida anche con file enormi.
+        final int generation = loadGeneration.incrementAndGet();
+        final GLSurfaceView surface = glSurfaceView;
+        parseExecutor.execute(() -> {
+            Log.d(TAG, "parsing in background: " + filePath);
+            GcodeRenderer.ParsedModel model = GcodeRenderer.parseFile(filePath);
+            if (model == null) {
+                Log.w(TAG, "parsing fallito o file vuoto: " + filePath);
+                return;
+            }
+            if (generation != loadGeneration.get()) {
+                Log.d(TAG, "parse scartato, richiesto file più recente");
+                return;
+            }
+            surface.queueEvent(() -> renderer.setModel(model));
+            surface.requestRender();
         });
     }
 

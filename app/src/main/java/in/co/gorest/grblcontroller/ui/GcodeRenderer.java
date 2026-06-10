@@ -25,7 +25,6 @@
 package in.co.gorest.grblcontroller.ui;
 
 
-import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
@@ -40,8 +39,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+import java.util.Locale;
 
 public class GcodeRenderer implements GLSurfaceView.Renderer {
 
@@ -52,17 +51,26 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     // -------------------------------------------------------------------------
 
     /**
-     * Vertex shader: riceve posizione (vec3) e colore (vec3),
-     * applica la matrice MVP e passa il colore al fragment shader.
+     * Vertex shader: riceve posizione (vec3), colore (vec3) e numero di riga
+     * GCode (float). Il gray-out delle righe già eseguite avviene QUI, in GPU:
+     * aggiornare il progresso costa un singolo glUniform1f invece di
+     * ricostruire e ricaricare l'intero color buffer a ogni notifica.
+     * aLineNumber = 0 (assi, tool) non viene mai ingrigito.
      */
     private static final String VERTEX_SHADER_SRC =
             "uniform mat4 uMVPMatrix;\n" +
+                    "uniform float uCurrentLine;\n" +
                     "attribute vec3 aPosition;\n" +
                     "attribute vec3 aColor;\n" +
+                    "attribute float aLineNumber;\n" +
                     "varying vec3 vColor;\n" +
                     "void main() {\n" +
                     "    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n" +
-                    "    vColor = aColor;\n" +
+                    "    if (aLineNumber > 0.5 && aLineNumber <= uCurrentLine) {\n" +
+                    "        vColor = vec3(0.4, 0.4, 0.4);\n" +
+                    "    } else {\n" +
+                    "        vColor = aColor;\n" +
+                    "    }\n" +
                     "}\n";
 
     /**
@@ -79,31 +87,125 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     // Colori (stesso schema di VisualizerUtils.Color originale)
     // -------------------------------------------------------------------------
     private static final float[] COLOR_WHITE  = {1.0f, 1.0f, 1.0f};
-    private static final float[] COLOR_GRAY   = {0.4f, 0.4f, 0.4f};
     private static final float[] COLOR_RED    = {1.0f, 0.0f, 0.0f};
     private static final float[] COLOR_BLUE   = {0.0f, 0.4f, 1.0f};
     private static final float[] COLOR_GREEN  = {0.0f, 1.0f, 0.0f};
     private static final float[] COLOR_YELLOW = {1.0f, 1.0f, 0.0f};
 
     // -------------------------------------------------------------------------
-    // Dati GCode
+    // Modello parsato (immutabile, prodotto da parseFile su thread background)
     // -------------------------------------------------------------------------
 
-    /** Segmento minimo: inizio/fine + flag tipo */
-    private static class Segment {
-        float x1, y1, z1;
-        float x2, y2, z2;
-        boolean isArc;
-        boolean isFastTraverse;
-        boolean isZMove;
-        int lineNumber;
+    /**
+     * Risultato del parsing di un file GCode: buffer pronti per la GPU
+     * più i metadati di scena (bounding box, primo punto).
+     * I FloatBuffer direct vengono allocati sul thread di parsing, così il
+     * GL thread deve solo fare glBufferData.
+     */
+    public static final class ParsedModel {
+        final FloatBuffer vertexBuffer;
+        final FloatBuffer colorBuffer;
+        final FloatBuffer lineNumberBuffer;
+        final int vertexCount;
+        final int segmentCount;
+        final float minX, maxX, minY, maxY, minZ, maxZ;
+        final float centerX, centerY, centerZ;
+        final float maxSide;
+        final float firstX, firstY, firstZ;
+
+        private ParsedModel(ModelBuilder b, float firstX, float firstY, float firstZ) {
+            this.vertexBuffer     = b.verts.toDirectBuffer();
+            this.colorBuffer      = b.colors.toDirectBuffer();
+            this.lineNumberBuffer = b.lineNums.toDirectBuffer();
+            this.vertexCount      = b.lineNums.size();
+            this.segmentCount     = b.lineNums.size() / 2;
+            this.minX = b.minX; this.maxX = b.maxX;
+            this.minY = b.minY; this.maxY = b.maxY;
+            this.minZ = b.minZ; this.maxZ = b.maxZ;
+            this.centerX = (b.minX + b.maxX) / 2f;
+            this.centerY = (b.minY + b.maxY) / 2f;
+            this.centerZ = (b.minZ + b.maxZ) / 2f;
+            float dx = b.maxX - b.minX;
+            float dy = b.maxY - b.minY;
+            float dz = b.maxZ - b.minZ;
+            float side = Math.max(dx, Math.max(dy, dz));
+            this.maxSide = (side == 0) ? 1f : side;
+            this.firstX = firstX;
+            this.firstY = firstY;
+            this.firstZ = firstZ;
+        }
     }
 
-    private final List<Segment> segments = new ArrayList<>();
-    private int currentCommandNumber = 0;
+    /** Array float crescente, senza boxing né oggetti per segmento. */
+    private static final class FloatList {
+        private float[] data = new float[4096];
+        private int size = 0;
+
+        void add(float v) {
+            if (size == data.length) data = Arrays.copyOf(data, data.length * 2);
+            data[size++] = v;
+        }
+
+        int size() { return size; }
+
+        FloatBuffer toDirectBuffer() {
+            ByteBuffer bb = ByteBuffer.allocateDirect(size * 4);
+            bb.order(ByteOrder.nativeOrder());
+            FloatBuffer fb = bb.asFloatBuffer();
+            fb.put(data, 0, size);
+            fb.position(0);
+            return fb;
+        }
+    }
+
+    /** Stato di costruzione del modello durante il parsing. */
+    private static final class ModelBuilder {
+        final FloatList verts    = new FloatList();
+        final FloatList colors   = new FloatList();
+        final FloatList lineNums = new FloatList();
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+
+        void updateExtremes(float x, float y, float z) {
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+            minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+        }
+
+        void addSegment(float x1, float y1, float z1,
+                        float x2, float y2, float z2,
+                        float[] color, int lineNum) {
+            verts.add(x1); verts.add(y1); verts.add(z1);
+            verts.add(x2); verts.add(y2); verts.add(z2);
+            for (int i = 0; i < 2; i++) {
+                colors.add(color[0]); colors.add(color[1]); colors.add(color[2]);
+                lineNums.add(lineNum);
+            }
+            // Entrambi gli estremi: il punto di partenza può non coincidere
+            // con la fine del segmento precedente (es. riposizionamenti via
+            // comandi non-motion che aggiornano solo lo stato del parser).
+            updateExtremes(x1, y1, z1);
+            updateExtremes(x2, y2, z2);
+        }
+
+        int segmentCount() { return lineNums.size() / 2; }
+    }
+
+    // -------------------------------------------------------------------------
+    // Stato scena (solo GL thread)
+    // -------------------------------------------------------------------------
+
+    private FloatBuffer vertexBuffer;
+    private FloatBuffer colorBuffer;
+    private FloatBuffer lineNumberBuffer;
+    private int vertexCount = 0;
+
+    /** Riga GCode corrente: i vertici con lineNumber <= a questo valore
+     *  vengono ingrigiti dallo shader. */
+    private float currentCommandNumber = 0;
 
     // Estremi dell'oggetto (per calcolo centro e scala)
-    private float minX, maxX, minY, maxY, minZ, maxZ;
     private float centerX, centerY, centerZ;
     private float maxSide = 1.0f;
 
@@ -117,7 +219,6 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     // Coordinate tool
     // -------------------------------------------------------------------------
     private double workX, workY, workZ;
-    private double machineX, machineY, machineZ;
 
     // -------------------------------------------------------------------------
     // Matrici OpenGL ES
@@ -144,27 +245,32 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     // -------------------------------------------------------------------------
     // OpenGL handles
     // -------------------------------------------------------------------------
-    private int shaderProgram  = 0;
-    private int attrPosition   = -1;
-    private int attrColor      = -1;
-    private int unifMVPMatrix  = -1;
+    private int shaderProgram   = 0;
+    private int attrPosition    = -1;
+    private int attrColor       = -1;
+    private int attrLineNumber  = -1;
+    private int unifMVPMatrix   = -1;
+    private int unifCurrentLine = -1;
 
     // VBO handles
-    private final int[] vboHandles = new int[2]; // [0]=vertex, [1]=color
+    private final int[] vboHandles = new int[3]; // [0]=vertex, [1]=color, [2]=lineNumber
     private boolean vboDirty = true;
 
-    // Buffer in memoria
-    private FloatBuffer vertexBuffer;
-    private FloatBuffer colorBuffer;
-    private int vertexCount = 0;
-
     // -------------------------------------------------------------------------
-    // Context
+    // Buffer cachati per assi e tool: niente allocazioni per-frame.
     // -------------------------------------------------------------------------
-    private final Context context;
+    private FloatBuffer axisVertexBuffer;
+    private FloatBuffer axisColorBuffer;
+    private final FloatBuffer toolVertexBuffer;
+    private final FloatBuffer toolColorBuffer;
 
-    public GcodeRenderer(Context context) {
-        this.context = context;
+    public GcodeRenderer() {
+        toolVertexBuffer = makeFloatBuffer(new float[6]);
+        toolColorBuffer = makeFloatBuffer(new float[]{
+                COLOR_YELLOW[0], COLOR_YELLOW[1], COLOR_YELLOW[2],
+                COLOR_YELLOW[0], COLOR_YELLOW[1], COLOR_YELLOW[2]
+        });
+        rebuildAxisBuffers();
     }
 
     // =========================================================================
@@ -183,18 +289,18 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
 
         shaderProgram = buildShaderProgram(VERTEX_SHADER_SRC, FRAGMENT_SHADER_SRC);
 
-        attrPosition = GLES20.glGetAttribLocation(shaderProgram, "aPosition");
-        attrColor    = GLES20.glGetAttribLocation(shaderProgram, "aColor");
-        unifMVPMatrix= GLES20.glGetUniformLocation(shaderProgram, "uMVPMatrix");
+        attrPosition    = GLES20.glGetAttribLocation(shaderProgram, "aPosition");
+        attrColor       = GLES20.glGetAttribLocation(shaderProgram, "aColor");
+        attrLineNumber  = GLES20.glGetAttribLocation(shaderProgram, "aLineNumber");
+        unifMVPMatrix   = GLES20.glGetUniformLocation(shaderProgram, "uMVPMatrix");
+        unifCurrentLine = GLES20.glGetUniformLocation(shaderProgram, "uCurrentLine");
 
-        GLES20.glGenBuffers(2, vboHandles, 0);
+        GLES20.glGenBuffers(3, vboHandles, 0);
 
-        // Se c'erano già dei segmenti caricati prima che la superficie fosse
-        // pronta (es. file caricato prima della rotazione), ricostruiamo i buffer.
-        if (!segments.isEmpty()) {
-            buildVertexBuffers();
-            uploadVBOs();
-            vboDirty = false;
+        // Se c'era già un modello caricato prima che la superficie fosse
+        // pronta (o il contesto GL è stato ricreato), ricarichiamo i VBO.
+        if (vertexCount > 0) {
+            vboDirty = true;
         }
     }
 
@@ -229,11 +335,8 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 unused) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        if (segments.isEmpty()) return;
-
-        // --- Aggiorna VBO se necessario ---
-        if (vboDirty) {
-            buildVertexBuffers();
+        // --- Aggiorna VBO se necessario (solo dopo un nuovo load) ---
+        if (vboDirty && vertexCount > 0) {
             uploadVBOs();
             vboDirty = false;
         }
@@ -260,6 +363,9 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         Matrix.multiplyMM(tempMatrix, 0, viewMatrix, 0, modelMatrix, 0);
         Matrix.multiplyMM(mvpMatrix,  0, projMatrix, 0, tempMatrix,  0);
 
+        GLES20.glUseProgram(shaderProgram);
+        GLES20.glUniformMatrix4fv(unifMVPMatrix, 1, false, mvpMatrix, 0);
+
         // --- Disegna assi XYZ nell'origine (sempre visibili) ---
         drawAxes();
 
@@ -277,12 +383,13 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     /**
      * Disegna tutte le linee GCode usando i VBO.
      * Corrisponde a renderModel() del VisualizerCanvas.
+     * Il gray-out del percorso già eseguito è fatto dallo shader tramite
+     * uCurrentLine: nessun rebuild di buffer durante lo streaming.
      */
     private void drawLines() {
         if (vertexCount == 0) return;
 
-        GLES20.glUseProgram(shaderProgram);
-        GLES20.glUniformMatrix4fv(unifMVPMatrix, 1, false, mvpMatrix, 0);
+        GLES20.glUniform1f(unifCurrentLine, currentCommandNumber);
 
         // Vertex buffer
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboHandles[0]);
@@ -294,43 +401,44 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         GLES20.glEnableVertexAttribArray(attrColor);
         GLES20.glVertexAttribPointer(attrColor, 3, GLES20.GL_FLOAT, false, 0, 0);
 
+        // Line number buffer (per il gray-out in shader)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboHandles[2]);
+        GLES20.glEnableVertexAttribArray(attrLineNumber);
+        GLES20.glVertexAttribPointer(attrLineNumber, 1, GLES20.GL_FLOAT, false, 0, 0);
+
+        GLES20.glLineWidth(3.0f);
         GLES20.glDrawArrays(GLES20.GL_LINES, 0, vertexCount);
 
         GLES20.glDisableVertexAttribArray(attrPosition);
         GLES20.glDisableVertexAttribArray(attrColor);
+        GLES20.glDisableVertexAttribArray(attrLineNumber);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
     }
 
     /**
      * Disegna il cursore tool nella posizione corrente di lavoro.
      * Corrisponde a renderTool() del VisualizerCanvas.
+     * Riusa sempre lo stesso FloatBuffer: zero allocazioni per frame.
      */
     private void drawTool() {
-        // Linea verticale gialla nella posizione work coordinate
         float toolHeight = 0.05f / (scaleBase * zoomLevel); // altezza in coordinate oggetto
 
-        float[] tv = {
-                (float) workX, (float) workY, (float) workZ,
-                (float) workX, (float) workY, (float) workZ + toolHeight
-        };
-        float[] tc = {
-                COLOR_YELLOW[0], COLOR_YELLOW[1], COLOR_YELLOW[2],
-                COLOR_YELLOW[0], COLOR_YELLOW[1], COLOR_YELLOW[2]
-        };
+        toolVertexBuffer.clear();
+        toolVertexBuffer.put((float) workX).put((float) workY).put((float) workZ);
+        toolVertexBuffer.put((float) workX).put((float) workY).put((float) (workZ + toolHeight));
+        toolVertexBuffer.position(0);
 
-        FloatBuffer tvBuf = makeFloatBuffer(tv);
-        FloatBuffer tcBuf = makeFloatBuffer(tc);
-
-        GLES20.glUseProgram(shaderProgram);
-        GLES20.glUniformMatrix4fv(unifMVPMatrix, 1, false, mvpMatrix, 0);
-
+        GLES20.glUniform1f(unifCurrentLine, 0f);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0); // usa client array per il tool
 
         GLES20.glEnableVertexAttribArray(attrPosition);
-        GLES20.glVertexAttribPointer(attrPosition, 3, GLES20.GL_FLOAT, false, 0, tvBuf);
+        GLES20.glVertexAttribPointer(attrPosition, 3, GLES20.GL_FLOAT, false, 0, toolVertexBuffer);
 
         GLES20.glEnableVertexAttribArray(attrColor);
-        GLES20.glVertexAttribPointer(attrColor, 3, GLES20.GL_FLOAT, false, 0, tcBuf);
+        GLES20.glVertexAttribPointer(attrColor, 3, GLES20.GL_FLOAT, false, 0, toolColorBuffer);
+
+        GLES20.glDisableVertexAttribArray(attrLineNumber);
+        GLES20.glVertexAttrib1f(attrLineNumber, 0f);
 
         GLES20.glLineWidth(4.0f); // nota: su ES 2.0 il line width max può essere limitato dall'hardware
         GLES20.glDrawArrays(GLES20.GL_LINES, 0, 2);
@@ -349,11 +457,32 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
      * (0,0,0) macchina (che spesso è altrove rispetto al pezzo).
      * Se nessun file è caricato, fallback su (0,0,0).
      *
-     * La lunghezza degli assi è proporzionale all'oggetto caricato.
+     * I buffer sono cachati e ricostruiti solo quando cambia il modello.
      */
     private void drawAxes() {
-        // Lunghezza asse: 10% del lato più lungo dell'oggetto, minimo visibile
-        float axisLen = maxSide * 0.15f;
+        GLES20.glUniform1f(unifCurrentLine, 0f);
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+
+        GLES20.glEnableVertexAttribArray(attrPosition);
+        GLES20.glVertexAttribPointer(attrPosition, 3, GLES20.GL_FLOAT, false, 0, axisVertexBuffer);
+
+        GLES20.glEnableVertexAttribArray(attrColor);
+        GLES20.glVertexAttribPointer(attrColor, 3, GLES20.GL_FLOAT, false, 0, axisColorBuffer);
+
+        GLES20.glDisableVertexAttribArray(attrLineNumber);
+        GLES20.glVertexAttrib1f(attrLineNumber, 0f);
+
+        GLES20.glLineWidth(3.0f);
+        GLES20.glDrawArrays(GLES20.GL_LINES, 0, 6); // 3 assi × 2 vertici
+
+        GLES20.glDisableVertexAttribArray(attrPosition);
+        GLES20.glDisableVertexAttribArray(attrColor);
+    }
+
+    /** Ricostruisce i buffer degli assi (al load del modello, non per frame). */
+    private void rebuildAxisBuffers() {
+        // Lunghezza asse: proporzionale all'oggetto caricato, minimo visibile
+        float axisLen = hasFirstPoint ? maxSide * 0.15f : 0.05f;
         if (axisLen == 0) axisLen = 0.05f;
 
         // Origine = primo punto del file GCode
@@ -379,43 +508,66 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                 0f, 0f, 1f,   0f, 0f, 1f
         };
 
-        FloatBuffer avBuf = makeFloatBuffer(av);
-        FloatBuffer acBuf = makeFloatBuffer(ac);
-
-        GLES20.glUseProgram(shaderProgram);
-        GLES20.glUniformMatrix4fv(unifMVPMatrix, 1, false, mvpMatrix, 0);
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
-
-        GLES20.glEnableVertexAttribArray(attrPosition);
-        GLES20.glVertexAttribPointer(attrPosition, 3, GLES20.GL_FLOAT, false, 0, avBuf);
-
-        GLES20.glEnableVertexAttribArray(attrColor);
-        GLES20.glVertexAttribPointer(attrColor, 3, GLES20.GL_FLOAT, false, 0, acBuf);
-
-        GLES20.glLineWidth(3.0f);
-        GLES20.glDrawArrays(GLES20.GL_LINES, 0, 6); // 3 assi × 2 vertici
-
-        GLES20.glDisableVertexAttribArray(attrPosition);
-        GLES20.glDisableVertexAttribArray(attrColor);
+        axisVertexBuffer = makeFloatBuffer(av);
+        axisColorBuffer  = makeFloatBuffer(ac);
     }
 
     // =========================================================================
-    // Caricamento file GCode
+    // Caricamento modello
     // =========================================================================
 
     /**
-     * Carica e parsa un file GCode.
-     * DEVE essere chiamato dal thread GL (via queueEvent).
-     *
-     * @param filePath percorso del file
-     * @param processed true se il file è già stato pre-processato
+     * Installa un modello parsato nella scena.
+     * DEVE essere chiamato dal thread GL (via queueEvent). Il parsing vero
+     * avviene altrove (thread background) tramite {@link #parseFile}.
      */
-    public void loadFile(String filePath, boolean processed) {
-        segments.clear();
-        resetExtremes();
-        // Reset del primo punto: verrà ricalcolato durante il parsing.
-        hasFirstPoint = false;
-        firstX = firstY = firstZ = 0f;
+    public void setModel(ParsedModel model) {
+        vertexBuffer     = model.vertexBuffer;
+        colorBuffer      = model.colorBuffer;
+        lineNumberBuffer = model.lineNumberBuffer;
+        vertexCount      = model.vertexCount;
+
+        centerX = model.centerX;
+        centerY = model.centerY;
+        centerZ = model.centerZ;
+        maxSide = model.maxSide;
+
+        firstX = model.firstX;
+        firstY = model.firstY;
+        firstZ = model.firstZ;
+        hasFirstPoint = true;
+
+        // Nuovo file: nessuna riga ancora eseguita.
+        currentCommandNumber = 0;
+
+        recalcScale();
+        rebuildAxisBuffers();
+        vboDirty = true;
+
+        Log.i(TAG, String.format(Locale.US,
+                "GCode caricato: %d segmenti, X(%.2f,%.2f) Y(%.2f,%.2f) Z(%.2f,%.2f)",
+                model.segmentCount,
+                model.minX, model.maxX, model.minY, model.maxY, model.minZ, model.maxZ));
+    }
+
+    // =========================================================================
+    // Parsing file GCode — statico, chiamabile da qualunque thread
+    // =========================================================================
+
+    /**
+     * Carica e parsa un file GCode producendo buffer pronti per la GPU.
+     * Pensato per girare su un thread di BACKGROUND: non tocca lo stato del
+     * renderer. Il risultato va consegnato al GL thread con
+     * {@code glSurfaceView.queueEvent(() -> renderer.setModel(model))}.
+     *
+     * @return il modello parsato, o null se il file è illeggibile o non
+     *         contiene segmenti disegnabili.
+     */
+    public static ParsedModel parseFile(String filePath) {
+        ModelBuilder b = new ModelBuilder();
+
+        // Primo punto reale del tracciato (origine logica degli assi).
+        float firstPosX = 0f, firstPosY = 0f, firstPosZ = 0f;
 
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
 
@@ -424,7 +576,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
             // Per un parser completo, integrare la libreria GcodeParser
             // già presente in UGS o una equivalente Android.
 
-            String line;
+            String raw;
             float x = 0, y = 0, z = 0;
             boolean isAbsolute = true;
             int lineNum = 0;
@@ -444,17 +596,13 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
             int modalMotion = 0; // 0=G0 rapid, 1=G1 linear, 2=G2 arc CW, 3=G3 arc CCW
             int plane       = 17; // 17=XY (default), 18=XZ, 19=YZ — piano per archi G2/G3
 
-            while ((line = reader.readLine()) != null) {
-                line = line.trim().toUpperCase();
+            while ((raw = reader.readLine()) != null) {
+                String line = stripComments(raw);
                 if (line.isEmpty()) continue;
 
-                // Rimuovi commenti ( ) e ;
-                int commentIdx = line.indexOf('(');
-                if (commentIdx >= 0) line = line.substring(0, commentIdx).trim();
-                commentIdx = line.indexOf(';');
-                if (commentIdx >= 0) line = line.substring(0, commentIdx).trim();
-                if (line.isEmpty()) continue;
-
+                // Conta SOLO le righe che anche lo streamer conta come inviate
+                // (non vuote dopo rimozione commenti e %): così lineNum resta
+                // allineato a rowsSent e il gray-out non deriva.
                 lineNum++;
 
                 // Detect comandi G con word boundary corretto
@@ -482,8 +630,8 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                 else if (hasG3) modalMotion = 3;
 
                 // Leggi coordinate presenti nella riga
-                boolean xInLine = line.contains("X");
-                boolean yInLine = line.contains("Y");
+                boolean xInLine = line.indexOf('X') >= 0;
+                boolean yInLine = line.indexOf('Y') >= 0;
                 float nx = parseCoord(line, 'X', x);
                 float ny = parseCoord(line, 'Y', y);
                 float nz = parseCoord(line, 'Z', z);
@@ -512,9 +660,9 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                 // G0/G1/G2/G3/G17/G18/G19/G90/G91 (es. G28, G53, G4...).
                 // In quel caso le coordinate sono parametri del comando,
                 // non destinazioni di movimento → nessun segmento.
-                boolean hasCoords = (xInLine || yInLine || line.contains("Z"));
+                boolean hasCoords = (xInLine || yInLine || line.indexOf('Z') >= 0);
                 boolean posChanged = (nx != x || ny != y || nz != z);
-                boolean hasNonMotionG = line.contains("G")
+                boolean hasNonMotionG = line.indexOf('G') >= 0
                         && !hasG0 && !hasG1 && !hasG2 && !hasG3
                         && !hasG17 && !hasG18 && !hasG19
                         && !hasG90 && !hasG91;
@@ -530,29 +678,32 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                             // come origine del tracciato senza disegnare alcun
                             // segmento (non sappiamo da dove arrivava il tool).
                             firstPositionSet = true;
-                            updateExtremes(nx, ny, nz);
+                            firstPosX = nx; firstPosY = ny; firstPosZ = nz;
+                            b.updateExtremes(nx, ny, nz);
                         } else {
                             boolean isArcMotion = (modalMotion == 2 || modalMotion == 3);
                             if (isArcMotion && hasIJK) {
                                 // Tessellazione arco G2/G3 in N segmenti
-                                // rettilinei. updateExtremes() viene chiamato
+                                // rettilinei. Gli estremi vengono aggiornati
                                 // per ciascun segmento intermedio (gli archi
                                 // possono uscire dal bbox start/end).
-                                appendArcSegments(x, y, z, nx, ny, nz,
+                                appendArcSegments(b, x, y, z, nx, ny, nz,
                                                   iVal, jVal, kVal,
                                                   modalMotion == 2, plane, lineNum);
                             } else {
-                                Segment seg = new Segment();
-                                seg.x1 = x; seg.y1 = y; seg.z1 = z;
-                                seg.x2 = nx; seg.y2 = ny; seg.z2 = nz;
-                                seg.isFastTraverse = (modalMotion == 0);
-                                // Se è G2/G3 ma manca I/J/K, fallback a corda
-                                // (visivamente sbagliato ma evita di scartare).
-                                seg.isArc          = isArcMotion;
-                                seg.isZMove        = (nz != z && nx == x && ny == y);
-                                seg.lineNumber     = lineNum;
-                                segments.add(seg);
-                                updateExtremes(nx, ny, nz);
+                                float[] color;
+                                if (isArcMotion) {
+                                    // G2/G3 senza I/J/K: fallback a corda
+                                    // (visivamente sbagliato ma evita di scartare).
+                                    color = COLOR_RED;
+                                } else if (modalMotion == 0) {
+                                    color = COLOR_BLUE;
+                                } else if (nz != z && nx == x && ny == y) {
+                                    color = COLOR_GREEN;
+                                } else {
+                                    color = COLOR_WHITE;
+                                }
+                                b.addSegment(x, y, z, nx, ny, nz, color, lineNum);
                             }
                         }
                     }
@@ -563,7 +714,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
 
         } catch (IOException e) {
             Log.e(TAG, "Errore lettura file GCode: " + e.getMessage());
-            return;
+            return null;
         }
 
         // NESSUNA pulizia finale: l'utente vuole vedere TUTTI i segmenti del
@@ -571,46 +722,32 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         // Tutte le linee disegnate corrispondono esattamente a comandi presenti
         // nel file GCode, niente partenze o arrivi inventati.
 
-        if (segments.isEmpty()) {
-            Log.w(TAG, "Nessun segmento valido nel file GCode dopo la pulizia.");
-            return;
+        if (b.segmentCount() == 0) {
+            Log.w(TAG, "Nessun segmento valido nel file GCode.");
+            return null;
         }
 
-        // Ricalcola il bounding box dai segmenti definitivi.
-        // Include sia il punto di inizio (x1) sia quello di fine (x2) di ogni segmento
-        // in modo che il centro e la scala siano corretti senza includere l'origine.
-        resetExtremes();
-        for (Segment seg : segments) {
-            updateExtremes(seg.x1, seg.y1, seg.z1);
-            updateExtremes(seg.x2, seg.y2, seg.z2);
+        return new ParsedModel(b, firstPosX, firstPosY, firstPosZ);
+    }
+
+    /**
+     * Rimuove commenti {@code (...)} e {@code ;...} e le righe {@code %},
+     * con la stessa semantica usata dallo streamer (GcodePreprocessorUtils):
+     * il codice DOPO un commento inline viene conservato.
+     */
+    private static String stripComments(String raw) {
+        String line = raw;
+        int open;
+        while ((open = line.indexOf('(')) >= 0) {
+            int close = line.indexOf(')', open);
+            if (close < 0) { line = line.substring(0, open); break; }
+            line = line.substring(0, open) + line.substring(close + 1);
         }
-
-        // Origine logica degli assi disegnati = punto iniziale del primo
-        // segmento del file. Ora che il parser non inventa più segmenti
-        // dall'origine (0,0,0), questo punto è esattamente la prima
-        // posizione del tool descritta dal file GCode.
-        Segment first = segments.get(0);
-        firstX = first.x1;
-        firstY = first.y1;
-        firstZ = first.z1;
-        hasFirstPoint = true;
-
-        // Calcola centro e scala
-        centerX = (minX + maxX) / 2f;
-        centerY = (minY + maxY) / 2f;
-        centerZ = (minZ + maxZ) / 2f;
-
-        float dx = maxX - minX;
-        float dy = maxY - minY;
-        float dz = maxZ - minZ;
-        maxSide = Math.max(dx, Math.max(dy, dz));
-        if (maxSide == 0) maxSide = 1;
-
-        recalcScale();
-        vboDirty = true;
-
-        Log.i(TAG, String.format("GCode caricato: %d segmenti, X(%.2f,%.2f) Y(%.2f,%.2f) Z(%.2f,%.2f)",
-                segments.size(), minX, maxX, minY, maxY, minZ, maxZ));
+        int semi = line.indexOf(';');
+        if (semi >= 0) line = line.substring(0, semi);
+        line = line.trim().toUpperCase();
+        if (line.equals("%")) return "";
+        return line;
     }
 
     // =========================================================================
@@ -630,10 +767,11 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
      * Se i parametri portano a un arco degenere (raggio ≈ 0), ricade su una corda
      * rettilinea per non perdere il movimento dal file.
      */
-    private void appendArcSegments(float x1, float y1, float z1,
-                                   float x2, float y2, float z2,
-                                   float iVal, float jVal, float kVal,
-                                   boolean cw, int plane, int lineNum) {
+    private static void appendArcSegments(ModelBuilder b,
+                                          float x1, float y1, float z1,
+                                          float x2, float y2, float z2,
+                                          float iVal, float jVal, float kVal,
+                                          boolean cw, int plane, int lineNum) {
 
         // Proietta sul piano 2D scelto e individua l'asse elicoidale.
         float ax1, ay1, ax2, ay2, ah1, ah2, ioff, joff;
@@ -659,15 +797,9 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         float cy = ay1 + joff;
         float r  = (float) Math.hypot(ax1 - cx, ay1 - cy);
 
-        // Arco degenere → fallback a corda dritta (con isArc=true per il colore).
+        // Arco degenere → fallback a corda dritta (colore arco per coerenza).
         if (r < 1e-5f) {
-            Segment seg = new Segment();
-            seg.x1 = x1; seg.y1 = y1; seg.z1 = z1;
-            seg.x2 = x2; seg.y2 = y2; seg.z2 = z2;
-            seg.isArc = true;
-            seg.lineNumber = lineNum;
-            segments.add(seg);
-            updateExtremes(x2, y2, z2);
+            b.addSegment(x1, y1, z1, x2, y2, z2, COLOR_RED, lineNum);
             return;
         }
 
@@ -723,64 +855,19 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
                     break;
             }
 
-            Segment seg = new Segment();
-            seg.x1 = sx1; seg.y1 = sy1; seg.z1 = sz1;
-            seg.x2 = sx2; seg.y2 = sy2; seg.z2 = sz2;
-            seg.isArc = true;
-            seg.lineNumber = lineNum; // tutti i mini-segmenti condividono la riga origine
-            segments.add(seg);
-            updateExtremes(sx2, sy2, sz2);
+            b.addSegment(sx1, sy1, sz1, sx2, sy2, sz2, COLOR_RED, lineNum);
 
             prevAx = newAx; prevAy = newAy; prevAh = newAh;
         }
     }
 
     // =========================================================================
-    // Buffer vertex/color (come createVertexBuffers in VisualizerCanvas)
+    // Upload VBO
     // =========================================================================
 
-    /**
-     * Converte la lista di segmenti in array float per posizioni e colori.
-     * Logica identica a createVertexBuffers() del VisualizerCanvas originale.
-     */
-    private void buildVertexBuffers() {
-        int n = segments.size();
-        if (n == 0) { vertexCount = 0; return; }
-
-        vertexCount = n * 2; // ogni segmento ha 2 vertici
-        float[] verts  = new float[vertexCount * 3];
-        float[] colors = new float[vertexCount * 3];
-
-        int vi = 0, ci = 0;
-
-        for (Segment seg : segments) {
-            float[] color;
-
-            // --- Schema colori (identico all'originale) ---
-            if (seg.isArc)          color = COLOR_RED;
-            else if (seg.isFastTraverse) color = COLOR_BLUE;
-            else if (seg.isZMove)    color = COLOR_GREEN;
-            else                     color = COLOR_WHITE;
-
-            // Grigio per le righe già eseguite
-            if (seg.lineNumber <= currentCommandNumber) color = COLOR_GRAY;
-
-            // Vertice 1
-            verts[vi++] = seg.x1; verts[vi++] = seg.y1; verts[vi++] = seg.z1;
-            colors[ci++] = color[0]; colors[ci++] = color[1]; colors[ci++] = color[2];
-
-            // Vertice 2
-            verts[vi++] = seg.x2; verts[vi++] = seg.y2; verts[vi++] = seg.z2;
-            colors[ci++] = color[0]; colors[ci++] = color[1]; colors[ci++] = color[2];
-        }
-
-        vertexBuffer = makeFloatBuffer(verts);
-        colorBuffer  = makeFloatBuffer(colors);
-    }
-
-    /** Carica i buffer in GPU (VBO). */
+    /** Carica i buffer in GPU (VBO). Solo al load di un nuovo modello. */
     private void uploadVBOs() {
-        if (vertexBuffer == null || colorBuffer == null) return;
+        if (vertexBuffer == null || colorBuffer == null || lineNumberBuffer == null) return;
 
         // Vertex VBO
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboHandles[0]);
@@ -794,6 +881,13 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,
                 colorBuffer.capacity() * 4,
                 colorBuffer,
+                GLES20.GL_STATIC_DRAW);
+
+        // Line number VBO
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboHandles[2]);
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,
+                lineNumberBuffer.capacity() * 4,
+                lineNumberBuffer,
                 GLES20.GL_STATIC_DRAW);
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
@@ -839,17 +933,16 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     // Setter dati (thread-safe perché chiamati via queueEvent)
     // =========================================================================
 
+    /**
+     * Aggiorna la riga corrente per il gray-out. Costo: un float — lo shader
+     * fa il resto, nessun rebuild di buffer.
+     */
     public void setCurrentCommandNumber(int n) {
         this.currentCommandNumber = n;
-        vboDirty = true;
     }
 
     public void setWorkCoordinate(double x, double y, double z) {
         this.workX = x; this.workY = y; this.workZ = z;
-    }
-
-    public void setMachineCoordinate(double x, double y, double z) {
-        this.machineX = x; this.machineY = y; this.machineZ = z;
     }
 
     // =========================================================================
@@ -861,18 +954,6 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
         // Scala l'oggetto in modo che entri nel frustum ortografico (-0.51, 0.51)
         // Uguale alla logica di VisualizerUtils.findScaleFactor
         scaleBase = (0.9f / maxSide);
-    }
-
-    private void resetExtremes() {
-        minX = Float.MAX_VALUE; maxX = -Float.MAX_VALUE;
-        minY = Float.MAX_VALUE; maxY = -Float.MAX_VALUE;
-        minZ = Float.MAX_VALUE; maxZ = -Float.MAX_VALUE;
-    }
-
-    private void updateExtremes(float x, float y, float z) {
-        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-        minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
     }
 
     /**
@@ -904,7 +985,7 @@ public class GcodeRenderer implements GLSurfaceView.Renderer {
     }
 
     /** Parsa una coordinata (es. X12.34) dalla riga GCode. */
-    private float parseCoord(String line, char axis, float defaultVal) {
+    private static float parseCoord(String line, char axis, float defaultVal) {
         int idx = line.indexOf(axis);
         if (idx < 0) return defaultVal;
         int start = idx + 1;
