@@ -62,6 +62,9 @@ import in.co.gorest.grblcontroller.util.GrblUtils;
 
 public class BluetoothConnectionActivity extends GrblActivity {
 
+    private static final int REQUEST_BLUETOOTH_PERMISSIONS = 9001;
+    private static final int REQUEST_ENABLE_BLUETOOTH = 9002;
+
     private GrblServiceMessageHandler grblServiceMessageHandler;
     private BluetoothAdapter bluetoothAdapter = null;
     private boolean mBound = false;
@@ -76,6 +79,7 @@ public class BluetoothConnectionActivity extends GrblActivity {
             showToastMessage(getString(R.string.text_no_bluetooth_adapter));
             restartInUsbMode();
         } else {
+            requestBluetoothPermissionsIfNeeded();
             Intent intent = new Intent(getApplicationContext(), GrblBluetoothSerialService.class);
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
         }
@@ -95,24 +99,57 @@ public class BluetoothConnectionActivity extends GrblActivity {
     @Override
     public void onStart() {
         super.onStart();
+        requestBluetoothEnableIfNeeded();
+    }
 
-        if (!bluetoothAdapter.isEnabled()) {
-            Thread thread = new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_no_bluetooth_permission), true, true));
-                            restartInUsbMode();
-                        }
-                        bluetoothAdapter.enable();
-                    }catch (RuntimeException e){
-                        EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_no_bluetooth_permission), true, true));
-                        restartInUsbMode();
-                    }
-                }
-            };
-            thread.start();
+    /**
+     * Da Android 12 (target 31+) BLUETOOTH_CONNECT e BLUETOOTH_SCAN sono
+     * permessi runtime: senza richiesta esplicita la connessione e la lista
+     * dei dispositivi associati falliscono. Sotto Android 12 non serve nulla.
+     */
+    private void requestBluetoothPermissionsIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        if (hasBluetoothConnectPermission()) return;
+        ActivityCompat.requestPermissions(this,
+                new String[]{
+                        android.Manifest.permission.BLUETOOTH_CONNECT,
+                        android.Manifest.permission.BLUETOOTH_SCAN
+                },
+                REQUEST_BLUETOOTH_PERMISSIONS);
+    }
+
+    private boolean hasBluetoothConnectPermission() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                || ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT)
+                        == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Chiede all'utente di attivare il Bluetooth col dialog di sistema.
+     * Il vecchio BluetoothAdapter.enable() è un no-op da Android 13 in poi,
+     * quindi ACTION_REQUEST_ENABLE è l'unica via supportata.
+     * Se il permesso runtime non è ancora stato concesso, l'attivazione viene
+     * ritentata in onRequestPermissionsResult dopo il grant.
+     */
+    private void requestBluetoothEnableIfNeeded() {
+        if (bluetoothAdapter == null || bluetoothAdapter.isEnabled()) return;
+        if (!hasBluetoothConnectPermission()) return;
+        try {
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BLUETOOTH);
+        } catch (RuntimeException e) {
+            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_no_bluetooth_permission), true, true));
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @androidx.annotation.NonNull String[] permissions, @androidx.annotation.NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_BLUETOOTH_PERMISSIONS) return;
+
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            requestBluetoothEnableIfNeeded();
+        } else {
+            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_no_bluetooth_permission), true, true));
         }
     }
 

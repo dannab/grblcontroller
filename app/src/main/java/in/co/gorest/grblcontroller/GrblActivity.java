@@ -48,6 +48,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.cardview.widget.CardView;
 import androidx.databinding.DataBindingUtil;
 import androidx.databinding.Observable;
@@ -165,6 +166,16 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         toolbarTitleView = findViewById(R.id.toolbar_title);
         toolbarSubtitleView = findViewById(R.id.toolbar_subtitle);
         applySubtitle(getString(R.string.text_not_connected));
+
+        // Da Android 13 (API 33) POST_NOTIFICATIONS è un permesso runtime:
+        // senza, le notifiche dei servizi (connessione, streaming, server HTTP)
+        // restano invisibili anche se i servizi funzionano.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9100);
+        }
 
         applicationSetup();
         binding.setMachineStatus(machineStatus);

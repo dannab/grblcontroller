@@ -122,7 +122,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(categoryValue));
-        final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 0);
+        final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
         notificationHelper.getNotificationGeneral(notificationTitle, notificationMessage, pendingIntent);
         saveNotification(remoteMessage);
     }
@@ -145,7 +145,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             if(versionCode > BuildConfig.VERSION_CODE){
                 Intent intent = new Intent(Intent.ACTION_VIEW);
                 intent.setData(Uri.parse("market://details?id=" + getPackageName()));
-                final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 0);
+                final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
                 notificationHelper.getNotificationGeneral(notificationTitle, notificationMessage, pendingIntent);
                 saveNotification(remoteMessage);
             }
@@ -154,14 +154,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setData(Uri.parse(categoryValue));
-            final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 0);
+            final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
             notificationHelper.getNotificationGeneral(notificationTitle, notificationMessage, pendingIntent);
             saveNotification(remoteMessage);
 
         }else{
             Intent intent = new Intent(this, SplashActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+            final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
             notificationHelper.getNotificationGeneral(notificationTitle, notificationMessage, pendingIntent);
             saveNotification(remoteMessage);
         }

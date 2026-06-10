@@ -2,10 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Permessi Bluetooth legacy: validi solo fino ad Android 11 (API 30).
+         Da Android 12 (API 31) sono sostituiti da BLUETOOTH_CONNECT/SCAN runtime. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- neverForLocation: la scansione serve solo per le periferiche seriali,
+         non per dedurre la posizione — evita di dover chiedere anche ACCESS_FINE_LOCATION. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
 
     <!-- PERMESSI DI ARCHIVIAZIONE: Aggiunto l'accesso completo per i file G-Code -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -18,6 +24,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Required from Android 14 (API 34) for dataSync foreground services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Required from Android 14 (API 34) for connectedDevice foreground services
+         (servizi seriali Bluetooth/USB e streaming GCode verso la macchina) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Required from Android 13 (API 33) to post the persistent server notification -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
@@ -104,14 +113,17 @@
         <service
             android:name=".service.GrblUsbSerialService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".service.GrblBluetoothSerialService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".service.FileStreamerIntentService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <service
             android:name=".service.HttpServerService"

@@ -39,6 +39,8 @@ import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import androidx.core.content.ContextCompat;
+
 import com.joanzapata.iconify.IconDrawable;
 import com.joanzapata.iconify.fonts.FontAwesomeIcons;
 
@@ -157,7 +159,9 @@ public class UsbConnectionActivity extends GrblActivity{
         filter.addAction(GrblUsbSerialService.ACTION_USB_DISCONNECTED);
         filter.addAction(GrblUsbSerialService.ACTION_USB_NOT_SUPPORTED);
         filter.addAction(GrblUsbSerialService.ACTION_USB_PERMISSION_NOT_GRANTED);
-        registerReceiver(mUsbReceiver, filter);
+        // Broadcast interni inviati da GrblUsbSerialService: da Android 14
+        // (target 34+) serve dichiarare il receiver come NOT_EXPORTED.
+        ContextCompat.registerReceiver(this, mUsbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     /*
