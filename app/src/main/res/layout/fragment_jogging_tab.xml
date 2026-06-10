@@ -198,7 +198,18 @@
                         android:text="A {fa-caret-right 26dp}"
                         tools:ignore="HardcodedText" />
 
-
+                    <!--
+                        Torcia del dispositivo Android (flash fotocamera).
+                        Click: accende/spegne. Non è legato allo stato GRBL,
+                        quindi resta sempre abilitato.
+                    -->
+                    <com.joanzapata.iconify.widget.IconButton
+                        android:id="@+id/btn_torch"
+                        android:layout_weight="0.22"
+                        android:layout_width="0dp"
+                        android:layout_height="65dp"
+                        android:text="{fa-lightbulb-o 26dp}"
+                        tools:ignore="HardcodedText" />
 
                 </TableRow>
 

@@ -22,6 +22,9 @@ package in.co.gorest.grblcontroller.ui;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.Context;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -155,6 +158,13 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      */
     private boolean continuousModeXYA = false;
     private boolean continuousModeZ = false;
+
+    /** Pulsante torcia (flash fotocamera) — non legato allo stato GRBL. */
+    private IconButton btnTorch;
+    /** Stato corrente della torcia: true = accesa. */
+    private boolean torchOn = false;
+    /** Id della camera con flash, risolto la prima volta che serve. */
+    private String torchCameraId;
 
     public JoggingTabFragment() {}
 
@@ -387,6 +397,14 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             return true;
         });
         updateStepCycleZButton();
+
+        // Pulsante torcia (flash fotocamera Android). Click = accende/spegne.
+        // Indipendente dallo stato GRBL, quindi resta sempre attivo.
+        btnTorch = view.findViewById(R.id.btn_torch);
+        if (btnTorch != null) {
+            btnTorch.setOnClickListener(v -> toggleTorch());
+            updateTorchButton();
+        }
 
 //        TableRow wposLayout = view.findViewById(R.id.wpos_layout);
 //        for (int i = 0; i < wposLayout.getChildCount(); i++) {
@@ -847,6 +865,72 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      */
     private boolean isZAxisTag(String tag) {
         return tag != null && tag.toUpperCase().contains("Z");
+    }
+
+    // -------------------------------------------------------------------------
+    // Torcia (flash fotocamera Android)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Accende/spegne la torcia del dispositivo usando CameraManager.setTorchMode
+     * (disponibile da API 23, in linea con minSdkVersion del progetto).
+     * Risolve la prima camera dotata di flash e ne ricorda l'id per le chiamate
+     * successive. In caso di errore (nessun flash, camera occupata, ecc.) mostra
+     * un toast e lascia lo stato coerente.
+     */
+    private void toggleTorch() {
+        if (getActivity() == null) return;
+
+        CameraManager cameraManager =
+                (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+        if (cameraManager == null) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Torcia non disponibile", true, true));
+            return;
+        }
+
+        try {
+            if (torchCameraId == null) {
+                torchCameraId = findTorchCameraId(cameraManager);
+            }
+            if (torchCameraId == null) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        "Nessun flash sul dispositivo", true, true));
+                return;
+            }
+
+            torchOn = !torchOn;
+            cameraManager.setTorchMode(torchCameraId, torchOn);
+            updateTorchButton();
+        } catch (CameraAccessException | IllegalArgumentException e) {
+            Log.e(TAG, "Errore torcia: " + e.getMessage());
+            torchOn = false;
+            updateTorchButton();
+            EventBus.getDefault().post(new UiToastEvent(
+                    "Impossibile controllare la torcia", true, true));
+        }
+    }
+
+    /** Restituisce l'id della prima camera con flash, o null se nessuna. */
+    private String findTorchCameraId(CameraManager cameraManager)
+            throws CameraAccessException {
+        for (String id : cameraManager.getCameraIdList()) {
+            Boolean hasFlash = cameraManager.getCameraCharacteristics(id)
+                    .get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE);
+            if (hasFlash != null && hasFlash) return id;
+        }
+        return null;
+    }
+
+    /**
+     * Aggiorna l'icona del pulsante torcia: accesa = lampadina piena in colore
+     * accent, spenta = lampadina vuota.
+     */
+    private void updateTorchButton() {
+        if (btnTorch == null) return;
+        btnTorch.setText(torchOn
+                ? "{fa-lightbulb-o 26dp @color/colorAccent}"
+                : "{fa-lightbulb-o 26dp}");
     }
 
     private void customButton(int resourceId, boolean isLongClick) {
