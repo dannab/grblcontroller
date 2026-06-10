@@ -106,8 +106,6 @@
             tools:targetApi="n"
             tools:ignore="LockedOrientationActivity,NonResizeableActivity" />
 
-        <activity android:name=".NotificationArchiveActivity" />
-
         <service
             android:name=".service.GrblUsbSerialService"
             android:enabled="true"
@@ -127,17 +125,6 @@
             android:name=".service.HttpServerService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
-
-        <service android:name=".service.MyFirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="@string/default_notification_channel_id" />
 
         <meta-data android:name="DATABASE" android:value="grblcontroller.db" />
         <meta-data android:name="VERSION" android:value="2" />

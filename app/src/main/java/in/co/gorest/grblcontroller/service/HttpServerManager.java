@@ -91,7 +91,7 @@ public class HttpServerManager {
      * Starts the foreground service if the user has enabled the server AND
      * set a password. No-ops otherwise — including when called from a context
      * that is not allowed to start a foreground service (e.g. Application
-     * onCreate triggered by Firebase in the background on API 31+); the
+     * onCreate triggered in the background on API 31+); the
      * resulting exception is logged and swallowed.
      */
     public void start(Context ctx) {

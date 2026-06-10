@@ -140,7 +140,6 @@
     <string name="text_no_usb_permission">Нет разрешения доступа USB</string>
     <string name="text_none_found">Ничего не найдено</string>
     <string name="text_not_connected">Не соединено</string>
-    <string name="text_notifications">Уведомления</string>
     <string name="text_ok">Хорошо</string>
     <string name="text_on_button">на кнопку</string>
     <string name="text_only_internal_storage_supported">Поддерживается только внутренняя память</string>

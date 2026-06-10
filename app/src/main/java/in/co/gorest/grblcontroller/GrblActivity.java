@@ -256,10 +256,6 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
                 startActivity(new Intent(getApplicationContext(), SettingsActivity.class));
                 return true;
 
-            case  R.id.app_notifications:
-                startActivity(new Intent(getApplicationContext(), NotificationArchiveActivity.class));
-                return true;
-
             case R.id.app_about:
                 startActivity(new Intent(getApplicationContext(), AboutActivity.class));
                 return true;

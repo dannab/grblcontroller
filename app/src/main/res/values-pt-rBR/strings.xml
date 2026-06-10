@@ -103,7 +103,6 @@
     <string name="text_haptic_feedback_description">enable short vibration when buttons are touched</string>
     <string name="text_only_internal_storage_supported">Only internal storage is supported</string>
     <string name="text_enable_ab_axis">Enable AB Axis</string>
-    <string name="text_notifications">Notifications</string>
     <string name="enable_ab_axis_description">enable two additional A and B axis in jogging control tab</string>
     <string name="text_grbl_status_update_interval">Status update interval</string>
     <string name="text_grbl_status_update_interval_summary">%s (if you have slow cpu or very old phone then increase this value, default value is 150)</string>

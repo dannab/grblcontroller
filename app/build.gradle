@@ -17,11 +17,11 @@ android {
 
 
     defaultConfig {
-        applicationId "in.co.gorest.grblcontroller"
+        applicationId "io.github.dannab.grblmachining"
         minSdkVersion 23
         targetSdkVersion 35
-        versionCode 38
-        versionName "2.57"
+        versionCode 39
+        versionName "2.58"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -64,8 +64,6 @@ allprojects {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'com.google.firebase:firebase-core:21.1.1'
-    implementation 'com.google.firebase:firebase-messaging:24.1.1'
     androidTestImplementation('androidx.test.espresso:espresso-core:3.6.1', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
@@ -91,5 +89,3 @@ dependencies {
 
     testImplementation 'junit:junit:4.13.2'
 }
-
-apply plugin: 'com.google.gms.google-services'

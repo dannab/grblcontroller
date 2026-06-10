@@ -80,7 +80,6 @@
     <string name="text_haptic_feedback_description">abilita una breve vibrazione quando vengono toccati i pulsanti</string>
     <string name="text_only_internal_storage_supported">È supportata solo la memoria interna</string>
     <string name="text_enable_ab_axis">Abilita asse AB</string>
-    <string name="text_notifications">Notifiche</string>
     <string name="enable_ab_axis_description">abilita due assi aggiuntivi A e B nella scheda di controllo jogging</string>
     <string name="text_grbl_status_update_interval">Intervallo aggiornamento stato</string>
     <string name="text_grbl_status_update_interval_summary">%s (se hai una CPU lenta o un telefono molto vecchio, aumenta questo valore, il valore predefinito è 150)</string>
