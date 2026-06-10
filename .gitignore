@@ -9,3 +9,6 @@ gradle
 /build
 /captures
 .externalNativeBuild
+keystore.properties
+*.jks
+*.keystore

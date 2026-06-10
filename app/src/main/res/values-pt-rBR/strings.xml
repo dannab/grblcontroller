@@ -95,7 +95,6 @@
     <string name="text_quick_jogging_desc">configure quick jogging buttons</string>
     <string name="text_button_4_behaviour">Configure Custom Button 4 Behaviour</string>
     <string name="text_default_connection">Default connection</string>
-    <string name="text_rotate_jogging_pad">Rotate XY jogging pad</string>
     <string name="text_streaming_stop_button_behaviour">Streaming stop button behaviour</string>
     <string name="text_check_machine_position">Check machine position</string>
     <string name="text_check_machine_position_description">prevent file streaming, if machine is not at zero position</string>
@@ -228,20 +227,6 @@
     <string name="probe_plus_tlo">Probe {fa-plus 14dp} TLO</string>
 
     <!-- Jogging Tab -->
-
-    <string-array name="preference_entries_rotate_xy_jogging_pad">
-        <item>0 degree clockwise</item>
-        <item>90 degree clockwise</item>
-        <item>180 degree clockwise</item>
-        <item>270 degree clockwise</item>
-    </string-array>
-
-    <string-array name="preference_values_rotate_xy_jogging_pad">
-        <item>0</item>
-        <item>90</item>
-        <item>180</item>
-        <item>270</item>
-    </string-array>
 
     <string name="text_zero_selected_axis">Zero selected axis</string>
     <string name="text_set_axis_location_in_current_wpos">set selected axis location in current coordinate system to zero | </string>

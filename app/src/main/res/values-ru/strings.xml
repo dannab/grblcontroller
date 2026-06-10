@@ -160,7 +160,6 @@
     <string name="text_quick_jogging_desc">настройте кнопки быстрого шагового перемещения</string>
     <string name="text_reset">Сброс</string>
     <string name="text_return_to_zero_position">Вернуться в нулевое положение</string>
-    <string name="text_rotate_jogging_pad">Поворот панели быстрого перемещения XY</string>
     <string name="text_save_coordinate_system">Сохранить систему координат</string>
     <string name="text_save_coordinate_system_desc">сохранить текущее положение в системе координат</string>
     <string name="text_select_paired_device">Выберете устройство сопряжения</string>

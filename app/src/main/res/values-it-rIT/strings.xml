@@ -72,7 +72,6 @@
     <string name="text_quick_jogging_desc">configura i pulsanti di jogging rapido</string>
     <string name="text_button_4_behaviour">Configura il comportamento del pulsante personalizzato 4</string>
     <string name="text_default_connection">Connessione predefinita</string>
-    <string name="text_rotate_jogging_pad">Ruota il pad di jogging XY</string>
     <string name="text_streaming_stop_button_behaviour">Comportamento del pulsante di stop streaming</string>
     <string name="text_check_machine_position">Controlla la posizione della macchina</string>
     <string name="text_check_machine_position_description">impedisci lo streaming del file se la macchina non è in posizione zero</string>
@@ -200,13 +199,6 @@
     <string name="text_last_probe_position">Ultima posizione di probing</string>
     <string name="text_current_tlo">TLO Corrente</string>
     <string name="probe_plus_tlo">Probing {fa-plus 14dp} TLO</string>
-
-    <string-array name="preference_entries_rotate_xy_jogging_pad">
-        <item>0 gradi in senso orario</item>
-        <item>90 gradi in senso orario</item>
-        <item>180 gradi in senso orario</item>
-        <item>270 gradi in senso orario</item>
-    </string-array>
 
     <string name="text_zero_selected_axis">Azzerra l\'asse selezionato</string>
     <string name="text_set_axis_location_in_current_wpos">imposta la posizione dell\'asse selezionato a zero nel sistema di coordinate corrente | </string>
