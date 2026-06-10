@@ -121,13 +121,26 @@ public abstract class SerialCommunicationHandler extends Handler {
             machineStatus.setBuildInfo(buildInfo);
             isVersionString = true;
 
+        }else if(GrblUtils.isFluidNcVersionString(message)){
+            // Va controllato PRIMA del banner GRBL generico: il banner FluidNC
+            // (es. "Grbl 3.9 [FluidNC v3.9.9 (bt) '$' for help]") inizia con
+            // "Grbl" ma non ha la lettera di versione, e il parsing classico
+            // fallirebbe. Se c'e scritto FluidNC il protocollo 1.1 e implicito.
+            EventBus.getDefault().post(new ConsoleMessageEvent(message));
+            machineStatus.setBuildInfo(new MachineStatusListener.BuildInfo(1.1, 'f'));
+            isVersionString = true;
+
         }else if(GrblUtils.isGrblVersionString(message)) {
 
             EventBus.getDefault().post(new ConsoleMessageEvent(message));
             double versionDouble = GrblUtils.getVersionDouble(message);
             Character versionLetter = GrblUtils.getVersionLetter(message);
 
-            MachineStatusListener.BuildInfo buildInfo = new MachineStatusListener.BuildInfo(versionDouble, versionLetter);
+            // versionLetter puo essere null (banner senza lettera, es. "Grbl 1.1"):
+            // il costruttore vuole un char primitivo e l'unboxing di null
+            // farebbe saltare la verifica con una NullPointerException.
+            MachineStatusListener.BuildInfo buildInfo = new MachineStatusListener.BuildInfo(
+                    versionDouble, versionLetter == null ? ' ' : versionLetter);
 
             if (buildInfo.versionDouble >= Constants.MIN_SUPPORTED_VERSION) {
                 machineStatus.setBuildInfo(buildInfo);
@@ -137,11 +150,6 @@ public abstract class SerialCommunicationHandler extends Handler {
                 EventBus.getDefault().post(new UiToastEvent(messageNotSupported));
                 EventBus.getDefault().post(new ConsoleMessageEvent(messageNotSupported));
             }
-        }else if(GrblUtils.isFluidNcVersionString(message)){
-            EventBus.getDefault().post(new ConsoleMessageEvent(message));
-            machineStatus.setBuildInfo(new MachineStatusListener.BuildInfo(1.1, 'f'));
-            isVersionString = true;
-
         }else{
             EventBus.getDefault().post(new ConsoleMessageEvent(message));
             Log.d(TAG, "MESSAGE NOT HANDLED: " + message);
