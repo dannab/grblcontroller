@@ -111,9 +111,15 @@ public class GcodeVisualizerFragment extends BaseFragment {
     // -------------------------------------------------------------------------
     private GcodeRenderer renderer;
 
-    /** Path dell'ultimo file passato a loadFile(). Usato per evitare di
-     *  riparsare lo stesso file al rientro dall'app (onResume ricorrente). */
-    private String lastLoadedPath;
+    /** Modello parsato dell'ultimo file caricato. Vive nel FRAGMENT (non
+     *  nella view): quando il ViewPager distrugge e ricrea la view, il
+     *  renderer nuovo riceve questo modello senza dover ri-parsare. */
+    private volatile GcodeRenderer.ParsedModel cachedModel;
+    /** Path del file a cui si riferisce cachedModel (o il parse in corso). */
+    private String cachedModelPath;
+    /** true se l'ISTANZA CORRENTE di renderer ha già ricevuto il modello.
+     *  Va azzerato a ogni onCreateView (renderer nuovo = scena vuota). */
+    private volatile boolean rendererHasModel;
 
     /** Esegue il parsing GCode fuori dal GL thread, così la vista 3D non si
      *  congela durante il load di file grandi. Single-thread: i load sono
@@ -190,14 +196,19 @@ public class GcodeVisualizerFragment extends BaseFragment {
         // Auto-load del file già selezionato: lo facciamo qui (non in
         // onCreateView) perché con BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT
         // questo viene chiamato solo quando il tab è davvero visibile.
-        // Dedup via lastLoadedPath: evita re-parse al rientro dall'app.
+        // Tre casi:
+        //  - file nuovo → parse in background;
+        //  - stesso file ma renderer ricreato dal ViewPager → riusa il
+        //    modello in cache, niente re-parse;
+        //  - stesso file e renderer già popolato → niente da fare.
         if (fileSender.getGcodeFile() != null && fileSender.getGcodeFile().exists()) {
             String path = fileSender.getGcodeFile().getAbsolutePath();
-            if (!path.equals(lastLoadedPath)) {
+            if (!path.equals(cachedModelPath)) {
                 Log.d(TAG, "onResume: carico file " + path);
                 loadFile(path);
-            } else {
-                Log.d(TAG, "onResume: file già caricato, skip parse");
+            } else if (!rendererHasModel && cachedModel != null) {
+                Log.d(TAG, "onResume: renderer nuovo, riuso modello in cache");
+                applyModelToRenderer(cachedModel);
             }
         }
     }
@@ -235,6 +246,9 @@ public class GcodeVisualizerFragment extends BaseFragment {
         glSurfaceView.setPreserveEGLContextOnPause(true);
 
         renderer = new GcodeRenderer();
+        // Renderer appena creato = scena vuota: se c'è un modello in cache
+        // verrà riapplicato da onResume (vedi rendererHasModel).
+        rendererHasModel = false;
         glSurfaceView.setRenderer(renderer);
         glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
@@ -283,12 +297,12 @@ public class GcodeVisualizerFragment extends BaseFragment {
 
     private void loadFile(String filePath) {
         Log.d(TAG, "loadFile chiamato con: " + filePath);
-        lastLoadedPath = filePath;
+        cachedModelPath = filePath;
+        cachedModel = null;
 
         // Parsing su thread background: il GL thread riceve solo i buffer
         // già pronti, quindi la vista resta fluida anche con file enormi.
         final int generation = loadGeneration.incrementAndGet();
-        final GLSurfaceView surface = glSurfaceView;
         parseExecutor.execute(() -> {
             Log.d(TAG, "parsing in background: " + filePath);
             GcodeRenderer.ParsedModel model = GcodeRenderer.parseFile(filePath);
@@ -300,9 +314,28 @@ public class GcodeVisualizerFragment extends BaseFragment {
                 Log.d(TAG, "parse scartato, richiesto file più recente");
                 return;
             }
-            surface.queueEvent(() -> renderer.setModel(model));
-            surface.requestRender();
+            // Il modello resta in cache nel fragment: se il ViewPager ricrea
+            // la view, il renderer nuovo lo riceve senza ri-parsare.
+            cachedModel = model;
+            applyModelToRenderer(model);
         });
+    }
+
+    /**
+     * Consegna un modello parsato al renderer corrente sul GL thread,
+     * ripristinando anche il progresso del gray-out (righe già inviate).
+     * Chiamabile sia dal main thread (onResume) sia dal thread di parsing.
+     */
+    private void applyModelToRenderer(GcodeRenderer.ParsedModel model) {
+        final GLSurfaceView surface = glSurfaceView;
+        final GcodeRenderer targetRenderer = renderer;
+        if (surface == null || targetRenderer == null) return;
+        rendererHasModel = true;
+        surface.queueEvent(() -> {
+            targetRenderer.setModel(model);
+            targetRenderer.setCurrentCommandNumber(fileSender.getRowsSent());
+        });
+        surface.requestRender();
     }
 
     // -------------------------------------------------------------------------
