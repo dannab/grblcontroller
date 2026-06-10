@@ -39,6 +39,8 @@ import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import androidx.core.content.ContextCompat;
+
 import com.joanzapata.iconify.IconDrawable;
 import com.joanzapata.iconify.fonts.FontAwesomeIcons;
 
@@ -157,7 +159,9 @@ public class UsbConnectionActivity extends GrblActivity{
         filter.addAction(GrblUsbSerialService.ACTION_USB_DISCONNECTED);
         filter.addAction(GrblUsbSerialService.ACTION_USB_NOT_SUPPORTED);
         filter.addAction(GrblUsbSerialService.ACTION_USB_PERMISSION_NOT_GRANTED);
-        registerReceiver(mUsbReceiver, filter);
+        // Broadcast interni inviati da GrblUsbSerialService: da Android 14
+        // (target 34+) serve dichiarare il receiver come NOT_EXPORTED.
+        ContextCompat.registerReceiver(this, mUsbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     /*
@@ -194,19 +198,21 @@ public class UsbConnectionActivity extends GrblActivity{
 
             switch (intentAction) {
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_GRANTED: // USB PERMISSION GRANTED
-                    if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_connected));
+                    applySubtitle(getString(R.string.text_connected));
+                    in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(getString(R.string.text_connected));
                     showToastMessage(getString(R.string.text_usb_device_connected));
                     break;
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_NOT_GRANTED: // USB PERMISSION NOT GRANTED
-                    if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(R.string.text_no_usb_permission);
+                    applySubtitle(getString(R.string.text_no_usb_permission));
                     showToastMessage(getString(R.string.text_usb_permission_not_granted), true, true);
                     break;
                 case GrblUsbSerialService.ACTION_NO_USB: // NO USB CONNECTED
-                    if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(R.string.text_no_usb_device);
+                    applySubtitle(getString(R.string.text_no_usb_device));
                     //grblToast("USB device not connected");
                     break;
                 case GrblUsbSerialService.ACTION_USB_DISCONNECTED: // USB DISCONNECTED
-                    if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_not_connected));
+                    applySubtitle(getString(R.string.text_not_connected));
+                    in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(null);
                     MachineStatusListener.getInstance().setState(Constants.MACHINE_STATUS_NOT_CONNECTED);
                     if(FileStreamerIntentService.getIsServiceRunning()){
                         FileStreamerIntentService.setShouldContinue(false);
@@ -215,7 +221,7 @@ public class UsbConnectionActivity extends GrblActivity{
                     showToastMessage(getString(R.string.text_usb_device_disconnected), true, true);
                     break;
                 case GrblUsbSerialService.ACTION_USB_NOT_SUPPORTED: // USB NOT SUPPORTED
-                    if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(R.string.text_usb_device_not_supported);
+                    applySubtitle(getString(R.string.text_usb_device_not_supported));
                     MachineStatusListener.getInstance().setState(Constants.MACHINE_STATUS_NOT_CONNECTED);
                     showToastMessage(getString(R.string.text_usb_device_not_supported), true, true);
                     break;

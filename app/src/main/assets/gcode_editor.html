@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  Copyright (C) 2024-2026 Daniele Cicchinelli
+  Part of GRBLController fork - https://github.com/dannab/grblcontroller
+  Based on GRBLController by zeevy - https://github.com/zeevy/grblcontroller
+
+  Embeds the ACE editor (BSD-3-Clause, Ajax.org B.V. and contributors).
+  See js/ace.js and THIRD_PARTY_LICENSES.md for upstream license details.
+
+  This file is released under the GNU General Public License v3 or later.
+  See the LICENSE file at the project root.
+-->
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #1a1a1a; }
+        #editor { margin: 0; position: absolute; top: 0; bottom: 0; left: 0; right: 0; font-size: 14px; }
+    </style>
+<!-- Caricamento LOCALE dei file per l'uso in officina senza internet -->
+<script src="js/ace.js"></script>
+<script src="js/mode-gcode.js"></script>
+<script src="js/theme-tomorrow_night.js"></script>
+<script src="js/ext-searchbox.js"></script>
+</head>
+<body>
+
+<div id="editor"></div>
+
+<script>
+    var editor = ace.edit("editor");
+    editor.setTheme("ace/theme/tomorrow_night");
+    editor.session.setMode("ace/mode/gcode");
+    // Parte in read-only: Android abilita l'editing solo quando la macchina è IDLE
+    editor.setReadOnly(true);
+
+    // Ottimizzazioni per performance estreme con >100k righe
+    editor.setOption("useWorker", false); // Disattiva i controlli sintattici in background per evitare lag
+    editor.session.setUseWrapMode(false); // Disattiva il wrapping per velocizzare il rendering verticale
+
+    // Interfaccia di comunicazione con Android
+    function setGcodeContent(text) {
+        editor.setValue(text, -1); // -1 sposta il cursore all'inizio
+    }
+
+    function getGcodeContent() {
+        return editor.getValue();
+    }
+
+    function openSearch() {
+        editor.execCommand("find");
+    }
+
+    // Toggle modalità sola lettura: chiamata da Android in base allo stato macchina
+    function setEditorReadOnly(flag) {
+        editor.setReadOnly(!!flag);
+    }
+</script>
+</body>
+</html>

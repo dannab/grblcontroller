@@ -48,8 +48,6 @@
     <string name="text_button_4_behaviour">настройте функцию пользовательской кнопки 4</string>
     <string name="text_button_label">Ярлык кнопки</string>
     <string name="text_button_label_desc">отображаемое название кнопки, максимум 3 символа.</string>
-    <string name="text_buy_app">Обновить до Grbl Controller +</string>
-    <string name="text_buy_app_summary">поддержать разработчика | больше функций</string>
     <string name="text_cancel">Отмена</string>
     <string name="text_cancel_tlo">G49: отменить смещение длины инструмента</string>
     <string name="text_cancel_tlo_desc">Вы хотите отменить текущий TLO</string>
@@ -187,7 +185,6 @@
     <string name="text_spindle_on_large">Шпиндель {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_start_probe">Зонд</string>
     <string name="text_starting_streaming">Начинается трансляция GCODE</string>
-    <string name="text_steps_feed">Шаг | Подача</string>
     <string name="text_straight_probe">G38.3: Прямое контактное измерение</string>
     <string name="text_streaming_stop_button_behaviour">Функции кнопки остановки трансляции</string>
     <string name="text_time_elapsed">Время работы</string>
@@ -327,15 +324,15 @@
     <string name="text_cam_zstep_desc">z step value is how much will be cut for each layer,this value will be harmonized to reach the full depth with passes of the same height</string>
 
 
-    <string name="text_cam_tool_dia">tool diameter</string>
-    <string name="text_cam_tool_dia_desc">set the tool diameter will be used to profiling a rectangle with cornering</string>
+    <string name="text_cam_tool_dia">tool radius</string>
+    <string name="text_cam_tool_dia_desc">set the tool radius will be used to profiling a rectangle with cornering</string>
 
     <string name="text_cam_title_help">Create simple toolpath</string>
     <string name="text_cam_help">"Create various toolpath "</string>
     <string name="write_job_file">Write job file</string>
     <string name="set_coord_to">Set Coord To</string>
     <string name="set_coord_from">Set Coord From</string>
-    <string name="tool_diameter_for_cornering">tool diameter(for cornering)</string>
+    <string name="tool_diameter_for_cornering">tool radius(for cornering)</string>
     <string name="z_deep">Z deep</string>
     <string name="z_step">Z step</string>
     <string name="z_traversal">Z traversal</string>
@@ -343,6 +340,7 @@
     <string name="text_cam_feed_rate" />
     <string name="job_type">Job type</string>
     <string name="on_the_fly_cam">On the fly cam</string>
+    <string name="error_z_step_greater_than_z_deep">error Z step greater than Z deep check and retry</string>
 
 
     <string-array name="job_type_list">

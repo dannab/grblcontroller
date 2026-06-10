@@ -28,6 +28,7 @@ import com.joanzapata.iconify.fonts.FontAwesomeModule;
 import com.orm.SugarApp;
 
 import es.dmoral.toasty.Toasty;
+import in.co.gorest.grblcontroller.service.HttpServerManager;
 
 public class GrblController extends SugarApp {
 
@@ -46,6 +47,8 @@ public class GrblController extends SugarApp {
                 .tintIcon(true)
                 .allowQueue(true)
                 .apply();
+
+        HttpServerManager.getInstance().start(this);
     }
 
     public static synchronized GrblController getInstance(){

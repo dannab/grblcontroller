@@ -39,7 +39,12 @@ public class GrblProbeEvent {
         String[] parts = probeString.split(":");
         String[] coordinates = parts[0].split(",");
 
-        this.probePosition = new Position(Double.parseDouble(coordinates[0]), Double.parseDouble(coordinates[1]), Double.parseDouble(coordinates[2]));
+        double a = (coordinates.length > 3) ? Double.parseDouble(coordinates[3]) : 0.0;
+        this.probePosition = new Position(
+                Double.parseDouble(coordinates[0]),
+                Double.parseDouble(coordinates[1]),
+                Double.parseDouble(coordinates[2]),
+                a);
         this.isProbeSuccess = parts[1].equals("1");
     }
 
@@ -50,6 +55,8 @@ public class GrblProbeEvent {
     public Double getProbeCordY(){ return this.probePosition.getCordY(); }
 
     public Double getProbeCordZ(){ return this.probePosition.getCordZ(); }
+
+    public Double getProbeCordA(){ return this.probePosition.getCordA(); }
 
     public Position getProbePosition(){ return this.probePosition; }
 

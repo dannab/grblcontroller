@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools" package="in.co.gorest.grblcontroller" >
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Permessi Bluetooth legacy: validi solo fino ad Android 11 (API 30).
+         Da Android 12 (API 31) sono sostituiti da BLUETOOTH_CONNECT/SCAN runtime. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- neverForLocation: la scansione serve solo per le periferiche seriali,
+         non per dedurre la posizione — evita di dover chiedere anche ACCESS_FINE_LOCATION. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+
+    <!-- Nessun permesso di archiviazione: i G-Code vengono selezionati via SAF
+         (ActivityResultContracts.OpenDocument) e copiati nella cartella media
+         dell'app (getExternalMediaDirs), che non richiede permessi. -->
+
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required from Android 14 (API 34) for dataSync foreground services -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Required from Android 14 (API 34) for connectedDevice foreground services
+         (servizi seriali Bluetooth/USB e streaming GCode verso la macchina) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Required from Android 13 (API 33) to post the persistent server notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
     <supports-screens
         android:smallScreens="true"
         android:normalScreens="true"
@@ -30,7 +47,6 @@
         android:largeHeap="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/AppTheme"
-        android:requestLegacyExternalStorage="true"
         tools:ignore="GoogleAppIndexingWarning"
         tools:targetApi="s"
         android:dataExtractionRules="@xml/data_extraction_rules">
@@ -95,14 +111,22 @@
         <service
             android:name=".service.GrblUsbSerialService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".service.GrblBluetoothSerialService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".service.FileStreamerIntentService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name=".service.HttpServerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <service android:name=".service.MyFirebaseMessagingService"
             android:exported="false">

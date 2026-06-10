@@ -1,0 +1,24 @@
+<resources>
+
+    <!--
+        Android 15 (API 35) forza l'edge-to-edge per le app che lo targettano:
+        i layout finirebbero sotto status bar e navigation bar. Finché i layout
+        non gestiscono gli insets, usiamo l'opt-out ufficiale (temporaneo:
+        l'attributo è deprecato e sparirà in una release futura di Android).
+    -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:navigationBarColor">@color/colorPrimaryDark</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+    <style name="SplashTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+</resources>

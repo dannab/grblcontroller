@@ -45,7 +45,6 @@
 
 package in.co.gorest.grblcontroller.service;
 
-import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -61,6 +60,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 
 import com.felhr.usbserial.CDCSerialDevice;
 import com.felhr.usbserial.UsbSerialDevice;
@@ -316,15 +316,22 @@ public class GrblUsbSerialService extends Service {
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(ACTION_USB_DETACHED);
         filter.addAction(ACTION_USB_ATTACHED);
-        registerReceiver(usbReceiver, filter);
+        // Da Android 14 (target 34+) i receiver registrati a runtime per
+        // broadcast non di sistema devono dichiarare se sono esportati.
+        // ACTION_USB_PERMISSION è interno all'app → NOT_EXPORTED.
+        ContextCompat.registerReceiver(this, usbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     /*
-     * Request user permission. The response will be received in the BroadcastReceiver
+     * Request user permission. The response will be received in the BroadcastReceiver.
+     * Da Android 12 il PendingIntent deve essere MUTABLE (il sistema vi scrive
+     * gli extra device/granted) e da Android 14 l'intent deve essere esplicito
+     * (setPackage), altrimenti il broadcast di risposta viene bloccato.
      */
-    @SuppressLint("UnspecifiedImmutableFlag")
     private void requestUserPermission() {
-        PendingIntent mPendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        Intent intent = new Intent(ACTION_USB_PERMISSION).setPackage(getPackageName());
+        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0;
+        PendingIntent mPendingIntent = PendingIntent.getBroadcast(this, 0, intent, flags);
         usbManager.requestPermission(device, mPendingIntent);
     }
 

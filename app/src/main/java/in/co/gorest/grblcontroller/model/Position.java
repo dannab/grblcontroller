@@ -30,19 +30,25 @@ public class Position {
     private final Double cordX;
     private final Double cordY;
     private final Double cordZ;
+    private final Double cordA;
 
 
     private static final NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.ENGLISH);
     private static final DecimalFormat decimalFormat = (DecimalFormat) numberFormat;
 
     public Position(double x, double y, double z){
-        this.cordX = x; this.cordY = y; this.cordZ = z;
+        this(x, y, z, 0.0);
+    }
+
+    public Position(double x, double y, double z, double a){
+        this.cordX = x; this.cordY = y; this.cordZ = z; this.cordA = a;
         decimalFormat.applyPattern("#0.###");
     }
 
     public Double getCordX(){ return this.cordX; }
     public Double getCordY(){ return this.cordY; }
     public Double getCordZ(){ return this.cordZ; }
+    public Double getCordA(){ return this.cordA; }
 
     private Double roundDouble(Double value){
         String s = decimalFormat.format(value);
@@ -50,11 +56,14 @@ public class Position {
     }
 
     public boolean hasChanged(Position position){
-        return (position.getCordX().compareTo(this.cordX) != 0) || (position.getCordY().compareTo(this.cordY) != 0) || (position.getCordZ().compareTo(this.cordZ) != 0);
+        return (position.getCordX().compareTo(this.cordX) != 0)
+                || (position.getCordY().compareTo(this.cordY) != 0)
+                || (position.getCordZ().compareTo(this.cordZ) != 0)
+                || (position.getCordA().compareTo(this.cordA) != 0);
     }
 
     public boolean atZero(){
-        return Math.abs(this.cordX) == 0 && Math.abs(this.cordY) == 0 && Math.abs(this.cordZ) == 0;
+        return Math.abs(this.cordX) == 0 && Math.abs(this.cordY) == 0 && Math.abs(this.cordZ) == 0 && Math.abs(this.cordA) == 0;
     }
 
 }

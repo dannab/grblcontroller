@@ -42,15 +42,24 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.cardview.widget.CardView;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.Observable;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager.widget.ViewPager;
+
+import java.io.File;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.google.android.material.tabs.TabLayout;
 import com.joanzapata.iconify.IconDrawable;
@@ -63,6 +72,7 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import es.dmoral.toasty.Toasty;
+import in.co.gorest.grblcontroller.BR;
 import in.co.gorest.grblcontroller.databinding.ActivityMainBinding;
 import in.co.gorest.grblcontroller.events.ConsoleMessageEvent;
 import in.co.gorest.grblcontroller.events.GrblAlarmEvent;
@@ -78,9 +88,11 @@ import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.service.FileStreamerIntentService;
+import in.co.gorest.grblcontroller.service.HttpServerManager;
 import in.co.gorest.grblcontroller.service.GrblBluetoothSerialService;
 import in.co.gorest.grblcontroller.ui.BaseFragment;
 import in.co.gorest.grblcontroller.ui.GrblFragmentPagerAdapter;
+import in.co.gorest.grblcontroller.util.GcodeDropChecker;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
 public abstract class GrblActivity extends AppCompatActivity implements BaseFragment.OnFragmentInteractionListener{
@@ -97,6 +109,47 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public static boolean isAppRunning;
 
     private Toast lastToast;
+    private CharSequence lastBaseSubtitle = null;
+    private TextView toolbarTitleView = null;
+    private TextView toolbarSubtitleView = null;
+
+    // ------------------------------------------------------------------
+    // Controllo affondi Z al caricamento file (vedi GcodeDropChecker)
+    // ------------------------------------------------------------------
+    private ExecutorService zDropExecutor;
+    private File lastZDropChecked = null;
+    private final Observable.OnPropertyChangedCallback gcodeFileCallback =
+            new Observable.OnPropertyChangedCallback() {
+                @Override
+                public void onPropertyChanged(Observable sender, int propertyId) {
+                    if (propertyId == BR.gcodeFile) {
+                        File f = FileSenderListener.getInstance().getGcodeFile();
+                        // Evita doppi check sullo stesso file (es. CamTabFragment
+                        // imposta lo stesso file più volte di seguito)
+                        if (f != null && f.exists() && !f.equals(lastZDropChecked)) {
+                            lastZDropChecked = f;
+                            runZDropCheckIfEnabled(f);
+                        }
+                    }
+                }
+            };
+
+    /**
+     * Sets the connection/machine label (toolbar line 1) and refreshes the
+     * server URL on line 2 if the HTTP server is active.
+     */
+    protected void applySubtitle(CharSequence base) {
+        lastBaseSubtitle = base;
+        if (toolbarTitleView == null || toolbarSubtitleView == null) return;
+        toolbarTitleView.setText(base == null ? "" : base);
+        String url = HttpServerManager.getInstance().getDisplayUrl();
+        toolbarSubtitleView.setText(url == null ? getString(R.string.text_http_server_off) : url);
+    }
+
+    /** Re-applies the last subtitle, picking up server state changes. */
+    protected void refreshSubtitle() {
+        if (lastBaseSubtitle != null) applySubtitle(lastBaseSubtitle);
+    }
 
     @SuppressLint("SourceLockedOrientationActivity")
     @Override
@@ -109,7 +162,20 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_not_connected));
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayShowTitleEnabled(false);
+        toolbarTitleView = findViewById(R.id.toolbar_title);
+        toolbarSubtitleView = findViewById(R.id.toolbar_subtitle);
+        applySubtitle(getString(R.string.text_not_connected));
+
+        // Da Android 13 (API 33) POST_NOTIFICATIONS è un permesso runtime:
+        // senza, le notifiche dei servizi (connessione, streaming, server HTTP)
+        // restano invisibili anche se i servizi funzionano.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9100);
+        }
 
         applicationSetup();
         binding.setMachineStatus(machineStatus);
@@ -120,7 +186,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             return true;
         });
 
-        for(int resourceId: new Integer[]{R.id.wpos_edit_x, R.id.wpos_edit_y, R.id.wpos_edit_z}){
+        for(int resourceId: new Integer[]{R.id.wpos_edit_x, R.id.wpos_edit_y, R.id.wpos_edit_z, R.id.wpos_edit_a}){
             IconTextView positionTextView = findViewById(resourceId);
             positionTextView.setOnClickListener(v -> setWorkPosition(v.getTag().toString()));
         }
@@ -128,22 +194,32 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         Iconify.with(new FontAwesomeModule());
         setupTabLayout();
         checkPowerManagement();
+
+        // Ascolta il caricamento di nuovi file GCode per il check affondi Z
+        FileSenderListener.getInstance().addOnPropertyChangedCallback(gcodeFileCallback);
+        zDropExecutor = Executors.newSingleThreadExecutor();
+
+        //preference cam z step and deep to are set to zero to ensure that
+        // there are no unwanted z-dips in onboard cam operations
+        sharedPref.edit().putString(getString(R.string.preference_cam_z_step), "0").apply();
+        sharedPref.edit().putString(getString(R.string.preference_cam_z_deep), "0").apply();
+
+
+
     }
 
-    private boolean hasPaidVersion() {
-        PackageManager pm = getPackageManager();
-        try {
-            pm.getPackageInfo("in.co.gorest.grblcontroller.plus", PackageManager.GET_ACTIVITIES);
-            return true;
-        } catch (PackageManager.NameNotFoundException ignored) {}
-
-        return false;
+    @Override
+    protected void onResume(){
+        super.onResume();
+        refreshSubtitle();
     }
-
 
     @Override
     public void onDestroy(){
         super.onDestroy();
+
+        FileSenderListener.getInstance().removeOnPropertyChangedCallback(gcodeFileCallback);
+        if (zDropExecutor != null) { zDropExecutor.shutdownNow(); zDropExecutor = null; }
 
         stopService(new Intent(this, FileStreamerIntentService.class));
         ConsoleLoggerListener.resetClass();
@@ -154,6 +230,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         lastToast = null;
     }
 
+    @SuppressLint("MissingSuperCall")
     @Override
     public void onBackPressed(){ moveTaskToBack(true); }
 
@@ -215,6 +292,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         machineStatus = MachineStatusListener.getInstance();
         machineStatus.setJogging(sharedPref.getDouble(getString(R.string.preference_jogging_step_size), 1.00),
                 sharedPref.getDouble(getString(R.string.preference_jogging_step_size_z), 0.1),
+                sharedPref.getDouble(getString(R.string.preference_jogging_step_size_a), 1.0),
                 sharedPref.getDouble(getString(R.string.preference_jogging_feed_rate), 2400.0),
                 sharedPref.getBoolean(getString(R.string.preference_jogging_in_inches), false));
         machineStatus.setVerboseOutput(sharedPref.getBoolean(getString(R.string.preference_console_verbose_mode), false));
@@ -228,22 +306,28 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     protected void setupTabLayout(){
         TabLayout tabLayout = findViewById(R.id.tab_layout);
 
-        if(isTablet(this)){
+        if (isTablet(this)) {
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(32)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(32)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(32)));
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_object_group).colorRes(R.color.colorAccent).sizeDp(32)));       // CAM (Computer Aided Manufacturing)
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(32)));       // Visualizzatore 3D
 
-        }else{
+            // NUOVO: Tab Editor di codice per Tablet
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(32)));       // Editor GCode
+
+        } else {
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(21)));
             tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(21)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_object_group).colorRes(R.color.colorAccent).sizeDp(21)));       // CAM (Computer Aided Manufacturing)
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(21)));       // Visualizzatore 3D
 
+            // NUOVO: Tab Editor di codice per Smartphone
+            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(21)));       // Editor GCode
         }
-
 
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
 
@@ -253,6 +337,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         viewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(tabLayout));
         viewPager.setPageTransformer(false, new ReaderViewPagerTransformer(ReaderViewPagerTransformer.TransformType.DEPTH));
         viewPager.setOffscreenPageLimit(1);
+
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
@@ -280,6 +365,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         if(axisLabel.equalsIgnoreCase("X")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordX()));
         if(axisLabel.equalsIgnoreCase("Y")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordY()));
         if(axisLabel.equalsIgnoreCase("Z")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordZ()));
+        if(axisLabel.equalsIgnoreCase("A")) editText.setText(String.valueOf(machineStatus.getWorkPosition().getCordA()));
         editText.setSelection(editText.getText().length());
 
         alertDialogBuilder.setCancelable(true)
@@ -425,6 +511,98 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         }
 
         return false;
+    }
+
+    // ----------------------------------------------------------------------
+    // Check affondi Z al caricamento file
+    // ----------------------------------------------------------------------
+
+    private void runZDropCheckIfEnabled(final File file) {
+        if (zDropExecutor == null || zDropExecutor.isShutdown()) return;
+
+        boolean enabled = sharedPref.getBoolean(
+                getString(R.string.preference_check_z_drop_enabled), false);
+        if (!enabled) return;
+
+        final float depthThresh = parseFloatPref(R.string.preference_check_z_drop_depth, 1.0f);
+        final float angleThresh = parseFloatPref(R.string.preference_check_z_drop_angle, 60f);
+
+        zDropExecutor.submit(() -> {
+            final List<GcodeDropChecker.DropWarning> warnings =
+                    GcodeDropChecker.check(file, depthThresh, angleThresh);
+            runOnUiThread(() -> showZDropDialog(file, warnings, depthThresh, angleThresh));
+        });
+    }
+
+    private float parseFloatPref(int keyResId, float defaultValue) {
+        try {
+            String raw = sharedPref.getString(getString(keyResId),
+                    String.valueOf(defaultValue));
+            if (raw == null || raw.isEmpty()) return defaultValue;
+            return Float.parseFloat(raw.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private void showZDropDialog(File file,
+                                 List<GcodeDropChecker.DropWarning> warnings,
+                                 float depthThresh, float angleThresh) {
+        if (isFinishing() || isDestroyed()) return;
+        if (warnings == null || warnings.isEmpty()) {
+            // Nessun affondo sospetto: feedback discreto, niente dialog
+            showToastMessage(String.format(Locale.US,
+                    "Check Z OK: nessun affondo > %.1f mm e > %.0f°",
+                    depthThresh, angleThresh), false, false);
+            return;
+        }
+
+        // Costruisce il body: lista delle prime 30 discese sospette
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(Locale.US,
+                "Soglie: profondità ≥ %.2f mm, angolo ≥ %.0f°\nFile: %s\n\n",
+                depthThresh, angleThresh, file.getName()));
+
+        // Trova la peggiore (più profonda + più ripida) per il titolo
+        GcodeDropChecker.DropWarning worst = warnings.get(0);
+        for (GcodeDropChecker.DropWarning w : warnings) {
+            if (w.dz < worst.dz) worst = w;
+        }
+        sb.append(String.format(Locale.US,
+                "Peggior affondo: ΔZ %.2f mm @ %.1f° (riga %d)\n\n",
+                worst.dz, worst.angleDeg, worst.lineNumber));
+
+        int max = Math.min(30, warnings.size());
+        sb.append(String.format(Locale.US, "Prime %d voci:\n", max));
+        for (int i = 0; i < max; i++) {
+            GcodeDropChecker.DropWarning w = warnings.get(i);
+            sb.append(String.format(Locale.US,
+                    "  riga %-5d  Z: %+7.2f → %+7.2f   ΔZ %+6.2f mm   @ %4.1f°\n",
+                    w.lineNumber, w.zBefore, w.zAfter, w.dz, w.angleDeg));
+        }
+        if (warnings.size() > max) {
+            sb.append(String.format(Locale.US,
+                    "\n…e altre %d voci non mostrate.", warnings.size() - max));
+        }
+
+        TextView body = new TextView(this);
+        body.setText(sb.toString());
+        body.setTypeface(android.graphics.Typeface.MONOSPACE);
+        body.setTextSize(11f);
+        body.setPadding(40, 20, 40, 20);
+        body.setHorizontallyScrolling(true);
+
+        android.widget.HorizontalScrollView hScroll = new android.widget.HorizontalScrollView(this);
+        hScroll.addView(body);
+        android.widget.ScrollView vScroll = new android.widget.ScrollView(this);
+        vScroll.addView(hScroll);
+
+        new AlertDialog.Builder(this)
+                .setTitle(String.format(Locale.US,
+                        "⚠ %d affondi Z sospetti", warnings.size()))
+                .setView(vScroll)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
 }

@@ -53,9 +53,6 @@
     <string name="text_grbl_soft_reset">Grbl soft reset!</string>
     <string name="text_grbl_soft_reset_desc">do you want to soft reset the machine?</string>
     <string name="text_unknown">Unknown</string>
-    <string name="text_buy_app">Upgrade to Grbl Controller +</string>
-    <string name="text_buy_app_summary">support development | get more features</string>
-
     <!-- Settings -->
     <string name="text_app_share">Share</string>
     <string name="text_app_about">About</string>
@@ -247,7 +244,6 @@
         <item>270</item>
     </string-array>
 
-    <string name="text_steps_feed">Step Size | Jog Feed</string>
     <string name="text_zero_selected_axis">Zero selected axis</string>
     <string name="text_set_axis_location_in_current_wpos">set selected axis location in current coordinate system to zero | </string>
     <string name="text_selected_coordinate_system">"Selected coordinate system "</string>
@@ -359,15 +355,15 @@
     <string name="text_cam_zstep_desc">z step value is how much will be cut for each layer,this value will be harmonized to reach the full depth with passes of the same height</string>
 
 
-    <string name="text_cam_tool_dia">tool diameter</string>
-    <string name="text_cam_tool_dia_desc">set the tool diameter will be used to profiling a rectangle with cornering</string>
+    <string name="text_cam_tool_dia">tool radius</string>
+    <string name="text_cam_tool_dia_desc">set the tool radius will be used to profiling a rectangle with cornering</string>
 
     <string name="text_cam_title_help">Create simple toolpath</string>
     <string name="text_cam_help">"Create various toolpath "</string>
     <string name="write_job_file">Write job file</string>
     <string name="set_coord_to">Set Coord To</string>
     <string name="set_coord_from">Set Coord From</string>
-    <string name="tool_diameter_for_cornering">tool diameter(for cornering)</string>
+    <string name="tool_diameter_for_cornering">tool radius(for cornering)</string>
     <string name="z_deep">Z deep</string>
     <string name="z_step">Z step</string>
     <string name="z_traversal">Z traversal</string>
@@ -375,6 +371,7 @@
     <string name="text_cam_feed_rate" />
     <string name="job_type">Job type</string>
     <string name="on_the_fly_cam">On the fly cam</string>
+    <string name="error_z_step_greater_than_z_deep">error Z step greater than Z deep check and retry</string>
 
 
     <string-array name="job_type_list">

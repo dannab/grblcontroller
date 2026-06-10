@@ -209,12 +209,12 @@ public abstract class SerialCommunicationHandler extends Handler {
             if(machineStatus.getWorkCoordsOffset() != null){
                 WCO = machineStatus.getWorkCoordsOffset();
             } else {
-                WCO = new Position(0,0,0);
+                WCO = new Position(0,0,0,0);
             }
         }
 
-        if(WPos == null && MPos != null) WPos = new Position(MPos.getCordX() - WCO.getCordX(), MPos.getCordY() - WCO.getCordY(), MPos.getCordZ() - WCO.getCordZ());
-        if(MPos == null && WPos != null) MPos = new Position(WPos.getCordX() + WCO.getCordX(), WPos.getCordY() + WCO.getCordY(), WPos.getCordZ() + WCO.getCordZ());
+        if(WPos == null && MPos != null) WPos = new Position(MPos.getCordX() - WCO.getCordX(), MPos.getCordY() - WCO.getCordY(), MPos.getCordZ() - WCO.getCordZ(), MPos.getCordA() - WCO.getCordA());
+        if(MPos == null && WPos != null) MPos = new Position(WPos.getCordX() + WCO.getCordX(), WPos.getCordY() + WCO.getCordY(), WPos.getCordZ() + WCO.getCordZ(), WPos.getCordA() + WCO.getCordA());
 
         machineStatus.setMachinePosition(MPos);
         machineStatus.setWorkPosition(WPos);
