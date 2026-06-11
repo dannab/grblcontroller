@@ -13,7 +13,7 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 - **G-code editor** — built-in editor with G-code syntax highlighting and search.
 - **HTTP file server** — send and fetch G-code files from your PC browser over WiFi; password protected, runs as a foreground service with the URL shown in the notification (user: `grbl`).
 - **CAM tab** — generate simple jobs directly on the device (lines, circles, rectangles) with multiple Z passes, saved straight into the file sender.
-- **Reworked jogging** — separate step and continuous modes, step size cycling via the central joypad button, optional 4th axis (A) control.
+- **Reworked jogging** — 4 axis separate step and continuous modes, step size cycling via the central joypad button.
 - **Quality of life** — flashlight button, UI rearrangement, safety checks before starting a job.
 - **Modern Android** — target SDK 35; files are picked via the system picker (SAF) and stored in the app media folder, so **no storage permissions** are required; runtime Bluetooth permissions (Android 12+); tested on Android 16.
 - **No telemetry** — Firebase and push notifications removed: the app talks to your machine and nothing else.
