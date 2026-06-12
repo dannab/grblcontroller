@@ -518,9 +518,9 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                  * Al tocco breve: salva le coordinate work position correnti
                  * (X, Y, Z) nel file points.txt nella memoria esterna dell'app.
                  *
-                 * Il file è in formato testo, una riga per punto:
-                 *   X=10.000 Y=25.500 Z=-2.000
-                 *   X=30.000 Y=15.000 Z=-2.000
+                 * Il file è in formato CSV, una riga per punto:
+                 *   10.0,25.5,-2.0
+                 *   30.0,15.0,-2.0
                  *
                  * Utile per memorizzare i punti di piazzamento dei pezzi
                  * durante operazioni di foratura o fresatura seriale.

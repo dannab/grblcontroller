@@ -132,6 +132,7 @@ public class FileStreamerIntentService extends IntentService{
 
         clearBuffers();
         fileSenderListener.setRowsSent(0);
+        fileSenderListener.setLastComment("");
         fileSenderListener.setJobStartTime(System.currentTimeMillis());
 
         try {
@@ -211,6 +212,11 @@ public class FileStreamerIntentService extends IntentService{
                 if(!shouldContinue) break;
 
                 gcodeCommand.setCommand(sCurrentLine);
+
+                // Mostra l'ultimo commento del file nel tab File Sender
+                // (anche per le righe di solo commento, che non vengono inviate)
+                if(gcodeCommand.getComment().length() > 0) fileSenderListener.setLastComment(gcodeCommand.getComment());
+
                 if(gcodeCommand.getSize() > 1){
 
                     if(gcodeCommand.getHasRomAccess()){
@@ -250,6 +256,7 @@ public class FileStreamerIntentService extends IntentService{
             while ((sCurrentLine = br.readLine()) != null) {
                 if(!shouldContinue) break;
                 gcodeCommand.setCommand(sCurrentLine);
+                if(gcodeCommand.getComment().length() > 0) fileSenderListener.setLastComment(gcodeCommand.getComment());
                 if(gcodeCommand.getCommandString().length() > 0){
                     EventBus.getDefault().post(gcodeCommand);
                     linesSent++;

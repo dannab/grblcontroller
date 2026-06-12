@@ -57,6 +57,10 @@ public class GcodeCommand {
         return this.command;
     }
 
+    public String getComment() {
+        return this.comment;
+    }
+
     private boolean getHasComment() {
         return this.comment != null && this.comment.length() != 0;
     }

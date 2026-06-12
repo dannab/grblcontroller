@@ -39,6 +39,7 @@ public class FileSenderListener extends BaseObservable {
     private Integer rowsSent;
 
     private String status;
+    private String lastComment;
 
     public static final String STATUS_IDLE = "Idle";
     public static final String STATUS_READING = "Reading";
@@ -64,6 +65,7 @@ public class FileSenderListener extends BaseObservable {
         this.gcodeFile = null;
         this.rowsInFile = 0;
         this.rowsSent = 0;
+        this.lastComment = "";
     }
 
     @Bindable
@@ -114,6 +116,14 @@ public class FileSenderListener extends BaseObservable {
     public void setElapsedTime(String elapsedTime){
         this.elapsedTime = elapsedTime;
         notifyPropertyChanged(BR.elapsedTime);
+    }
+
+    @Bindable
+    public String getLastComment(){ return this.lastComment; }
+    public void setLastComment(String lastComment){
+        if(lastComment == null || lastComment.equals(this.lastComment)) return;
+        this.lastComment = lastComment;
+        notifyPropertyChanged(BR.lastComment);
     }
 
     @Bindable

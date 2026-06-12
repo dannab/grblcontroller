@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <data>
+        <import type="android.view.View" />
         <variable name="machineStatus" type="in.co.gorest.grblcontroller.listeners.MachineStatusListener" />
         <variable name="fileSender" type="in.co.gorest.grblcontroller.listeners.FileSenderListener" />
     </data>
@@ -40,6 +41,18 @@
                     tools:ignore="HardcodedText" />
 
             </RelativeLayout>
+
+            <TextView
+                android:id="@+id/last_gcode_comment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:textStyle="italic"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:text="@{fileSender.lastComment}"
+                android:visibility="@{fileSender.lastComment.empty ? View.GONE : View.VISIBLE}" />
 
             <View android:layout_margin="4dp" android:layout_height="0.2dp" android:background="@color/colorDivider" android:layout_width="fill_parent"/>
 

@@ -42,6 +42,13 @@ public class GcodeLeveling {
     /**
      * Legge il file G-Code originale, calcola la compensazione basata sui 3 punti
      * salvati in points.txt e scrive un nuovo file con suffisso "_leveled".
+     *
+     * Convenzione: nel file G-Code la superficie del pezzo deve essere a Z0
+     * (standard CAM: Z0 = piano di lavoro). I 3 punti di probing possono invece
+     * trovarsi a QUALSIASI quota di lavoro, positiva o negativa: la compensazione
+     * riporta la Z0 del file esattamente sul piano reale rilevato (quota + inclinazione).
+     * Probing e lavorazione devono avvenire nello stesso sistema di coordinate,
+     * senza azzerare di nuovo la Z tra le due fasi.
      */
     public static void applyAutolevel(final File pointsFile, final File gcodeFile, final LevelingCallback callback) {
 
@@ -115,75 +122,124 @@ public class GcodeLeveling {
 
 // 3. Elaborazione e Iniezione G-Code
             List<String> outputLines = new ArrayList<>();
-            Pattern patternX = Pattern.compile("X\\s*([-\\d.]+)");
-            Pattern patternY = Pattern.compile("Y\\s*([-\\d.]+)");
-            Pattern patternZ = Pattern.compile("Z\\s*([-\\d.]+)");
+
+            // Parsing a parole (lettera + numero): evita i falsi positivi del
+            // vecchio match a sottostringa ("G17" conteneva "G1", "G21" conteneva
+            // "G2", ecc.) che iniettavano Z anche nel preambolo del file.
+            Pattern wordPattern = Pattern.compile("(?i)([A-Z])\\s*([+-]?(?:\\d+\\.?\\d*|\\.\\d+))");
+            Pattern zWordPattern = Pattern.compile("(?i)Z\\s*[+-]?(?:\\d+\\.?\\d*|\\.\\d+)");
+            Pattern parenCommentPattern = Pattern.compile("\\([^)]*\\)");
 
             double currentX = 0.0;
             double currentY = 0.0;
-            double currentZ = 0.0; // Tiene traccia della Z di lavoro teorica
+            double currentZ = 0.0;       // Z di lavoro teorica del file
+            boolean zKnown = false;      // true dopo la prima Z esplicita in G90
+            boolean absoluteMode = true; // G90 (default GRBL) / G91
 
             try (BufferedReader br = new BufferedReader(new FileReader(gcodeFile))) {
                 String line;
-                while ((line = br.readLine()) != null) {
-                    String upperLine = line.toUpperCase().trim();
+                outputLines.add("(Livellamento 3 punti applicato - Z0 del file riportata sul piano rilevato)");
 
-                    // Salta commenti e comandi speciali
-                    if (upperLine.startsWith(";") || upperLine.startsWith("(") || upperLine.startsWith("M")) {
+                while ((line = br.readLine()) != null) {
+                    String trimmed = line.trim();
+
+                    // Righe vuote, commenti puri, '%' e comandi M passano invariati
+                    if (trimmed.isEmpty() || trimmed.startsWith(";") || trimmed.startsWith("(")
+                            || trimmed.startsWith("%") || trimmed.toUpperCase().startsWith("M")) {
                         outputLines.add(line);
                         continue;
                     }
 
-                    // Intercettiamo i blocchi di movimento reali
-                    if (upperLine.contains("G0") || upperLine.contains("G1") ||
-                            upperLine.contains("G2") || upperLine.contains("G3") ||
-                            upperLine.contains("X")  || upperLine.contains("Y")  ||
-                            upperLine.contains("Z")) {
+                    // Separa il codice dai commenti inline (';' e parentesi)
+                    String code = line;
+                    String semicolonComment = "";
+                    int semiIdx = code.indexOf(';');
+                    if (semiIdx >= 0) {
+                        semicolonComment = code.substring(semiIdx);
+                        code = code.substring(0, semiIdx);
+                    }
+                    StringBuilder parenComments = new StringBuilder();
+                    Matcher pc = parenCommentPattern.matcher(code);
+                    while (pc.find()) parenComments.append(" ").append(pc.group());
+                    code = pc.replaceAll(" ");
 
-                        Matcher mX = patternX.matcher(upperLine);
-                        Matcher mY = patternY.matcher(upperLine);
-                        Matcher mZ = patternZ.matcher(upperLine);
-
-                        boolean haX = mX.find();
-                        boolean haY = mY.find();
-                        boolean haZ = mZ.find();
-
-                        // Aggiorna lo stato modale delle coordinate teoriche del file
-                        if (haX) currentX = Double.parseDouble(mX.group(1));
-                        if (haY) currentY = Double.parseDouble(mY.group(1));
-                        if (haZ) currentZ = Double.parseDouble(mZ.group(1));
-
-                        // Calcola la quota del piano inclinato in questo specifico punto (X, Y)
-                        double zTargetPlane = -(A * currentX + B * currentY + D) / C;
-
-                        // La Z reale finale è la quota teorica del file + la pendenza del piano inclinato
-                        double realZ = currentZ + zTargetPlane;
-
-                        // --- RICOSTRUZIONE DELLA RIGA CON INIEZIONE ---
-                        // Puliamo la riga da un'eventuale Z vecchia per non duplicarla
-                        String cleanedLine = line.replaceAll("(?i)Z\\s*([-\\d.]+)", "").trim();
-
-                        // Cerchiamo dove inserire la nuova Z. La posizione ideale è dopo la X o dopo la Y.
-                        // Se la riga ha X o Y, inseriamo la Z subito dopo di loro.
-                        if (cleanedLine.matches(".*[XXYFillGg].*")) {
-                            // Troviamo l'ultima coordinata (X o Y) e appendiamo la Z compensata
-                            if (cleanedLine.contains("Y") || cleanedLine.contains("y")) {
-                                cleanedLine = cleanedLine.replaceAll("(?i)(Y\\s*[-\\d.]+)", "$1 " + String.format(Locale.US, "Z%.3f", realZ));
-                            } else if (cleanedLine.contains("X") || cleanedLine.contains("x")) {
-                                cleanedLine = cleanedLine.replaceAll("(?i)(X\\s*[-\\d.]+)", "$1 " + String.format(Locale.US, "Z%.3f", realZ));
-                            } else {
-                                // Se è un comando di movimento (es. G00/G01) senza X e Y ma con cambio Z
-                                cleanedLine = cleanedLine + " " + String.format(Locale.US, "Z%.3f", realZ);
+                    // Analizza le parole della riga
+                    boolean isProtected = false; // G10/G28/G30/G38.x/G43.1/G53/G92: mai toccare
+                    boolean hasX = false, hasY = false, hasZ = false;
+                    double wordX = 0, wordY = 0, wordZ = 0;
+                    Matcher wm = wordPattern.matcher(code);
+                    while (wm.find()) {
+                        char letter = Character.toUpperCase(wm.group(1).charAt(0));
+                        double value = Double.parseDouble(wm.group(2));
+                        if (letter == 'G') {
+                            if (value == 90.0) absoluteMode = true;
+                            else if (value == 91.0) absoluteMode = false;
+                            else if (value == 10.0 || value == 28.0 || value == 30.0
+                                    || value == 53.0 || value == 43.1
+                                    || (value >= 38.0 && value < 39.0)
+                                    || (value >= 92.0 && value < 93.0)) {
+                                isProtected = true;
                             }
-                        } else {
-                            // Fallback di sicurezza se la riga è strana
-                            cleanedLine = cleanedLine + " " + String.format(Locale.US, "Z%.3f", realZ);
-                        }
-
-                        // Rimuove eventuali doppi spazi generati dalla pulizia
-                        line = cleanedLine.replaceAll("\\s+", " ");
+                        } else if (letter == 'X') { hasX = true; wordX = value; }
+                        else if (letter == 'Y') { hasY = true; wordY = value; }
+                        else if (letter == 'Z') { hasZ = true; wordZ = value; }
                     }
 
+                    // Comandi di homing, coordinate macchina, probing e offset:
+                    // passano invariati. Dopo di essi la Z di lavoro non è più
+                    // affidabile: la compensazione delle righe solo-X/Y riprende
+                    // alla prossima Z esplicita del file.
+                    if (isProtected) {
+                        zKnown = false;
+                        outputLines.add(line);
+                        continue;
+                    }
+
+                    // Modalità incrementale (G91): gli incrementi non dipendono
+                    // dalla quota del piano, quindi la riga passa invariata.
+                    // Aggiorniamo comunque la posizione teorica.
+                    if (!absoluteMode) {
+                        if (hasX) currentX += wordX;
+                        if (hasY) currentY += wordY;
+                        if (hasZ) currentZ += wordZ;
+                        outputLines.add(line);
+                        continue;
+                    }
+
+                    // Modalità assoluta: aggiorna lo stato modale
+                    if (hasX) currentX = wordX;
+                    if (hasY) currentY = wordY;
+                    if (hasZ) { currentZ = wordZ; zKnown = true; }
+
+                    // Compensa solo le righe che muovono davvero gli assi:
+                    // - righe con Z esplicita: sempre
+                    // - righe solo X/Y: solo se la Z teorica è nota
+                    // Righe senza parole asse ("G17 G21 G90", "G1 F100", "G4 P500",
+                    // "T1", "S12000") passano invariate.
+                    if (!hasZ && !(zKnown && (hasX || hasY))) {
+                        outputLines.add(line);
+                        continue;
+                    }
+
+                    // Quota del piano rilevato in questo punto (X, Y)
+                    double zTargetPlane = -(A * currentX + B * currentY + D) / C;
+
+                    // La Z reale è la Z teorica del file (riferita a Z0 = superficie)
+                    // più la quota assoluta del piano in quel punto
+                    double realZ = currentZ + zTargetPlane;
+                    String zWord = String.format(Locale.US, "Z%.3f", realZ);
+
+                    // Sostituisce la Z esistente al suo posto, oppure la appende
+                    String newCode;
+                    Matcher zm = zWordPattern.matcher(code);
+                    if (zm.find()) {
+                        newCode = code.substring(0, zm.start()) + zWord + code.substring(zm.end());
+                    } else {
+                        newCode = code.trim() + " " + zWord;
+                    }
+
+                    line = (newCode + parenComments + (semicolonComment.isEmpty() ? "" : " " + semicolonComment))
+                            .replaceAll("\\s+", " ").trim();
                     outputLines.add(line);
                 }
 
