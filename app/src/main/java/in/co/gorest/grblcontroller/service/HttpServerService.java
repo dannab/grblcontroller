@@ -123,6 +123,17 @@ public class HttpServerService extends Service {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // When the user closes the app (swipes it from recents) the hosting
+        // process is often killed by the system. That silently kills the
+        // NanoHTTPD listening socket — so the server stops answering — while
+        // this foreground notification lingers as a zombie. Stop cleanly here
+        // so the notification disappears together with the server.
+        stopSelfSafely();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public void onDestroy() {
         if (server != null) {
             try {
