@@ -37,6 +37,7 @@ import android.widget.Spinner;
 
 import androidx.annotation.NonNull;
 import androidx.databinding.DataBindingUtil;
+import androidx.databinding.Observable;
 
 import com.joanzapata.iconify.widget.IconButton;
 
@@ -46,6 +47,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
+import in.co.gorest.grblcontroller.BR;
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentCamTabBinding;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
@@ -77,6 +79,24 @@ public class CamTabFragment extends BaseFragment {
     // Flag: l'utente ha esplicitamente impostato From e To
     private boolean fromSet = false;
     private boolean toSet   = false;
+
+    // Stato di connessione precedente: serve per resettare ZStep/ZDeep a 0
+    // (per sicurezza) solo nel momento in cui la macchina si collega.
+    // Durante la sessione i valori restano quelli impostati dall'utente.
+    private boolean wasConnected = false;
+    private final Observable.OnPropertyChangedCallback connectionCallback =
+            new Observable.OnPropertyChangedCallback() {
+                @Override
+                public void onPropertyChanged(Observable sender, int propertyId) {
+                    if (propertyId != BR.state) return;
+                    boolean connected = !machineStatus.getState()
+                            .equals(Constants.MACHINE_STATUS_NOT_CONNECTED);
+                    if (connected && !wasConnected) {
+                        resetZStepZDeep();
+                    }
+                    wasConnected = connected;
+                }
+            };
 
     public CamTabFragment() {}
 
@@ -185,7 +205,37 @@ public class CamTabFragment extends BaseFragment {
         // --- Help ---
         view.findViewById(R.id.cam_help).setOnClickListener(v -> showCamHelp());
 
+        // --- Reset di sicurezza ZStep/ZDeep alla connessione della macchina ---
+        // Se siamo già collegati al momento della creazione della vista non
+        // resettiamo (i valori della sessione vanno mantenuti).
+        wasConnected = !machineStatus.getState()
+                .equals(Constants.MACHINE_STATUS_NOT_CONNECTED);
+        machineStatus.addOnPropertyChangedCallback(connectionCallback);
+
         return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        machineStatus.removeOnPropertyChangedCallback(connectionCallback);
+    }
+
+    // Azzera ZStep e ZDeep (preferenze + caselle visibili) per sicurezza.
+    private void resetZStepZDeep() {
+        sharedPref.edit()
+                .putString(getString(R.string.preference_cam_z_step), "0")
+                .putString(getString(R.string.preference_cam_z_deep), "0")
+                .apply();
+
+        // L'aggiornamento dello stato può arrivare da un thread di background:
+        // aggiorniamo le viste sul thread UI.
+        if (camZStep != null) {
+            camZStep.post(() -> camZStep.setText("0" + editIcon));
+        }
+        if (camZDeep != null) {
+            camZDeep.post(() -> camZDeep.setText("0" + editIcon));
+        }
     }
 
     // -------------------------------------------------------------------------
