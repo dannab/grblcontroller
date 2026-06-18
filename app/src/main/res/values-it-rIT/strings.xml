@@ -38,6 +38,10 @@
     <string name="text_send_custom_command">invia comandi personalizzati per l\'azione</string>
     <string name="text_auto_connect">Connessione automatica</string>
     <string name="text_auto_connect_desc">connetti all\'ultimo dispositivo Bluetooth utilizzato all\'avvio dell\'applicazione</string>
+    <string name="text_restore_wpos_on_connect">Ripristina coordinate di lavoro alla connessione</string>
+    <string name="text_restore_wpos_on_connect_desc">Alla connessione, se nelle caselle X/Y/Z/A sono rimasti dei valori, chiede se reimpostarli sulla macchina con G10 L20 P0</string>
+    <string name="text_restore_wpos_title">Ripristinare le coordinate di lavoro?</string>
+    <string name="text_restore_wpos_desc">Impostare le coordinate di lavoro della macchina ai valori rimasti nelle caselle?\n\nX %1$s  Y %2$s  Z %3$s  A %4$s\n\nCorretto solo se l\'utensile è ancora nella stessa posizione fisica.</string>
     <string name="text_soft_reset_confirm">Conferma reset software</string>
     <string name="text_soft_reset_confirm_desc">chiedi conferma prima di effettuare il reset software</string>
     <string name="text_sleep_after_job">Sospendi dopo il lavoro</string>
@@ -230,6 +234,24 @@
     <string name="text_starting_streaming">Avvio dello streaming GCODE</string>
     <string name="text_check_every_thing">controlla che tutto sia pronto!</string>
     <string name="text_continue_streaming">Continua</string>
+
+    <!-- Parti da una riga -->
+    <string name="text_run_from_line_title">Parti da una riga</string>
+    <string name="text_run_from_line_message">Inserisci il numero di riga del file da cui iniziare lo streaming (stessa numerazione dell\'editor).</string>
+    <string name="text_run_from_line_hint">Numero riga</string>
+    <string name="text_run_from_line_invalid">Numero riga non valido</string>
+    <string name="text_run_from_line_needs_idle">Disponibile solo a macchina IDLE e senza job in corso</string>
+    <string name="text_run_from_line_open_editor">Apri editor</string>
+    <string name="text_run_from_line_scanning">Scansione del file…</string>
+    <string name="text_run_from_line_out_of_range">Riga fuori intervallo (il file ha %1$d righe)</string>
+    <string name="text_run_from_line_unknown">n/d</string>
+    <string name="text_run_from_line_summary">Partenza dalla riga %1$d.\nLa macchina dovrebbe essere a:\n\n%2$s</string>
+    <string name="text_run_from_line_safe_z">Quota Z di sicurezza (coord. lavoro) per il riposizionamento</string>
+    <string name="text_run_from_line_auto">Vai automaticamente</string>
+    <string name="text_run_from_line_manual">Ho posizionato a mano</string>
+    <string name="text_run_from_line_spindle_warning_title">Il mandrino partirà</string>
+    <string name="text_run_from_line_spindle_warning">A questa riga mandrino/refrigerante erano accesi. Il preambolo li riaccenderà (%1$s S%2$d). Stai lontano e continua?</string>
+
     <string name="text_gcode_length_warning">ATTENZIONE! Comando Gcode con lunghezza fino a 80 caratteri trovato alla riga</string>
     <string name="text_lines_total_sent">Linee Totali | Inviate</string>
     <string name="text_time_elapsed">Tempo trascorso</string>

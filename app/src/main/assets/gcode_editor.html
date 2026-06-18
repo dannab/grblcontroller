@@ -52,6 +52,19 @@
         editor.execCommand("find");
     }
 
+    // Posiziona il cursore su una riga (1-based) e la centra: usato dal
+    // "Run from line" per portare l'utente alla riga di ripartenza.
+    function gotoLine(n) {
+        try {
+            n = parseInt(n, 10);
+            if (isNaN(n) || n < 1) return;
+            editor.gotoLine(n, 0, true);
+            editor.scrollToLine(n, true, true, function () {});
+            editor.selection.selectLine();
+            editor.focus();
+        } catch (e) {}
+    }
+
     // Toggle modalità sola lettura: chiamata da Android in base allo stato macchina
     function setEditorReadOnly(flag) {
         editor.setReadOnly(!!flag);

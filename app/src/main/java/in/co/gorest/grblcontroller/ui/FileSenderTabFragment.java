@@ -30,11 +30,15 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
+import android.text.InputType;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -66,6 +70,7 @@ import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentFileSenderTabBinding;
 import in.co.gorest.grblcontroller.events.BluetoothDisconnectEvent;
 import in.co.gorest.grblcontroller.events.GrblErrorEvent;
+import in.co.gorest.grblcontroller.events.OpenGcodeEditorEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
 import in.co.gorest.grblcontroller.listeners.FileSenderListener;
@@ -75,6 +80,7 @@ import in.co.gorest.grblcontroller.model.GcodeCommand;
 import in.co.gorest.grblcontroller.model.Overrides;
 import in.co.gorest.grblcontroller.service.FileStreamerIntentService;
 import in.co.gorest.grblcontroller.util.GrblUtils;
+import in.co.gorest.grblcontroller.util.RunFromLineHelper;
 
 public class FileSenderTabFragment extends BaseFragment
         implements View.OnClickListener, View.OnLongClickListener {
@@ -170,6 +176,12 @@ public class FileSenderTabFragment extends BaseFragment
                 return;
             }
             startFileStreaming();
+        });
+
+        // --- Start streaming da una riga specifica (long click) ---
+        startStreaming.setOnLongClickListener(v -> {
+            showRunFromLineInputDialog();
+            return true;
         });
 
         // --- Stop streaming ---
@@ -503,6 +515,208 @@ public class FileSenderTabFragment extends BaseFragment
         if (fileSender.getStatus().equals(FileSenderListener.STATUS_STREAMING)) {
             fileSender.setStatus(FileSenderListener.STATUS_IDLE);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Run from line — partenza da una riga specifica (long click su play)
+    // -------------------------------------------------------------------------
+
+    private static final String PREF_SAFE_Z = "run_from_line_safe_z";
+
+    /**
+     * Step 1: chiede all'utente il numero di riga (numerazione reale del file,
+     * come nell'editor). Offre anche di aprire l'editor su quella riga.
+     */
+    private void showRunFromLineInputDialog() {
+        if (fileSender.getGcodeFile() == null) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_no_gcode_file_selected), true, true));
+            return;
+        }
+        if (fileSender.getStatus().equals(FileSenderListener.STATUS_READING)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_file_reading_in_progress), true, true));
+            return;
+        }
+        if (FileStreamerIntentService.getIsServiceRunning()
+                || !machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_run_from_line_needs_idle), true, true));
+            return;
+        }
+
+        final EditText input = new EditText(getActivity());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint(getString(R.string.text_run_from_line_hint));
+
+        LinearLayout container = new LinearLayout(getActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        container.setPadding(pad, dp(8), pad, 0);
+        container.addView(input);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(getString(R.string.text_run_from_line_title))
+                .setMessage(getString(R.string.text_run_from_line_message))
+                .setView(container)
+                .setPositiveButton(getString(R.string.text_continue_streaming), (dialog, which) -> {
+                    int line = parseLineInput(input.getText().toString());
+                    if (line < 1) {
+                        EventBus.getDefault().post(new UiToastEvent(
+                                getString(R.string.text_run_from_line_invalid), true, true));
+                        return;
+                    }
+                    parseFileThenShowSummary(line);
+                })
+                .setNeutralButton(getString(R.string.text_run_from_line_open_editor), (dialog, which) -> {
+                    int line = parseLineInput(input.getText().toString());
+                    EventBus.getDefault().post(new OpenGcodeEditorEvent(Math.max(1, line)));
+                })
+                .setNegativeButton(getString(R.string.text_cancel), null)
+                .show();
+    }
+
+    private int parseLineInput(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Step 2: scorre il file in background fino alla riga scelta per ricostruire
+     * stato modale e coordinate, quindi mostra il riepilogo.
+     */
+    private void parseFileThenShowSummary(final int line) {
+        final File file = fileSender.getGcodeFile();
+        EventBus.getDefault().post(new UiToastEvent(
+                getString(R.string.text_run_from_line_scanning), true, false));
+
+        new Thread(() -> {
+            try {
+                final RunFromLineHelper.ProgramState state =
+                        RunFromLineHelper.parseUpToLine(file, line);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (!state.lineExists) {
+                        EventBus.getDefault().post(new UiToastEvent(
+                                getString(R.string.text_run_from_line_out_of_range,
+                                        state.totalLines), true, true));
+                        return;
+                    }
+                    showRunFromLineSummaryDialog(state);
+                });
+            } catch (IOException e) {
+                Log.e(TAG, "run-from-line parse: " + e.getMessage(), e);
+                EventBus.getDefault().post(new UiToastEvent(
+                        getString(R.string.text_file_not_found), true, true));
+            }
+        }).start();
+    }
+
+    /**
+     * Step 3: mostra coordinate e stato modale calcolati e lascia scegliere fra
+     * riposizionamento automatico (con safe-Z) o manuale (l'utente jogga a mano).
+     */
+    private void showRunFromLineSummaryDialog(final RunFromLineHelper.ProgramState state) {
+        String summary = RunFromLineHelper.describe(state, getString(R.string.text_run_from_line_unknown));
+
+        final EditText safeZInput = new EditText(getActivity());
+        safeZInput.setInputType(InputType.TYPE_CLASS_NUMBER
+                | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        safeZInput.setText(sharedPref.getString(PREF_SAFE_Z, "5"));
+
+        TextView summaryView = new TextView(getActivity());
+        summaryView.setText(getString(R.string.text_run_from_line_summary,
+                state.startLine, summary));
+
+        TextView safeZLabel = new TextView(getActivity());
+        safeZLabel.setText(getString(R.string.text_run_from_line_safe_z));
+
+        LinearLayout container = new LinearLayout(getActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        container.setPadding(pad, dp(8), pad, 0);
+        container.addView(summaryView);
+        TextView spacer = new TextView(getActivity());
+        spacer.setHeight(dp(12));
+        container.addView(spacer);
+        container.addView(safeZLabel);
+        container.addView(safeZInput);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(getString(R.string.text_run_from_line_title))
+                .setView(container)
+                .setPositiveButton(getString(R.string.text_run_from_line_auto), (dialog, which) -> {
+                    double safeZ = parseSafeZ(safeZInput.getText().toString());
+                    sharedPref.edit().putString(PREF_SAFE_Z,
+                            safeZInput.getText().toString().trim()).apply();
+                    confirmThenStart(state, true, safeZ);
+                })
+                .setNeutralButton(getString(R.string.text_run_from_line_manual), (dialog, which) ->
+                        confirmThenStart(state, false, 0))
+                .setNegativeButton(getString(R.string.text_cancel), null)
+                .show();
+    }
+
+    private double parseSafeZ(String s) {
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (NumberFormatException e) {
+            return 5.0;
+        }
+    }
+
+    /**
+     * Step 4: se a quella riga il mandrino/refrigerante risultano attivi avvisa
+     * esplicitamente prima di partire (il mandrino si avvierà!). Poi lancia.
+     */
+    private void confirmThenStart(final RunFromLineHelper.ProgramState state,
+                                  final boolean autoMove, final double safeZ) {
+        boolean spindleOrCoolant = state.spindleState != 0 || state.flood || state.mist;
+        if (spindleOrCoolant) {
+            String spindle = state.spindleState == 3 ? "M3" : state.spindleState == 4 ? "M4" : "";
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(getString(R.string.text_run_from_line_spindle_warning_title))
+                    .setMessage(getString(R.string.text_run_from_line_spindle_warning,
+                            spindle, state.spindleSpeed != null ? state.spindleSpeed.intValue() : 0))
+                    .setPositiveButton(getString(R.string.text_continue_streaming), (d, w) ->
+                            launchRunFromLine(state, autoMove, safeZ, true))
+                    .setNegativeButton(getString(R.string.text_cancel), null)
+                    .show();
+        } else {
+            launchRunFromLine(state, autoMove, safeZ, false);
+        }
+    }
+
+    /**
+     * Costruisce il preambolo, lo passa al service e avvia lo streaming dalla
+     * riga scelta. Lo stato macchina deve essere IDLE (verificato a monte).
+     */
+    private void launchRunFromLine(RunFromLineHelper.ProgramState state,
+                                   boolean autoMove, double safeZ, boolean restoreSpindle) {
+        if (FileStreamerIntentService.getIsServiceRunning()
+                || !machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_run_from_line_needs_idle), true, true));
+            return;
+        }
+
+        List<String> preamble = RunFromLineHelper.buildPreamble(
+                state, autoMove, safeZ, restoreSpindle);
+        FileStreamerIntentService.setRunFromLine(state.startLine, preamble);
+        FileStreamerIntentService.setShouldContinue(true);
+
+        Intent intent = new Intent(
+                requireActivity().getApplicationContext(),
+                FileStreamerIntentService.class);
+        startService(intent);
+    }
+
+    private int dp(float value) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                value, getResources().getDisplayMetrics());
     }
 
     // -------------------------------------------------------------------------

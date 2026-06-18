@@ -69,6 +69,18 @@ public class GcodeEditorFragment extends BaseFragment {
     private boolean isEditorLoaded = false;
 
     /**
+     * Riga (1-based) richiesta dall'esterno (es. "Run from line" nel File Sender)
+     * su cui posizionare il cursore appena l'editor ha caricato il file.
+     * Statica perché il fragment potrebbe non esistere ancora quando arriva la
+     * richiesta (ViewPager offscreen limit). 0 = nessuna richiesta.
+     */
+    private static volatile int pendingGotoLine = 0;
+
+    public static void requestGotoLine(int line) {
+        pendingGotoLine = line;
+    }
+
+    /**
      * Callback registrato su MachineStatusListener: ogni cambio di stato
      * macchina riapplica la policy "editing solo in IDLE".
      * Riferimento tenuto per poterlo deregistrare in onDestroyView.
@@ -196,7 +208,23 @@ public class GcodeEditorFragment extends BaseFragment {
         if (isEditorLoaded) {
             applyReadOnlyForCurrentState();
             checkAndLoadActiveFile();
+            // Se il file era già caricato (stesso file) checkAndLoadActiveFile non
+            // ricarica nulla: consumiamo qui l'eventuale richiesta di goto line.
+            consumePendingGotoLine();
         }
+    }
+
+    /**
+     * Se c'è una richiesta pendente di posizionamento su una riga (da "Run from
+     * line"), la inoltra all'editor ACE e la azzera. No-op se l'editor non è
+     * pronto o non c'è richiesta.
+     */
+    private void consumePendingGotoLine() {
+        if (!isEditorLoaded || webView == null) return;
+        int line = pendingGotoLine;
+        if (line <= 0) return;
+        pendingGotoLine = 0;
+        webView.evaluateJavascript("gotoLine(" + line + ");", null);
     }
 
     /**
@@ -241,6 +269,7 @@ public class GcodeEditorFragment extends BaseFragment {
                     requireActivity().runOnUiThread(() -> {
                         webView.evaluateJavascript("setGcodeContent(`" + escaped + "`);", null);
                         loadingOverlay.setVisibility(View.GONE);
+                        consumePendingGotoLine();
                     });
                 } else {
                     // Fragment non più visibile durante il caricamento —

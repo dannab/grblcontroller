@@ -78,6 +78,7 @@ import in.co.gorest.grblcontroller.events.ConsoleMessageEvent;
 import in.co.gorest.grblcontroller.events.GrblAlarmEvent;
 import in.co.gorest.grblcontroller.events.GrblErrorEvent;
 import in.co.gorest.grblcontroller.events.StreamingCompleteEvent;
+import in.co.gorest.grblcontroller.events.OpenGcodeEditorEvent;
 import in.co.gorest.grblcontroller.events.StreamingStartedEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
@@ -87,10 +88,12 @@ import in.co.gorest.grblcontroller.listeners.ConsoleLoggerListener;
 import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
+import in.co.gorest.grblcontroller.model.Position;
 import in.co.gorest.grblcontroller.service.FileStreamerIntentService;
 import in.co.gorest.grblcontroller.service.HttpServerManager;
 import in.co.gorest.grblcontroller.service.GrblBluetoothSerialService;
 import in.co.gorest.grblcontroller.ui.BaseFragment;
+import in.co.gorest.grblcontroller.ui.GcodeEditorFragment;
 import in.co.gorest.grblcontroller.ui.GrblFragmentPagerAdapter;
 import in.co.gorest.grblcontroller.util.GcodeDropChecker;
 import in.co.gorest.grblcontroller.util.GrblUtils;
@@ -109,6 +112,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public static boolean isAppRunning;
 
     private Toast lastToast;
+    private ViewPager tabViewPager = null;
     private CharSequence lastBaseSubtitle = null;
     private TextView toolbarTitleView = null;
     private TextView toolbarSubtitleView = null;
@@ -133,6 +137,87 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
                     }
                 }
             };
+
+    // ------------------------------------------------------------------
+    // Ripristino coordinate di lavoro alla (ri)connessione — opzionale,
+    // attivabile da Impostazioni (preference_restore_wpos_on_connect).
+    // Lo snapshot viene congelato al tap su "Connetti" (prima che il primo
+    // status report sovrascriva le caselle XYZA) e reinviato con G10 L20 P0
+    // appena la macchina raggiunge IDLE.
+    // ------------------------------------------------------------------
+    private Position pendingWorkPositionRestore = null;
+    private final Observable.OnPropertyChangedCallback workPositionRestoreCallback =
+            new Observable.OnPropertyChangedCallback() {
+                @Override
+                public void onPropertyChanged(Observable sender, int propertyId) {
+                    if (propertyId == BR.state) sendPendingWorkPositionRestore();
+                }
+            };
+
+    /**
+     * Da chiamare al tap su "Connetti", PRIMA di stabilire il collegamento.
+     * Se l'opzione è attiva e nelle caselle XYZA sono rimasti dei valori (≠0),
+     * chiede conferma; in caso affermativo congela i valori e li reinvia con
+     * G10 L20 P0 al primo IDLE post-connessione. In ogni caso esegue {@code onProceed},
+     * che avvia la connessione vera e propria.
+     */
+    protected void promptRestoreWorkPositionThenConnect(final Runnable onProceed) {
+        final Position wpos = machineStatus.getWorkPosition();
+        boolean enabled = sharedPref.getBoolean(
+                getString(R.string.preference_restore_wpos_on_connect), false);
+        boolean hasValues = enabled && wpos != null
+                && (wpos.getCordX() != 0.0 || wpos.getCordY() != 0.0
+                 || wpos.getCordZ() != 0.0 || wpos.getCordA() != 0.0);
+
+        if (!hasValues) {
+            onProceed.run();
+            return;
+        }
+
+        final Position snapshot = new Position(
+                wpos.getCordX(), wpos.getCordY(), wpos.getCordZ(), wpos.getCordA());
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.text_restore_wpos_title)
+                .setMessage(getString(R.string.text_restore_wpos_desc,
+                        snapshot.getCordX(), snapshot.getCordY(),
+                        snapshot.getCordZ(), snapshot.getCordA()))
+                .setPositiveButton(getString(R.string.text_yes_confirm), (d, w) -> {
+                    pendingWorkPositionRestore = snapshot;
+                    machineStatus.addOnPropertyChangedCallback(workPositionRestoreCallback);
+                    onProceed.run();
+                })
+                .setNegativeButton(getString(R.string.text_no_confirm), (d, w) -> onProceed.run())
+                .setOnCancelListener(d -> onProceed.run())
+                .show();
+    }
+
+    /**
+     * Invia il G10 L20 P0 congelato non appena la macchina è IDLE, poi si disarma.
+     * L'asse A è incluso solo se il 4° asse è abilitato, per non generare errori
+     * sui controller a 3 assi.
+     */
+    private void sendPendingWorkPositionRestore() {
+        if (pendingWorkPositionRestore == null) return;
+        if (!Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState())) return;
+
+        // setState() (e quindi questo callback) gira sull'executor di lettura
+        // seriale, NON sul main thread: congelo e disarmo subito, poi marshallo
+        // l'invio del comando sul thread UI come fa il resto dell'app.
+        final Position p = pendingWorkPositionRestore;
+        pendingWorkPositionRestore = null;
+        machineStatus.removeOnPropertyChangedCallback(workPositionRestoreCallback);
+
+        final StringBuilder command = new StringBuilder("G10L20P0")
+                .append("X").append(p.getCordX())
+                .append("Y").append(p.getCordY())
+                .append("Z").append(p.getCordZ());
+        if (sharedPref.getBoolean(getString(R.string.preference_enable_additional_axis), false)) {
+            command.append("A").append(p.getCordA());
+        }
+
+        runOnUiThread(() -> onGcodeCommandReceived(command.toString()));
+    }
 
     /**
      * Sets the connection/machine label (toolbar line 1) and refreshes the
@@ -219,6 +304,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         super.onDestroy();
 
         FileSenderListener.getInstance().removeOnPropertyChangedCallback(gcodeFileCallback);
+        machineStatus.removeOnPropertyChangedCallback(workPositionRestoreCallback);
         if (zDropExecutor != null) { zDropExecutor.shutdownNow(); zDropExecutor = null; }
 
         stopService(new Intent(this, FileStreamerIntentService.class));
@@ -328,6 +414,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
 
         final ViewPager viewPager = findViewById(R.id.tab_layout_pager);
+        tabViewPager = viewPager;
         final GrblFragmentPagerAdapter pagerAdapter = new GrblFragmentPagerAdapter(getSupportFragmentManager(), tabLayout.getTabCount());
         viewPager.setAdapter(pagerAdapter);
         viewPager.addOnPageChangeListener(new TabLayout.TabLayoutOnPageChangeListener(tabLayout));
@@ -481,6 +568,16 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public void OnStreamingStartEvent(StreamingStartedEvent event){
         if(sharedPref.getBoolean(getString(R.string.preference_keep_screen_on), false)){
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onOpenGcodeEditorEvent(OpenGcodeEditorEvent event){
+        // L'editor GCode è l'ultimo tab: lo apriamo e gli chiediamo di
+        // posizionarsi sulla riga richiesta (consumata quando il file è caricato).
+        GcodeEditorFragment.requestGotoLine(event.getLine());
+        if(tabViewPager != null && tabViewPager.getAdapter() != null){
+            tabViewPager.setCurrentItem(tabViewPager.getAdapter().getCount() - 1);
         }
     }
 

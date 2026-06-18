@@ -84,6 +84,7 @@
     <string name="preference_remember_last_file_location" translatable="false">remember_last_file_location</string>
     <string name="most_recent_selected_file" translatable="false">most_recent_selected_file</string>
     <string name="preference_single_step_mode" translatable="false">preference_single_step_mode</string>
+    <string name="preference_restore_wpos_on_connect" translatable="false">preference_restore_wpos_on_connect</string>
     <string name="preference_http_server_enabled" translatable="false">preference_http_server_enabled</string>
     <string name="preference_http_server_port" translatable="false">preference_http_server_port</string>
     <string name="preference_http_server_password" translatable="false">preference_http_server_password</string>
@@ -152,6 +153,10 @@
     <string name="text_send_custom_command">send custom commands for the action</string>
     <string name="text_auto_connect">Auto connect</string>
     <string name="text_auto_connect_desc">connect to last used bluetooth device on application start</string>
+    <string name="text_restore_wpos_on_connect">Restore work coordinates on connect</string>
+    <string name="text_restore_wpos_on_connect_desc">On connect, if the X/Y/Z/A fields still hold values, ask whether to reapply them to the machine with G10 L20 P0</string>
+    <string name="text_restore_wpos_title">Restore work coordinates?</string>
+    <string name="text_restore_wpos_desc">Set the machine work coordinates to the values left in the fields?\n\nX %1$s  Y %2$s  Z %3$s  A %4$s\n\nOnly correct if the tool is still in the same physical position.</string>
     <string name="text_soft_reset_confirm">Soft reset confirmation</string>
     <string name="text_soft_reset_confirm_desc">ask for confirmation before doing soft reset</string>
     <string name="text_sleep_after_job">Sleep after job</string>
@@ -356,6 +361,24 @@
     <string name="text_starting_streaming">Starting GCODE streaming</string>
     <string name="text_check_every_thing">do check every thing is ready!</string>
     <string name="text_continue_streaming">Continue</string>
+
+    <!-- Run from line -->
+    <string name="text_run_from_line_title">Start from line</string>
+    <string name="text_run_from_line_message">Enter the file line number to start streaming from (same numbering as the editor).</string>
+    <string name="text_run_from_line_hint">Line number</string>
+    <string name="text_run_from_line_invalid">Invalid line number</string>
+    <string name="text_run_from_line_needs_idle">Available only when the machine is IDLE and no job is running</string>
+    <string name="text_run_from_line_open_editor">Open editor</string>
+    <string name="text_run_from_line_scanning">Scanning file…</string>
+    <string name="text_run_from_line_out_of_range">Line out of range (file has %1$d lines)</string>
+    <string name="text_run_from_line_unknown">n/d</string>
+    <string name="text_run_from_line_summary">Starting from line %1$d.\nMachine should be at:\n\n%2$s</string>
+    <string name="text_run_from_line_safe_z">Safe Z height (work coord.) for repositioning</string>
+    <string name="text_run_from_line_auto">Go automatically</string>
+    <string name="text_run_from_line_manual">Positioned by hand</string>
+    <string name="text_run_from_line_spindle_warning_title">Spindle will start</string>
+    <string name="text_run_from_line_spindle_warning">At this line the spindle/coolant were ON. The preamble will turn them on (%1$s S%2$d). Keep clear and continue?</string>
+
     <string name="text_gcode_length_warning">WARNING! Gcode command with length up to 80 characters found at line</string>
     <string name="text_lines_total_sent">Total lines | Sent</string>
     <string name="text_time_elapsed">Time elapsed</string>

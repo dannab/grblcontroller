@@ -41,6 +41,13 @@
             android:summary="@string/text_auto_connect_desc" />
 
         <SwitchPreference
+            android:icon="@drawable/ic_settings_input_hdmi_black_24dp"
+            android:defaultValue="false"
+            android:key="@string/preference_restore_wpos_on_connect"
+            android:title="@string/text_restore_wpos_on_connect"
+            android:summary="@string/text_restore_wpos_on_connect_desc" />
+
+        <SwitchPreference
             android:icon="@drawable/ic_swap_horizontal_black_24dp"
             android:key="@string/preference_single_step_mode"
             android:title="@string/text_single_step_mode"

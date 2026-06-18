@@ -39,6 +39,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -74,11 +75,35 @@ public class FileStreamerIntentService extends IntentService{
     private static volatile boolean isServiceRunning = false;
     private static volatile boolean shouldContinue = true;
 
+    // "Run from line": riga (1-based, come nell'editor) da cui iniziare lo
+    // streaming, e comandi di preambolo da inviare prima. startFromLine <= 1
+    // significa partenza normale dall'inizio del file.
+    private static volatile int startFromLine = 0;
+    private static volatile List<String> preambleCommands = null;
+
     public synchronized static boolean getIsServiceRunning(){ return isServiceRunning; }
     private synchronized static void setIsServiceRunning(boolean running){ isServiceRunning = running; }
 
     public synchronized static boolean getShouldContinue(){ return shouldContinue; }
     public synchronized static void setShouldContinue(boolean b){ shouldContinue = b; }
+
+    /**
+     * Imposta la ripartenza da una riga specifica col relativo preambolo.
+     * Va chiamato PRIMA di avviare il service. Viene azzerato automaticamente
+     * a fine job, così la partenza successiva torna normale.
+     */
+    public synchronized static void setRunFromLine(int line, List<String> preamble){
+        startFromLine = line;
+        preambleCommands = preamble;
+    }
+
+    private synchronized static void clearRunFromLine(){
+        startFromLine = 0;
+        preambleCommands = null;
+    }
+
+    private synchronized static int getStartFromLine(){ return startFromLine; }
+    private synchronized static List<String> getPreambleCommands(){ return preambleCommands; }
 
     private FileSenderListener fileSenderListener;
     private MachineStatusListener machineStatusListener;
@@ -98,6 +123,7 @@ public class FileStreamerIntentService extends IntentService{
     public void onDestroy(){
         super.onDestroy();
         clearBuffers();
+        clearRunFromLine();
         jobTimer.cancel();
         setIsServiceRunning(false);
         if(fileSenderListener != null) fileSenderListener.setStatus(FileSenderListener.STATUS_IDLE);
@@ -204,12 +230,30 @@ public class FileStreamerIntentService extends IntentService{
 
         BufferedReader br; String sCurrentLine;
 
+        // "Run from line": invia il preambolo (ripristino stato modale ed
+        // eventuale riposizionamento) e poi salta alle righe già eseguite.
+        final int startLine = getStartFromLine();
+        final List<String> preamble = getPreambleCommands();
+        if(preamble != null){
+            for(String cmd : preamble){
+                if(!shouldContinue) break;
+                GcodeCommand pre = new GcodeCommand(cmd);
+                if(pre.getCommandString().length() > 0) streamLine(pre);
+            }
+        }
+
         try{
             br = new BufferedReader(new FileReader(fileSenderListener.getGcodeFile()));
             int linesSent = 0;
+            int fileLineNo = 0;
             GcodeCommand gcodeCommand = new GcodeCommand();
             while ((sCurrentLine = br.readLine()) != null) {
                 if(!shouldContinue) break;
+
+                fileLineNo++;
+                // Salta le righe precedenti al punto di ripartenza: il loro effetto
+                // è già stato ricostruito nel preambolo.
+                if(startLine > 1 && fileLineNo < startLine) continue;
 
                 gcodeCommand.setCommand(sCurrentLine);
 

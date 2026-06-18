@@ -237,8 +237,10 @@ public class BluetoothConnectionActivity extends GrblActivity {
                                     .show();
 
                         }else{
-                            Intent serverIntent = new Intent(this, DeviceListActivity.class);
-                            startActivityForResult(serverIntent, Constants.CONNECT_DEVICE_INSECURE);
+                            promptRestoreWorkPositionThenConnect(() -> {
+                                Intent serverIntent = new Intent(this, DeviceListActivity.class);
+                                startActivityForResult(serverIntent, Constants.CONNECT_DEVICE_INSECURE);
+                            });
                         }
                     }else{
                         EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_bt_service_not_running), true, true));
