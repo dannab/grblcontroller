@@ -9,7 +9,7 @@
         tools:targetApi="n_mr1">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="in.co.gorest.grblcontroller"
+            android:targetPackage="io.github.dannab.grblmachining"
             android:targetClass="in.co.gorest.grblcontroller.SettingsActivity" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
@@ -23,7 +23,7 @@
         tools:targetApi="n_mr1">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="in.co.gorest.grblcontroller"
+            android:targetPackage="io.github.dannab.grblmachining"
             android:targetClass="in.co.gorest.grblcontroller.AboutActivity" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>

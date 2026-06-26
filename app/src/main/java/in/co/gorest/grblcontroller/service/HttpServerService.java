@@ -29,8 +29,19 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -57,8 +68,19 @@ public class HttpServerService extends Service {
 
     private static volatile HttpServerService running;
 
+    /** Auto-stop the "find the phone" ring after this long if not stopped manually. */
+    private static final long RING_DURATION_MS = 30_000L;
+
     private GcodeHttpServer server;
     private int port = -1;
+
+    // ---- "find the phone" ringing state ----
+    private MediaPlayer ringPlayer;
+    private Handler ringStopHandler;
+    private int savedAlarmVolume = -1;
+    private final Runnable autoStopRing = new Runnable() {
+        @Override public void run() { stopRinging(); }
+    };
 
     public static HttpServerService getRunning() {
         return running;
@@ -106,7 +128,12 @@ public class HttpServerService extends Service {
         startForeground(NOTIF_ID, buildNotification(p));
 
         try {
-            GcodeHttpServer s = new GcodeHttpServer(p, rootDir, password);
+            GcodeHttpServer s = new GcodeHttpServer(p, rootDir, password,
+                    new GcodeHttpServer.RingHandler() {
+                        @Override public void ring() { ringPhone(); }
+                        @Override public void stopRing() { stopRinging(); }
+                    },
+                    buildWebPalette());
             s.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
             this.server = s;
             this.port = p;
@@ -135,6 +162,7 @@ public class HttpServerService extends Service {
 
     @Override
     public void onDestroy() {
+        stopRinging();
         if (server != null) {
             try {
                 server.stop();
@@ -151,6 +179,139 @@ public class HttpServerService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    /**
+     * Makes the phone ring loudly to help locate it in the workshop. Plays the
+     * default alarm tone on the ALARM stream (so it sounds even when the ringer
+     * is on silent/vibrate), forces the alarm volume to max, vibrates, and
+     * auto-stops after {@link #RING_DURATION_MS}. The previous alarm volume is
+     * restored on stop. Called from a NanoHTTPD worker thread.
+     */
+    synchronized void ringPhone() {
+        try {
+            // Stop any in-progress ring first, but don't restore volume yet —
+            // we're about to force it to max again.
+            internalStopRinging(false);
+
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am != null) {
+                // Only capture the original volume on the first ring of a burst.
+                if (savedAlarmVolume < 0) {
+                    savedAlarmVolume = am.getStreamVolume(AudioManager.STREAM_ALARM);
+                }
+                am.setStreamVolume(AudioManager.STREAM_ALARM,
+                        am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+            }
+
+            Uri uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM);
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (uri != null) {
+                MediaPlayer mp = new MediaPlayer();
+                mp.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+                mp.setDataSource(this, uri);
+                mp.setLooping(true);
+                mp.prepare();
+                mp.start();
+                ringPlayer = mp;
+            }
+
+            startVibration();
+
+            if (ringStopHandler == null) ringStopHandler = new Handler(Looper.getMainLooper());
+            ringStopHandler.removeCallbacks(autoStopRing);
+            ringStopHandler.postDelayed(autoStopRing, RING_DURATION_MS);
+            Log.i(TAG, "ringPhone started");
+        } catch (Exception e) {
+            Log.w(TAG, "ringPhone failed", e);
+        }
+    }
+
+    synchronized void stopRinging() {
+        internalStopRinging(true);
+    }
+
+    private void internalStopRinging(boolean restoreVolume) {
+        if (ringStopHandler != null) ringStopHandler.removeCallbacks(autoStopRing);
+        if (ringPlayer != null) {
+            try { if (ringPlayer.isPlaying()) ringPlayer.stop(); } catch (Exception ignore) {}
+            try { ringPlayer.release(); } catch (Exception ignore) {}
+            ringPlayer = null;
+        }
+        try {
+            Vibrator v = getVibrator();
+            if (v != null) v.cancel();
+        } catch (Exception ignore) {}
+        if (restoreVolume && savedAlarmVolume >= 0) {
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am != null) {
+                try {
+                    am.setStreamVolume(AudioManager.STREAM_ALARM, savedAlarmVolume, 0);
+                } catch (Exception ignore) {}
+            }
+            savedAlarmVolume = -1;
+        }
+    }
+
+    private void startVibration() {
+        try {
+            Vibrator v = getVibrator();
+            if (v == null || !v.hasVibrator()) return;
+            long[] pattern = {0, 600, 400};
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // repeat at index 0 → loops until cancel()
+                v.vibrate(VibrationEffect.createWaveform(pattern, 0),
+                        new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .build());
+            } else {
+                //noinspection deprecation
+                v.vibrate(pattern, 0);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "vibrate failed", e);
+        }
+    }
+
+    private Vibrator getVibrator() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            VibratorManager vm = (VibratorManager) getSystemService(VIBRATOR_MANAGER_SERVICE);
+            return vm != null ? vm.getDefaultVibrator() : null;
+        }
+        //noinspection deprecation
+        return (Vibrator) getSystemService(VIBRATOR_SERVICE);
+    }
+
+    /**
+     * Builds the web-page colour palette from the app theme colours so the
+     * HTTP interface matches the in-app look. Text colours are picked (white or
+     * near-black) for readable contrast, so it keeps working if the palette
+     * changes later.
+     */
+    private GcodeHttpServer.Palette buildWebPalette() {
+        String scheme = in.co.gorest.grblcontroller.util.ThemeHelper.getScheme(this);
+        String primary = colorHex(in.co.gorest.grblcontroller.util.ThemeHelper.primaryColorRes(scheme));
+        String primaryDark = colorHex(in.co.gorest.grblcontroller.util.ThemeHelper.primaryDarkColorRes(scheme));
+        String accent = colorHex(in.co.gorest.grblcontroller.util.ThemeHelper.accentColorRes(scheme));
+        return new GcodeHttpServer.Palette(
+                primary, primaryDark, accent,
+                readableTextOn(primary), readableTextOn(accent));
+    }
+
+    private String colorHex(int colorRes) {
+        return String.format("#%06X", 0xFFFFFF & getResources().getColor(colorRes, getTheme()));
+    }
+
+    /** Returns near-black for light backgrounds, white for dark ones (WCAG-ish). */
+    private String readableTextOn(String hex) {
+        int c = Color.parseColor(hex);
+        double r = Color.red(c) / 255.0, g = Color.green(c) / 255.0, b = Color.blue(c) / 255.0;
+        double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        return luminance > 0.6 ? "#212121" : "#ffffff";
     }
 
     private void stopSelfSafely() {

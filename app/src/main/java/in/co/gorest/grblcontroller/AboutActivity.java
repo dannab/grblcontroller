@@ -35,6 +35,7 @@ public class AboutActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        in.co.gorest.grblcontroller.util.ThemeHelper.apply(this, false);
         super.onCreate(savedInstanceState);
         if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_app_about));
         getSupportFragmentManager().beginTransaction().replace(android.R.id.content, new AppAboutFragment()).commit();

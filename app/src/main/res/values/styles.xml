@@ -15,6 +15,63 @@
         <item name="windowNoTitle">true</item>
     </style>
 
+    <!-- ===== Selectable colour schemes ===== -->
+    <!-- Each scheme has a with-action-bar variant (Settings/About) and a
+         NoActionBar variant (main screen). ThemeHelper picks the right one at
+         runtime from the preference_color_scheme setting. -->
+
+    <style name="AppTheme.Slate" parent="AppTheme">
+        <item name="colorPrimary">@color/slate_primary</item>
+        <item name="colorPrimaryDark">@color/slate_primary_dark</item>
+        <item name="colorAccent">@color/slate_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/slate_primary_dark</item>
+    </style>
+    <style name="AppTheme.NoActionBar.Slate" parent="AppTheme.NoActionBar">
+        <item name="colorPrimary">@color/slate_primary</item>
+        <item name="colorPrimaryDark">@color/slate_primary_dark</item>
+        <item name="colorAccent">@color/slate_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/slate_primary_dark</item>
+    </style>
+
+    <style name="AppTheme.Red" parent="AppTheme">
+        <item name="colorPrimary">@color/red_primary</item>
+        <item name="colorPrimaryDark">@color/red_primary_dark</item>
+        <item name="colorAccent">@color/red_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/red_primary_dark</item>
+    </style>
+    <style name="AppTheme.NoActionBar.Red" parent="AppTheme.NoActionBar">
+        <item name="colorPrimary">@color/red_primary</item>
+        <item name="colorPrimaryDark">@color/red_primary_dark</item>
+        <item name="colorAccent">@color/red_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/red_primary_dark</item>
+    </style>
+
+    <style name="AppTheme.Blue" parent="AppTheme">
+        <item name="colorPrimary">@color/blue_primary</item>
+        <item name="colorPrimaryDark">@color/blue_primary_dark</item>
+        <item name="colorAccent">@color/blue_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/blue_primary_dark</item>
+    </style>
+    <style name="AppTheme.NoActionBar.Blue" parent="AppTheme.NoActionBar">
+        <item name="colorPrimary">@color/blue_primary</item>
+        <item name="colorPrimaryDark">@color/blue_primary_dark</item>
+        <item name="colorAccent">@color/blue_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/blue_primary_dark</item>
+    </style>
+
+    <style name="AppTheme.Teal" parent="AppTheme">
+        <item name="colorPrimary">@color/teal_primary</item>
+        <item name="colorPrimaryDark">@color/teal_primary_dark</item>
+        <item name="colorAccent">@color/teal_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/teal_primary_dark</item>
+    </style>
+    <style name="AppTheme.NoActionBar.Teal" parent="AppTheme.NoActionBar">
+        <item name="colorPrimary">@color/teal_primary</item>
+        <item name="colorPrimaryDark">@color/teal_primary_dark</item>
+        <item name="colorAccent">@color/teal_accent</item>
+        <item name="android:navigationBarColor" tools:targetApi="lollipop">@color/teal_primary_dark</item>
+    </style>
+
 
     <style name="SplashTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background</item>

@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#d50000</color>
-    <color name="colorPrimaryLight">#ff5131</color>
-    <color name="colorPrimaryDark">#9b0000</color>
-    <color name="colorAccent">#338a3e</color>
+    <!-- Default scheme (Industrial slate) — referenced by the base AppTheme -->
+    <color name="colorPrimary">#37474f</color>
+    <color name="colorPrimaryLight">#62727b</color>
+    <color name="colorPrimaryDark">#263238</color>
+    <color name="colorAccent">#ffa000</color>
+
+    <!-- Selectable colour schemes (see ThemeHelper / preference_color_scheme) -->
+    <color name="slate_primary">#37474f</color>
+    <color name="slate_primary_dark">#263238</color>
+    <color name="slate_accent">#ffa000</color>
+
+    <color name="red_primary">#d50000</color>
+    <color name="red_primary_dark">#9b0000</color>
+    <color name="red_accent">#338a3e</color>
+
+    <color name="blue_primary">#1565c0</color>
+    <color name="blue_primary_dark">#0d47a1</color>
+    <color name="blue_accent">#ff8f00</color>
+
+    <color name="teal_primary">#00796b</color>
+    <color name="teal_primary_dark">#004d40</color>
+    <color name="teal_accent">#ff6e40</color>
     <color name="colorPrimaryText">#ffffff</color>
     <color name="colorWhite">#ffffff</color>
     <color name="colorDivider">#bdbdbd</color>

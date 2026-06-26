@@ -43,6 +43,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        in.co.gorest.grblcontroller.util.ThemeHelper.apply(this, false);
         super.onCreate(savedInstanceState);
         if(getSupportActionBar() != null) getSupportActionBar().setSubtitle(getString(R.string.text_application_settings));
         getFragmentManager().beginTransaction().replace(android.R.id.content, new SettingsFragment()).commit();
@@ -133,6 +134,14 @@ public class SettingsActivity extends AppCompatActivity {
                     || key.equals(getString(R.string.preference_http_server_password))){
                 HttpServerManager.getInstance().restart(getActivity().getApplicationContext());
                 updateHttpServerInfo();
+            }
+
+            if(key.equals(getString(R.string.preference_color_scheme))){
+                EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_color_scheme_changed), false, true));
+                // Repaint the HTTP page with the new scheme too (it captures the
+                // palette at start), then re-theme the settings screen itself.
+                HttpServerManager.getInstance().restart(getActivity().getApplicationContext());
+                if(getActivity() != null) getActivity().recreate();
             }
         }
 

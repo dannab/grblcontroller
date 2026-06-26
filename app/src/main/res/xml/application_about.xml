@@ -21,7 +21,7 @@
         android:title="Application Usage">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="https://zeevy.github.io/grblcontroller" />
+            android:data="https://dannab.github.io/grblcontroller" />
     </Preference>
 
     <Preference
@@ -30,7 +30,7 @@
         android:title="Source / Issue tracker">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="https://github.com/zeevy/grblcontroller" />
+            android:data="https://github.com/dannab/grblcontroller" />
     </Preference>
 
     <Preference
@@ -39,16 +39,25 @@
         android:title="@string/text_app_rating">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="market://details?id=in.co.gorest.grblcontroller"/>
+            android:data="market://details?id=io.github.dannab.grblmachining"/>
     </Preference>
 
-<Preference
+    <Preference
         android:icon="@drawable/ic_contact_mail_black_36dp"
-        android:summary="zeevy@outlook.in"
+        android:summary="daniele.cicchinelli@gmail.com"
         android:title="Contact Developer">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="mailto:zeevy@outlook.in?subject=Grbl Controller"/>
+            android:data="mailto:daniele.cicchinelli@gmail.com?subject=GRBL Machining"/>
+    </Preference>
+
+    <Preference
+        android:icon="@drawable/ic_star_half_black_36dp"
+        android:summary="Based on Grbl Controller by zeevy (GPL v2)"
+        android:title="Credits">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://github.com/zeevy/grblcontroller" />
     </Preference>
 
 </PreferenceScreen>

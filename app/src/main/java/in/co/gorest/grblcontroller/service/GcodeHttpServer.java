@@ -38,6 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import fi.iki.elonen.NanoHTTPD;
+import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 
 public class GcodeHttpServer extends NanoHTTPD {
 
@@ -55,12 +56,46 @@ public class GcodeHttpServer extends NanoHTTPD {
     /** Cap on the no-overwrite rename loop. */
     private static final int MAX_RENAME_ATTEMPTS = 999;
 
+    /**
+     * Hook the server uses to make the host phone ring/stop. Implemented by
+     * {@link HttpServerService} (which has a Context); kept as an interface so
+     * the HTTP layer stays decoupled from Android audio APIs. May be null.
+     */
+    public interface RingHandler {
+        void ring();
+        void stopRing();
+    }
+
+    /**
+     * App-derived colours so the web page follows the in-app theme. {@code on*}
+     * are the readable text colours (white or near-black) computed for contrast
+     * against {@code primary}/{@code accent} on the Android side.
+     */
+    public static final class Palette {
+        final String primary, primaryDark, accent, onPrimary, onAccent;
+        public Palette(String primary, String primaryDark, String accent,
+                       String onPrimary, String onAccent) {
+            this.primary = primary;
+            this.primaryDark = primaryDark;
+            this.accent = accent;
+            this.onPrimary = onPrimary;
+            this.onAccent = onAccent;
+        }
+        static final Palette DEFAULT =
+                new Palette("#37474f", "#263238", "#ffa000", "#ffffff", "#212121");
+    }
+
     private final File rootDir;
     private final byte[] expectedAuthBytes;
+    private final RingHandler ringHandler;
+    private final Palette palette;
 
-    public GcodeHttpServer(int port, File rootDir, String password) {
+    public GcodeHttpServer(int port, File rootDir, String password,
+                           RingHandler ringHandler, Palette palette) {
         super(port);
         this.rootDir = rootDir;
+        this.ringHandler = ringHandler;
+        this.palette = (palette != null) ? palette : Palette.DEFAULT;
         if (password != null && !password.isEmpty()) {
             String creds = HttpServerManager.USERNAME + ":" + password;
             String header = "Basic " + Base64.encodeToString(
@@ -108,6 +143,10 @@ public class GcodeHttpServer extends NanoHTTPD {
                 resp = serveDownload(name);
             } else if (Method.POST.equals(method) && uri.equals("/upload")) {
                 resp = handleUpload(session);
+            } else if (Method.POST.equals(method) && uri.equals("/ring")) {
+                resp = handleRing(session, true);
+            } else if (Method.POST.equals(method) && uri.equals("/ring/stop")) {
+                resp = handleRing(session, false);
             } else {
                 resp = newFixedLengthResponse(
                         Response.Status.NOT_FOUND, "text/plain", "Not found");
@@ -169,26 +208,28 @@ public class GcodeHttpServer extends NanoHTTPD {
         StringBuilder html = new StringBuilder(4096);
         html.append("<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-                .append("<meta name=\"theme-color\" content=\"#d50000\">")
-                .append("<title>Grbl Controller — File</title>")
+                .append("<meta name=\"theme-color\" content=\"").append(palette.primary).append("\">")
+                .append("<title>GRBL Machining — File</title>")
                 // Favicon: small SVG wrench emoji as data URI, no asset round-trip
-                .append("<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,")
-                .append("%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E")
-                .append("%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2712%27%20fill%3D%27%23d50000%27%2F%3E")
-                .append("%3Ctext%20x%3D%2750%25%27%20y%3D%2754%27%20font-size%3D%2742%27%20text-anchor%3D%27middle%27%20fill%3D%27white%27%20font-family%3D%27sans-serif%27%3E%E2%9A%99%3C%2Ftext%3E")
-                .append("%3C%2Fsvg%3E\">")
+                .append("<link rel=\"icon\" type=\"image/svg+xml\" href=\"").append(faviconHref()).append("\">")
                 .append("<style>")
+                .append(cssVars())
                 .append("*{box-sizing:border-box}")
                 .append("body{margin:0;background:#f5f5f5;color:#212121;")
                 .append("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;")
                 .append("font-size:15px;line-height:1.45}")
-                .append("header{background:#d50000;color:#fff;padding:18px 20px;")
+                .append("header{background:var(--primary);color:var(--on-primary);padding:18px 20px;")
                 .append("box-shadow:0 2px 4px rgba(0,0,0,.2)}")
-                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto}")
+                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto;flex-wrap:wrap}")
                 .append("header .logo{width:42px;height:42px;background:rgba(255,255,255,.15);")
                 .append("border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}")
+                .append("header .hinfo{flex:1;min-width:160px}")
                 .append("header h1{margin:0;font-size:1.15em;font-weight:500;letter-spacing:.2px}")
                 .append("header .sub{opacity:.85;font-size:.85em;margin-top:2px}")
+                .append("header .ring{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}")
+                .append("header .ring button{padding:8px 16px;font-size:13px}")
+                .append("header .ring .stop{background:#c62828;color:#fff}")
+                .append("header .ring .msg{color:var(--on-primary);opacity:.9;font-size:.8em;text-transform:none;letter-spacing:0}")
                 .append("main{max-width:780px;margin:18px auto;padding:0 16px}")
                 .append(".card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);")
                 .append("margin-bottom:16px;overflow:hidden}")
@@ -196,12 +237,12 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append(".card-body{padding:18px}")
                 .append("input[type=file]{display:block;width:100%;padding:10px;border:1px dashed #bdbdbd;")
                 .append("border-radius:6px;background:#fafafa;margin-bottom:12px}")
-                .append("button{background:#338a3e;color:#fff;border:0;border-radius:4px;")
+                .append("button{background:var(--accent);color:var(--on-accent);border:0;border-radius:4px;")
                 .append("padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;")
                 .append("letter-spacing:.5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.2);")
-                .append("transition:background .15s,box-shadow .15s}")
-                .append("button:hover{background:#256029;box-shadow:0 2px 4px rgba(0,0,0,.25)}")
-                .append("button:active{background:#1b4220}")
+                .append("transition:filter .15s,box-shadow .15s}")
+                .append("button:hover{filter:brightness(.92);box-shadow:0 2px 4px rgba(0,0,0,.25)}")
+                .append("button:active{filter:brightness(.85)}")
                 .append(".hint{color:#757575;font-size:.85em;margin:0 0 10px}")
                 .append("table{width:100%;border-collapse:collapse}")
                 .append("th{text-align:left;padding:10px 18px;background:#fafafa;font-weight:500;")
@@ -212,7 +253,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("td.size{text-align:right;white-space:nowrap;color:#616161;font-variant-numeric:tabular-nums}")
                 .append("tr:last-child td{border-bottom:0}")
                 .append("tr:hover td{background:#fafafa}")
-                .append("td a{color:#d50000;text-decoration:none;font-weight:500}")
+                .append("td a{color:var(--primary);text-decoration:none;font-weight:500}")
                 .append("td a:hover{text-decoration:underline}")
                 .append(".empty{padding:30px 18px;text-align:center;color:#9e9e9e;font-style:italic}")
                 .append("footer{max-width:780px;margin:8px auto 20px;padding:0 18px;color:#757575;")
@@ -236,21 +277,14 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append(".modal-foot{padding:12px 24px;border-top:1px solid #eee;")
                 .append("display:flex;justify-content:flex-end;gap:8px;align-items:center}")
                 .append(".modal-foot .countdown{color:#9e9e9e;font-size:.85em;margin-right:auto}")
-                .append(".modal-foot button{background:transparent;color:#d50000;border:0;padding:8px 14px;")
+                .append(".modal-foot button{background:transparent;color:var(--primary);border:0;padding:8px 14px;")
                 .append("cursor:pointer;font-weight:500;text-transform:uppercase;font-size:.82em;")
                 .append("letter-spacing:.5px;border-radius:4px;box-shadow:none}")
-                .append(".modal-foot button:hover{background:#fff5f5;box-shadow:none}")
+                .append(".modal-foot button:hover{background:rgba(0,0,0,.05);box-shadow:none}")
                 .append("</style></head><body>");
 
-        // ----- Header -----
-        html.append("<header><div class=\"row\">")
-                .append("<div class=\"logo\">⚙</div>")
-                .append("<div><h1>Grbl Controller</h1>")
-                .append("<div class=\"sub\">")
-                .append(machineName != null && !machineName.isEmpty()
-                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
-                        : "Nessuna macchina connessa")
-                .append("</div></div></div></header>");
+        // ----- Header (machine name + state + find-the-phone controls) -----
+        appendHeader(html, machineName, true);
 
         html.append("<main>");
 
@@ -308,7 +342,7 @@ public class GcodeHttpServer extends NanoHTTPD {
             html.append("<span>ultimo aggiornamento: <b>")
                     .append(formatRelativeTime(lastModified)).append("</b></span>");
         }
-        html.append("</div><div>Grbl Controller</div></footer>");
+        html.append("</div><div>GRBL Machining</div></footer>");
 
         // ----- Upload success modal (only when ?ok=N is in the URL) -----
         if (uploadedOk > 0) {
@@ -343,6 +377,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                     .append("})();</script>");
         }
 
+        html.append(ringScript());
         html.append("</body></html>");
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html.toString());
     }
@@ -498,6 +533,25 @@ public class GcodeHttpServer extends NanoHTTPD {
         return renderUploadResult(saved, savedNames, rejected);
     }
 
+    /**
+     * Rings (or stops ringing) the host phone so an operator can locate it in
+     * the workshop. Same-origin guarded like uploads — this changes device
+     * state, so we don't want a cross-site page triggering it. No-ops cleanly
+     * if no {@link RingHandler} was wired.
+     */
+    private Response handleRing(IHTTPSession session, boolean start) {
+        if (!isSameOriginIfPresent(session)) {
+            return newFixedLengthResponse(
+                    Response.Status.FORBIDDEN, "text/plain", "Cross-origin denied");
+        }
+        if (ringHandler != null) {
+            if (start) ringHandler.ring();
+            else ringHandler.stopRing();
+        }
+        return newFixedLengthResponse(
+                Response.Status.OK, "text/plain", start ? "ringing" : "stopped");
+    }
+
     private Response renderUploadResult(int saved, List<String> savedNames, List<String> rejected) {
         String machineName = HttpServerManager.getMachineName();
         boolean allOk = rejected.isEmpty() && saved > 0;
@@ -524,15 +578,18 @@ public class GcodeHttpServer extends NanoHTTPD {
         StringBuilder html = new StringBuilder(2048);
         html.append("<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-                .append("<meta name=\"theme-color\" content=\"#d50000\">")
-                .append("<title>Esito upload — Grbl Controller</title>")
+                .append("<meta name=\"theme-color\" content=\"").append(palette.primary).append("\">")
+                .append("<title>Esito upload — GRBL Machining</title>")
+                .append("<link rel=\"icon\" type=\"image/svg+xml\" href=\"").append(faviconHref()).append("\">")
                 .append("<style>")
+                .append(cssVars())
                 .append("*{box-sizing:border-box}")
                 .append("body{margin:0;background:#f5f5f5;color:#212121;")
                 .append("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;")
                 .append("font-size:15px;line-height:1.45}")
-                .append("header{background:#d50000;color:#fff;padding:18px 20px;box-shadow:0 2px 4px rgba(0,0,0,.2)}")
-                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto}")
+                .append("header{background:var(--primary);color:var(--on-primary);padding:18px 20px;box-shadow:0 2px 4px rgba(0,0,0,.2)}")
+                .append("header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:0 auto;flex-wrap:wrap}")
+                .append("header .hinfo{flex:1;min-width:160px}")
                 .append("header .logo{width:42px;height:42px;background:rgba(255,255,255,.15);")
                 .append("border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}")
                 .append("header h1{margin:0;font-size:1.15em;font-weight:500;letter-spacing:.2px}")
@@ -556,24 +613,17 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("background:#338a3e;margin-right:10px;vertical-align:middle}")
                 .append(".filelist li.bad::before{background:#c62828}")
                 .append(".actions{padding:14px 20px;display:flex;gap:10px;flex-wrap:wrap}")
-                .append(".btn{display:inline-block;background:#d50000;color:#fff;border:0;border-radius:4px;")
+                .append(".btn{display:inline-block;background:var(--primary);color:var(--on-primary);border:0;border-radius:4px;")
                 .append("padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;")
-                .append("text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:background .15s,box-shadow .15s}")
-                .append(".btn:hover{background:#a30000;box-shadow:0 2px 4px rgba(0,0,0,.25)}")
-                .append(".btn.alt{background:#fff;color:#d50000;border:1px solid #d50000;box-shadow:none}")
-                .append(".btn.alt:hover{background:#fff5f5;box-shadow:0 1px 2px rgba(0,0,0,.1)}")
+                .append("text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:filter .15s,box-shadow .15s}")
+                .append(".btn:hover{filter:brightness(.92);box-shadow:0 2px 4px rgba(0,0,0,.25)}")
+                .append(".btn.alt{background:#fff;color:var(--primary);border:1px solid var(--primary);box-shadow:none}")
+                .append(".btn.alt:hover{background:rgba(0,0,0,.04);box-shadow:0 1px 2px rgba(0,0,0,.1)}")
                 .append(".hint{padding:0 20px 16px;color:#757575;font-size:.85em}")
                 .append("</style></head><body>");
 
-        // Header (same as index)
-        html.append("<header><div class=\"row\">")
-                .append("<div class=\"logo\">⚙</div>")
-                .append("<div><h1>Grbl Controller</h1>")
-                .append("<div class=\"sub\">")
-                .append(machineName != null && !machineName.isEmpty()
-                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
-                        : "Nessuna macchina connessa")
-                .append("</div></div></div></header>");
+        // Header (same as index, without the ring controls)
+        appendHeader(html, machineName, false);
 
         html.append("<main>");
 
@@ -619,6 +669,72 @@ public class GcodeHttpServer extends NanoHTTPD {
 
         html.append("</body></html>");
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html.toString());
+    }
+
+    /** App-theme colours exposed to the page as CSS custom properties. */
+    private String cssVars() {
+        return ":root{--primary:" + palette.primary
+                + ";--primary-dark:" + palette.primaryDark
+                + ";--accent:" + palette.accent
+                + ";--on-primary:" + palette.onPrimary
+                + ";--on-accent:" + palette.onAccent + "}";
+    }
+
+    /** Wrench favicon as an inline SVG data URI, tinted with the primary colour. */
+    private String faviconHref() {
+        String fill = palette.primary.replace("#", "%23");
+        return "data:image/svg+xml,"
+                + "%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E"
+                + "%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2712%27%20fill%3D%27" + fill + "%27%2F%3E"
+                + "%3Ctext%20x%3D%2750%25%27%20y%3D%2754%27%20font-size%3D%2742%27%20text-anchor%3D%27middle%27%20fill%3D%27white%27%20font-family%3D%27sans-serif%27%3E%E2%9A%99%3C%2Ftext%3E"
+                + "%3C%2Fsvg%3E";
+    }
+
+    /**
+     * Shared page header: machine name + live machine state, and (on the index)
+     * the "find the phone" controls on the right.
+     */
+    private void appendHeader(StringBuilder html, String machineName, boolean withRing) {
+        String state = MachineStatusListener.getInstance().getState();
+        html.append("<header><div class=\"row\">")
+                .append("<div class=\"logo\">⚙</div>")
+                .append("<div class=\"hinfo\"><h1>GRBL Machining</h1>")
+                .append("<div class=\"sub\">")
+                .append(machineName != null && !machineName.isEmpty()
+                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
+                        : "Nessuna macchina connessa")
+                .append(" &middot; Stato macchina: <b>")
+                .append(escapeHtml(state != null && !state.isEmpty() ? state : "—"))
+                .append("</b></div></div>");
+        if (withRing) {
+            html.append("<div class=\"ring\">")
+                    .append("<button type=\"button\" id=\"ringBtn\">Fai squillare</button>")
+                    .append("<button type=\"button\" id=\"stopRingBtn\" class=\"stop\" style=\"display:none\">Ferma</button>")
+                    .append("<span class=\"msg\" id=\"ringMsg\" style=\"display:none\"></span>")
+                    .append("</div>");
+        }
+        html.append("</div></header>");
+    }
+
+    /** Client logic for the header "find the phone" buttons. */
+    private String ringScript() {
+        return "<script>(function(){"
+                + "var rb=document.getElementById('ringBtn');"
+                + "var sb=document.getElementById('stopRingBtn');"
+                + "var msg=document.getElementById('ringMsg');"
+                + "if(!rb)return;"
+                + "var timer=null;"
+                + "function reset(){if(timer){clearTimeout(timer);timer=null;}"
+                + "sb.style.display='none';rb.style.display='';msg.style.display='none';}"
+                + "function post(u,cb){fetch(u,{method:'POST'}).then(function(r){cb(r.ok);})"
+                + ".catch(function(){cb(false);});}"
+                + "rb.addEventListener('click',function(){post('/ring',function(ok){"
+                + "if(ok){rb.style.display='none';sb.style.display='';msg.style.display='';"
+                + "msg.textContent='Sta squillando\\u2026';"
+                + "timer=setTimeout(reset,30000);}"
+                + "else{msg.style.display='';msg.textContent='Errore';}});});"
+                + "sb.addEventListener('click',function(){post('/ring/stop',function(){reset();});});"
+                + "})();</script>";
     }
 
     private List<File> listGcodeFiles() {

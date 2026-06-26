@@ -105,6 +105,9 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     }
 
     protected EnhancedSharedPreferences sharedPref;
+
+    /** Colour scheme this activity was themed with, to detect changes on resume. */
+    private String appliedColorScheme;
     protected ConsoleLoggerListener consoleLogger = null;
     protected MachineStatusListener machineStatus = null;
     protected GrblBluetoothSerialService grblBluetoothSerialService = null;
@@ -240,6 +243,8 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        in.co.gorest.grblcontroller.util.ThemeHelper.apply(this, true);
+        appliedColorScheme = in.co.gorest.grblcontroller.util.ThemeHelper.getScheme(this);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         ActivityMainBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
@@ -296,6 +301,12 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     @Override
     protected void onResume(){
         super.onResume();
+        // If the colour scheme was changed in Settings, re-theme the main screen.
+        String current = in.co.gorest.grblcontroller.util.ThemeHelper.getScheme(this);
+        if (appliedColorScheme != null && !appliedColorScheme.equals(current)) {
+            recreate();
+            return;
+        }
         refreshSubtitle();
     }
 

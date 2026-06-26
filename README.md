@@ -7,6 +7,7 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 
 #### What's new in this fork
 - **FluidNC support** — works out of the box with [FluidNC](https://github.com/bdring/FluidNC) controllers (tested on real hardware): both the GRBL 1.1 and the FluidNC banners are auto-detected at connection, no custom init string needed.
+- **Run from line** — resume a job from any line. The app reads the file up to that point and rebuilds the full modal state (work position, units, plane, work coordinate system, distance mode, feed, spindle and coolant), then sends a preamble to restore the controller before streaming continues. You can let it reposition the machine automatically at a chosen safe Z height or place the tool by hand, and it warns you before the spindle/coolant restart. Line numbers match the built-in G-code editor.
 - **G-code visualizer** — OpenGL toolpath preview with pinch zoom and pan; while streaming, the already-executed path is grayed out in real time.
 - **3-point autolevel** — probe three points on the stock, the app computes the plane compensation and writes a `_leveled` copy of the G-code file.
 - **Z plunge analyzer** — scans the G-code before the job and flags suspicious deep/steep Z plunges (wrong zero, missing safe height), so you catch them before the bit does.
@@ -14,6 +15,7 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 - **HTTP file server** — send and fetch G-code files from your PC browser over WiFi; password protected, runs as a foreground service with the URL shown in the notification (user: `grbl`).
 - **CAM tab** — generate simple jobs directly on the device (lines, circles, rectangles) with multiple Z passes, saved straight into the file sender.
 - **Reworked jogging** — 4 axis separate step and continuous modes, step size cycling via the central joypad button.
+- **Restore work coordinates on connect** — optional: on reconnect, if the jog fields still hold X/Y/Z/A values, the app offers to reapply them to the machine with `G10 L20 P0` — handy to recover your zero after an accidental disconnect mid-job (only correct if the tool hasn't moved).
 - **Quality of life** — flashlight button, UI rearrangement, safety checks before starting a job.
 - **Modern Android** — target SDK 35; files are picked via the system picker (SAF) and stored in the app media folder, so **no storage permissions** are required; runtime Bluetooth permissions (Android 12+); tested on Android 16.
 - **No telemetry** — Firebase and push notifications removed: the app talks to your machine and nothing else.

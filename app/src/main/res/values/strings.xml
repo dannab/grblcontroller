@@ -24,7 +24,7 @@
 <resources>
 
     <string name="app_name" translatable="false">GRBL Machining</string>
-    <string name="shared_preference_key" translatable="false">in.co.gorest.grblcontroller.f635f2e523d7c64f5b4ad9179b689433</string>
+    <string name="shared_preference_key" translatable="false">io.github.dannab.grblmachining.f635f2e523d7c64f5b4ad9179b689433</string>
     <string name="preference_auto_connect" translatable="false">auto_connect</string>
     <string name="preference_start_up_string" translatable="false">start_up_string</string>
     <string name="preference_console_verbose_mode" translatable="false">console_verbose_mode</string>
@@ -85,6 +85,7 @@
     <string name="most_recent_selected_file" translatable="false">most_recent_selected_file</string>
     <string name="preference_single_step_mode" translatable="false">preference_single_step_mode</string>
     <string name="preference_restore_wpos_on_connect" translatable="false">preference_restore_wpos_on_connect</string>
+    <string name="preference_color_scheme" translatable="false">preference_color_scheme</string>
     <string name="preference_http_server_enabled" translatable="false">preference_http_server_enabled</string>
     <string name="preference_http_server_port" translatable="false">preference_http_server_port</string>
     <string name="preference_http_server_password" translatable="false">preference_http_server_password</string>
@@ -153,6 +154,9 @@
     <string name="text_send_custom_command">send custom commands for the action</string>
     <string name="text_auto_connect">Auto connect</string>
     <string name="text_auto_connect_desc">connect to last used bluetooth device on application start</string>
+    <string name="text_color_scheme">Color scheme</string>
+    <string name="text_color_scheme_desc">Accent colours for the app and the web interface</string>
+    <string name="text_color_scheme_changed">Color scheme applied</string>
     <string name="text_restore_wpos_on_connect">Restore work coordinates on connect</string>
     <string name="text_restore_wpos_on_connect_desc">On connect, if the X/Y/Z/A fields still hold values, ask whether to reapply them to the machine with G10 L20 P0</string>
     <string name="text_restore_wpos_title">Restore work coordinates?</string>
@@ -216,6 +220,20 @@
     <string-array name="preference_values_default_connection">
         <item>bluetooth</item>
         <item>usbotg</item>
+    </string-array>
+
+    <string-array name="preference_entries_color_scheme">
+        <item>Industrial slate (default)</item>
+        <item>Classic red</item>
+        <item>Machinist blue</item>
+        <item>Workshop teal</item>
+    </string-array>
+
+    <string-array name="preference_values_color_scheme">
+        <item>slate</item>
+        <item>red</item>
+        <item>blue</item>
+        <item>teal</item>
     </string-array>
 
     <string-array name="preference_entries_stop_button_behaviour">

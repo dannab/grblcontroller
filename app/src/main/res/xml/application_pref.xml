@@ -47,6 +47,15 @@
             android:title="@string/text_restore_wpos_on_connect"
             android:summary="@string/text_restore_wpos_on_connect_desc" />
 
+        <ListPreference
+            android:icon="@drawable/ic_view_module_black_24dp"
+            android:key="@string/preference_color_scheme"
+            android:title="@string/text_color_scheme"
+            android:entries="@array/preference_entries_color_scheme"
+            android:entryValues="@array/preference_values_color_scheme"
+            android:summary="%s"
+            android:defaultValue="slate" />
+
         <SwitchPreference
             android:icon="@drawable/ic_swap_horizontal_black_24dp"
             android:key="@string/preference_single_step_mode"
