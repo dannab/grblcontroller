@@ -37,8 +37,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.greenrobot.eventbus.EventBus;
+
 import fi.iki.elonen.NanoHTTPD;
+import in.co.gorest.grblcontroller.events.GrblRealTimeCommandEvent;
+import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
+import in.co.gorest.grblcontroller.model.Overrides;
+import in.co.gorest.grblcontroller.util.GrblUtils;
 
 public class GcodeHttpServer extends NanoHTTPD {
 
@@ -143,6 +149,12 @@ public class GcodeHttpServer extends NanoHTTPD {
                 resp = serveDownload(name);
             } else if (Method.POST.equals(method) && uri.equals("/upload")) {
                 resp = handleUpload(session);
+            } else if (Method.GET.equals(method) && uri.equals("/status")) {
+                resp = handleStatus();
+            } else if (Method.POST.equals(method) && uri.equals("/delete")) {
+                resp = handleDelete(session);
+            } else if (Method.POST.equals(method) && uri.equals("/control")) {
+                resp = handleControl(session);
             } else if (Method.POST.equals(method) && uri.equals("/ring")) {
                 resp = handleRing(session, true);
             } else if (Method.POST.equals(method) && uri.equals("/ring/stop")) {
@@ -195,6 +207,12 @@ public class GcodeHttpServer extends NanoHTTPD {
                 if (n > 0 && n < 10000) uploadedOk = n;
             }
         } catch (NumberFormatException ignore) {}
+
+        // ?delerr=busy is set by handleDelete when a delete is refused because
+        // the file is currently being streamed.
+        boolean delBusy = false;
+        List<String> de = session.getParameters().get("delerr");
+        if (de != null && !de.isEmpty()) delBusy = "busy".equals(de.get(0));
 
         List<File> files = listGcodeFiles();
         long totalBytes = 0;
@@ -256,6 +274,27 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("td a{color:var(--primary);text-decoration:none;font-weight:500}")
                 .append("td a:hover{text-decoration:underline}")
                 .append(".empty{padding:30px 18px;text-align:center;color:#9e9e9e;font-style:italic}")
+                // Job progress line in header + delete controls + banner
+                .append("header .job{margin-top:6px;font-size:.82em;opacity:.95;")
+                .append("display:flex;gap:4px 14px;flex-wrap:wrap}")
+                .append("header .job b{font-weight:600}")
+                .append("th.act,td.act{text-align:right;white-space:nowrap}")
+                .append(".delform{display:inline;margin:0}")
+                .append(".del{background:#c62828;color:#fff;padding:6px 14px;font-size:12px}")
+                .append(".banner{margin-bottom:14px;padding:11px 16px;border-radius:6px;font-size:.9em}")
+                .append(".banner.warn{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}")
+                // Machine control panel (pause / stop / overrides)
+                .append(".ctrl .ovr{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}")
+                .append(".ctrl .ovr .lbl{min-width:110px;color:#616161;font-size:.9em}")
+                .append(".ctrl .ovr b{min-width:54px;text-align:center;color:#263238;")
+                .append("font-variant-numeric:tabular-nums}")
+                .append(".ctrl .ob{background:#eceff1;color:#263238;padding:8px 14px;box-shadow:none}")
+                .append(".ctrl .ob.rst{font-size:12px}")
+                .append(".ctrl-main{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}")
+                .append(".ctrl-main .pause{background:#ef6c00;color:#fff}")
+                .append(".ctrl-main .stopbtn{background:#c62828;color:#fff}")
+                .append(".ctrl .chint{color:#757575;font-size:.82em;margin:12px 0 0}")
+                .append("button:disabled{opacity:.4;cursor:not-allowed;filter:none!important;box-shadow:none}")
                 .append("footer{max-width:780px;margin:8px auto 20px;padding:0 18px;color:#757575;")
                 .append("font-size:.82em;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}")
                 .append("footer .stats{display:flex;gap:18px;flex-wrap:wrap}")
@@ -287,6 +326,31 @@ public class GcodeHttpServer extends NanoHTTPD {
         appendHeader(html, machineName, true);
 
         html.append("<main>");
+
+        if (delBusy) {
+            html.append("<div class=\"banner warn\">Impossibile eliminare: il file è in esecuzione.</div>");
+        }
+
+        // ----- Machine control card (pause / stop / overrides). No resume. -----
+        html.append("<div class=\"card\">")
+                .append("<div class=\"card-head\">Controllo macchina</div>")
+                .append("<div class=\"card-body ctrl\">")
+                .append("<div class=\"ovr\"><span class=\"lbl\">Avanzamento</span>")
+                .append("<button class=\"ob\" data-cmd=\"feed_minus\">&minus;</button>")
+                .append("<b id=\"ovrFeed\">—</b>")
+                .append("<button class=\"ob\" data-cmd=\"feed_plus\">+</button>")
+                .append("<button class=\"ob rst\" data-cmd=\"feed_reset\">Reset</button></div>")
+                .append("<div class=\"ovr\"><span class=\"lbl\">Mandrino</span>")
+                .append("<button class=\"ob\" data-cmd=\"spindle_minus\">&minus;</button>")
+                .append("<b id=\"ovrSpindle\">—</b>")
+                .append("<button class=\"ob\" data-cmd=\"spindle_plus\">+</button>")
+                .append("<button class=\"ob rst\" data-cmd=\"spindle_reset\">Reset</button></div>")
+                .append("<div class=\"ctrl-main\">")
+                .append("<button class=\"pause\" data-cmd=\"pause\">Pausa</button>")
+                .append("<button class=\"stopbtn\" data-cmd=\"stop\">Arresto</button></div>")
+                .append("<p class=\"chint\">La pausa ferma il movimento ma <b>non il mandrino</b>. ")
+                .append("Per riprendere usa il telefono alla macchina.</p>")
+                .append("</div></div>");
 
         // ----- Upload card -----
         html.append("<div class=\"card\">")
@@ -324,11 +388,18 @@ public class GcodeHttpServer extends NanoHTTPD {
         if (files.isEmpty()) {
             html.append("<div class=\"empty\">Nessun file G-code presente.<br>Caricane uno qui sopra per iniziare.</div>");
         } else {
-            html.append("<table><thead><tr><th>Nome</th><th class=\"size\">Dimensione</th></tr></thead><tbody>");
+            html.append("<table><thead><tr><th>Nome</th><th class=\"size\">Dimensione</th>")
+                    .append("<th class=\"act\">Azioni</th></tr></thead><tbody>");
             for (File f : files) {
                 html.append("<tr><td><a href=\"/d/").append(encode(f.getName())).append("\">")
                         .append(escapeHtml(f.getName())).append("</a></td>")
-                        .append("<td class=\"size\">").append(formatSize(f.length())).append("</td></tr>");
+                        .append("<td class=\"size\">").append(formatSize(f.length())).append("</td>")
+                        .append("<td class=\"act\">")
+                        .append("<form class=\"delform\" method=\"POST\" action=\"/delete?name=")
+                        .append(encode(f.getName())).append("\" data-name=\"")
+                        .append(escapeHtml(f.getName())).append("\">")
+                        .append("<button type=\"submit\" class=\"del\" title=\"Elimina\">Elimina</button>")
+                        .append("</form></td></tr>");
             }
             html.append("</tbody></table>");
         }
@@ -378,6 +449,9 @@ public class GcodeHttpServer extends NanoHTTPD {
         }
 
         html.append(ringScript());
+        html.append(jobStatusScript());
+        html.append(controlScript());
+        html.append(deleteConfirmScript());
         html.append("</body></html>");
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html.toString());
     }
@@ -552,6 +626,52 @@ public class GcodeHttpServer extends NanoHTTPD {
                 Response.Status.OK, "text/plain", start ? "ringing" : "stopped");
     }
 
+    /**
+     * Sends a GRBL real-time command to the machine on behalf of a browser
+     * button. Same-origin guarded (changes device state). Only a whitelist of
+     * "slow down / pause / stop" commands is honoured — crucially NOT cycle
+     * start / resume ('~'): the machine must never be restarted remotely, an
+     * operator has to be physically present to resume motion.
+     */
+    private Response handleControl(IHTTPSession session) {
+        if (!isSameOriginIfPresent(session)) {
+            return newFixedLengthResponse(
+                    Response.Status.FORBIDDEN, "text/plain", "Cross-origin denied");
+        }
+        try { session.parseBody(new HashMap<String, String>()); } catch (Exception ignore) {}
+
+        String cmd = null;
+        List<String> p = session.getParameters().get("cmd");
+        if (p != null && !p.isEmpty()) cmd = p.get(0);
+
+        Byte b = controlByte(cmd);
+        if (b == null) {
+            return newFixedLengthResponse(
+                    Response.Status.BAD_REQUEST, "text/plain", "Unknown command");
+        }
+        EventBus.getDefault().post(new GrblRealTimeCommandEvent(b));
+        return newFixedLengthResponse(Response.Status.OK, "text/plain", "ok");
+    }
+
+    /**
+     * Maps a control id to its GRBL real-time byte. Returns null for anything
+     * not on the whitelist. Resume ('~') and play are deliberately absent.
+     */
+    private static Byte controlByte(String cmd) {
+        if (cmd == null) return null;
+        switch (cmd) {
+            case "pause":         return GrblUtils.GRBL_PAUSE_COMMAND;   // '!' feed hold
+            case "stop":          return GrblUtils.GRBL_RESET_COMMAND;   // 0x18 soft reset
+            case "feed_minus":    return GrblUtils.getOverrideForEnum(Overrides.CMD_FEED_OVR_COARSE_MINUS);
+            case "feed_plus":     return GrblUtils.getOverrideForEnum(Overrides.CMD_FEED_OVR_COARSE_PLUS);
+            case "feed_reset":    return GrblUtils.getOverrideForEnum(Overrides.CMD_FEED_OVR_RESET);
+            case "spindle_minus": return GrblUtils.getOverrideForEnum(Overrides.CMD_SPINDLE_OVR_COARSE_MINUS);
+            case "spindle_plus":  return GrblUtils.getOverrideForEnum(Overrides.CMD_SPINDLE_OVR_COARSE_PLUS);
+            case "spindle_reset": return GrblUtils.getOverrideForEnum(Overrides.CMD_SPINDLE_OVR_RESET);
+            default:              return null;
+        }
+    }
+
     private Response renderUploadResult(int saved, List<String> savedNames, List<String> rejected) {
         String machineName = HttpServerManager.getMachineName();
         boolean allOk = rejected.isEmpty() && saved > 0;
@@ -703,9 +823,11 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append(machineName != null && !machineName.isEmpty()
                         ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
                         : "Nessuna macchina connessa")
-                .append(" &middot; Stato macchina: <b>")
+                .append(" &middot; Stato macchina: <b id=\"machineState\">")
                 .append(escapeHtml(state != null && !state.isEmpty() ? state : "—"))
-                .append("</b></div></div>");
+                .append("</b></div>");
+        if (withRing) appendJobInfo(html);
+        html.append("</div>");
         if (withRing) {
             html.append("<div class=\"ring\">")
                     .append("<button type=\"button\" id=\"ringBtn\">Fai squillare</button>")
@@ -735,6 +857,177 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "else{msg.style.display='';msg.textContent='Errore';}});});"
                 + "sb.addEventListener('click',function(){post('/ring/stop',function(){reset();});});"
                 + "})();</script>";
+    }
+
+    /**
+     * Live job progress block shown in the header (only on the index). The IDs
+     * are kept in sync client-side by {@link #jobStatusScript()} polling /status.
+     */
+    private void appendJobInfo(StringBuilder html) {
+        FileSenderListener fs = FileSenderListener.getInstance();
+        boolean hasFile = fs.getGcodeFile() != null;
+        String fileName = hasFile ? fs.getGcodeFileName() : "";
+        int total = fs.getRowsInFile() != null ? fs.getRowsInFile() : 0;
+        int sent = fs.getRowsSent() != null ? fs.getRowsSent() : 0;
+        int perc = total > 0 ? (int) Math.round(sent * 100.0 / total) : 0;
+        String status = fs.getStatus() != null ? fs.getStatus() : "";
+        String elapsed = fs.getElapsedTime() != null ? fs.getElapsedTime() : "";
+        html.append("<div class=\"job\">")
+                .append("<span id=\"jobEmpty\"").append(hasFile ? " style=\"display:none\"" : "")
+                .append(">Nessun file caricato</span>")
+                .append("<span id=\"jobInfo\"").append(hasFile ? "" : " style=\"display:none\"").append(">")
+                .append("File: <b id=\"jName\">").append(escapeHtml(fileName)).append("</b>")
+                .append(" &middot; Righe <b id=\"jSent\">").append(sent).append("</b>/<b id=\"jTotal\">")
+                .append(total).append("</b> (<b id=\"jPerc\">").append(perc).append("%</b>)")
+                .append(" &middot; <b id=\"jStatus\">").append(escapeHtml(status)).append("</b>")
+                .append(" &middot; Tempo <b id=\"jElapsed\">").append(escapeHtml(elapsed)).append("</b>")
+                .append(" &middot; Stima rimanente <b id=\"jEta\">—</b>")
+                .append("</span></div>");
+    }
+
+    /** JSON snapshot of machine state + current job progress, polled by the page. */
+    private Response handleStatus() {
+        FileSenderListener fs = FileSenderListener.getInstance();
+        MachineStatusListener ms = MachineStatusListener.getInstance();
+        String state = ms.getState();
+        boolean streaming = FileStreamerIntentService.getIsServiceRunning();
+        boolean hasFile = fs.getGcodeFile() != null;
+        boolean connected = !MachineStatusListener.STATE_NOT_CONNECTED.equals(state);
+        int total = fs.getRowsInFile() != null ? fs.getRowsInFile() : 0;
+        int sent = fs.getRowsSent() != null ? fs.getRowsSent() : 0;
+        long elapsedSec = (streaming && fs.getJobStartTime() > 0)
+                ? (System.currentTimeMillis() - fs.getJobStartTime()) / 1000 : 0;
+        MachineStatusListener.OverridePercents ovr = ms.getOverridePercents();
+        int ovrFeed = (ovr != null) ? ovr.feed : 100;
+        int ovrSpindle = (ovr != null) ? ovr.spindle : 100;
+        String json = "{"
+                + "\"state\":\"" + jsonEscape(state != null ? state : "") + "\","
+                + "\"status\":\"" + jsonEscape(fs.getStatus() != null ? fs.getStatus() : "") + "\","
+                + "\"connected\":" + connected + ","
+                + "\"hasFile\":" + hasFile + ","
+                + "\"streaming\":" + streaming + ","
+                + "\"file\":\"" + jsonEscape(hasFile ? fs.getGcodeFileName() : "") + "\","
+                + "\"sent\":" + sent + ","
+                + "\"total\":" + total + ","
+                + "\"elapsed\":\"" + jsonEscape(fs.getElapsedTime() != null ? fs.getElapsedTime() : "") + "\","
+                + "\"elapsedSec\":" + elapsedSec + ","
+                + "\"ovrFeed\":" + ovrFeed + ","
+                + "\"ovrSpindle\":" + ovrSpindle
+                + "}";
+        return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", json);
+    }
+
+    /**
+     * Deletes a G-code file from the list. Same-origin guarded (it changes
+     * device state) and refuses to delete the file currently being streamed —
+     * pulling the file out from under a running job is dangerous on a CNC.
+     */
+    private Response handleDelete(IHTTPSession session) throws IOException {
+        if (!isSameOriginIfPresent(session)) {
+            return newFixedLengthResponse(
+                    Response.Status.FORBIDDEN, "text/plain", "Cross-origin denied");
+        }
+        // Some clients send a body on POST; parse it so NanoHTTPD doesn't leave
+        // the socket in a weird state. The file name itself is read from the
+        // query string of the action URL, which is always parsed into params.
+        try { session.parseBody(new HashMap<String, String>()); } catch (Exception ignore) {}
+
+        String name = null;
+        List<String> p = session.getParameters().get("name");
+        if (p != null && !p.isEmpty()) name = p.get(0);
+
+        Response redirect = newFixedLengthResponse(Response.Status.REDIRECT_SEE_OTHER, "text/plain", "");
+        if (name == null || name.isEmpty()) {
+            redirect.addHeader("Location", "/");
+            return redirect;
+        }
+
+        // Safety: never delete the file currently being streamed.
+        FileSenderListener fs = FileSenderListener.getInstance();
+        if (FileStreamerIntentService.getIsServiceRunning() && name.equals(fs.getGcodeFileName())) {
+            redirect.addHeader("Location", "/?delerr=busy");
+            return redirect;
+        }
+
+        File target = safeResolve(sanitizeFileName(name));
+        if (target != null && target.isFile() && hasAllowedExtension(target.getName())) {
+            if (!target.delete()) Log.w(TAG, "delete failed for " + name);
+        }
+        redirect.addHeader("Location", "/");
+        return redirect;
+    }
+
+    /** Polls /status every 2s and updates the header job line in place. */
+    private String jobStatusScript() {
+        return "<script>(function(){"
+                + "function p(n){return(n<10?'0':'')+n;}"
+                + "function fmt(s){s=Math.max(0,Math.round(s));var h=Math.floor(s/3600),"
+                + "m=Math.floor((s%3600)/60),x=s%60;return p(h)+':'+p(m)+':'+p(x);}"
+                + "function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}"
+                + "function upd(){fetch('/status',{cache:'no-store'}).then(function(r){return r.json();})"
+                + ".then(function(d){"
+                + "set('machineState',d.state||'\\u2014');"
+                + "set('ovrFeed',(d.ovrFeed!=null?d.ovrFeed:100)+'%');"
+                + "set('ovrSpindle',(d.ovrSpindle!=null?d.ovrSpindle:100)+'%');"
+                + "var dis=!d.connected,cb=document.querySelectorAll('.ctrl [data-cmd]');"
+                + "for(var i=0;i<cb.length;i++){cb[i].disabled=dis;}"
+                + "var info=document.getElementById('jobInfo'),empty=document.getElementById('jobEmpty');"
+                + "if(d.hasFile){if(info)info.style.display='';if(empty)empty.style.display='none';"
+                + "set('jName',d.file);set('jSent',d.sent);set('jTotal',d.total);"
+                + "var perc=d.total>0?Math.round(d.sent*100/d.total):0;set('jPerc',perc+'%');"
+                + "set('jStatus',d.status);set('jElapsed',d.elapsed);"
+                + "var eta='\\u2014';if(d.streaming&&d.sent>0&&d.total>d.sent){"
+                + "eta=fmt(d.elapsedSec*(d.total-d.sent)/d.sent);}set('jEta',eta);"
+                + "}else{if(info)info.style.display='none';if(empty)empty.style.display='';}"
+                + "}).catch(function(){});}"
+                + "upd();setInterval(upd,2000);"
+                + "})();</script>";
+    }
+
+    /**
+     * Wires the machine-control buttons to POST /control?cmd=… . The "stop"
+     * (soft reset) button asks for confirmation first, since it aborts the job.
+     */
+    private String controlScript() {
+        return "<script>(function(){"
+                + "var btns=document.querySelectorAll('.ctrl [data-cmd]');"
+                + "for(var i=0;i<btns.length;i++){(function(b){"
+                + "b.addEventListener('click',function(){"
+                + "var cmd=b.getAttribute('data-cmd');"
+                + "if(cmd==='stop'&&!confirm('Arrestare la macchina? Il job in corso verrà interrotto.'))return;"
+                + "fetch('/control?cmd='+encodeURIComponent(cmd),{method:'POST'}).catch(function(){});"
+                + "});})(btns[i]);}"
+                + "})();</script>";
+    }
+
+    /** Confirmation prompt before submitting a delete form. */
+    private String deleteConfirmScript() {
+        return "<script>(function(){"
+                + "var forms=document.querySelectorAll('.delform');"
+                + "for(var i=0;i<forms.length;i++){(function(f){"
+                + "f.addEventListener('submit',function(e){"
+                + "if(!confirm('Eliminare il file \"'+f.getAttribute('data-name')+'\"?'))e.preventDefault();"
+                + "});})(forms[i]);}"
+                + "})();</script>";
+    }
+
+    private static String jsonEscape(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':  b.append("\\\""); break;
+                case '\\': b.append("\\\\"); break;
+                case '\n': b.append("\\n");  break;
+                case '\r': b.append("\\r");  break;
+                case '\t': b.append("\\t");  break;
+                default:
+                    if (c < 0x20) b.append(String.format("\\u%04x", (int) c));
+                    else b.append(c);
+            }
+        }
+        return b.toString();
     }
 
     private List<File> listGcodeFiles() {
