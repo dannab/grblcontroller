@@ -274,26 +274,29 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("td a{color:var(--primary);text-decoration:none;font-weight:500}")
                 .append("td a:hover{text-decoration:underline}")
                 .append(".empty{padding:30px 18px;text-align:center;color:#9e9e9e;font-style:italic}")
-                // Job progress line in header + delete controls + banner
-                .append("header .job{margin-top:6px;font-size:.82em;opacity:.95;")
-                .append("display:flex;gap:4px 14px;flex-wrap:wrap}")
-                .append("header .job b{font-weight:600}")
+                // Header: prominent machine name + two info lines
+                .append(headerInfoCss())
+                // Delete controls + banner
                 .append("th.act,td.act{text-align:right;white-space:nowrap}")
                 .append(".delform{display:inline;margin:0}")
                 .append(".del{background:#c62828;color:#fff;padding:6px 14px;font-size:12px}")
                 .append(".banner{margin-bottom:14px;padding:11px 16px;border-radius:6px;font-size:.9em}")
                 .append(".banner.warn{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}")
-                // Machine control panel (pause / stop / overrides)
-                .append(".ctrl .ovr{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}")
-                .append(".ctrl .ovr .lbl{min-width:110px;color:#616161;font-size:.9em}")
-                .append(".ctrl .ovr b{min-width:54px;text-align:center;color:#263238;")
+                // Machine control bar: pause/stop (left) + overrides (right)
+                .append(".ctrl{display:flex;align-items:stretch;gap:20px;flex-wrap:wrap}")
+                .append(".ctrl .cmain{display:flex;align-items:center;justify-content:center;gap:10px;")
+                .append("padding-right:20px;border-right:1px solid #eee;flex-wrap:wrap}")
+                .append(".ctrl .covr{flex:1;min-width:240px;display:flex;flex-direction:column;")
+                .append("justify-content:center;gap:12px}")
+                .append(".ctrl .ovr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}")
+                .append(".ctrl .ovr .lbl{min-width:104px;color:#616161;font-size:.9em}")
+                .append(".ctrl .ovr b{min-width:50px;text-align:center;color:#263238;")
                 .append("font-variant-numeric:tabular-nums}")
                 .append(".ctrl .ob{background:#eceff1;color:#263238;padding:8px 14px;box-shadow:none}")
                 .append(".ctrl .ob.rst{font-size:12px}")
-                .append(".ctrl-main{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}")
-                .append(".ctrl-main .pause{background:#ef6c00;color:#fff}")
-                .append(".ctrl-main .stopbtn{background:#c62828;color:#fff}")
-                .append(".ctrl .chint{color:#757575;font-size:.82em;margin:12px 0 0}")
+                .append(".ctrl .pause{background:#ef6c00;color:#fff;padding:11px 26px}")
+                .append(".ctrl .stopbtn{background:#c62828;color:#fff;padding:11px 26px}")
+                .append(".ctrl .chint{flex-basis:100%;color:#757575;font-size:.82em;margin:6px 0 0}")
                 .append("button:disabled{opacity:.4;cursor:not-allowed;filter:none!important;box-shadow:none}")
                 .append("footer{max-width:780px;margin:8px auto 20px;padding:0 18px;color:#757575;")
                 .append("font-size:.82em;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}")
@@ -332,9 +335,14 @@ public class GcodeHttpServer extends NanoHTTPD {
         }
 
         // ----- Machine control card (pause / stop / overrides). No resume. -----
+        // Two columns: pause/stop on the left (centred), overrides on the right.
         html.append("<div class=\"card\">")
                 .append("<div class=\"card-head\">Controllo macchina</div>")
                 .append("<div class=\"card-body ctrl\">")
+                .append("<div class=\"cmain\">")
+                .append("<button class=\"pause\" data-cmd=\"pause\">Pausa</button>")
+                .append("<button class=\"stopbtn\" data-cmd=\"stop\">Arresto</button></div>")
+                .append("<div class=\"covr\">")
                 .append("<div class=\"ovr\"><span class=\"lbl\">Avanzamento</span>")
                 .append("<button class=\"ob\" data-cmd=\"feed_minus\">&minus;</button>")
                 .append("<b id=\"ovrFeed\">—</b>")
@@ -345,9 +353,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("<b id=\"ovrSpindle\">—</b>")
                 .append("<button class=\"ob\" data-cmd=\"spindle_plus\">+</button>")
                 .append("<button class=\"ob rst\" data-cmd=\"spindle_reset\">Reset</button></div>")
-                .append("<div class=\"ctrl-main\">")
-                .append("<button class=\"pause\" data-cmd=\"pause\">Pausa</button>")
-                .append("<button class=\"stopbtn\" data-cmd=\"stop\">Arresto</button></div>")
+                .append("</div>")
                 .append("<p class=\"chint\">La pausa ferma il movimento ma <b>non il mandrino</b>. ")
                 .append("Per riprendere usa il telefono alla macchina.</p>")
                 .append("</div></div>");
@@ -740,6 +746,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append(".btn.alt{background:#fff;color:var(--primary);border:1px solid var(--primary);box-shadow:none}")
                 .append(".btn.alt:hover{background:rgba(0,0,0,.04);box-shadow:0 1px 2px rgba(0,0,0,.1)}")
                 .append(".hint{padding:0 20px 16px;color:#757575;font-size:.85em}")
+                .append(headerInfoCss())
                 .append("</style></head><body>");
 
         // Header (same as index, without the ring controls)
@@ -816,18 +823,28 @@ public class GcodeHttpServer extends NanoHTTPD {
      */
     private void appendHeader(StringBuilder html, String machineName, boolean withRing) {
         String state = MachineStatusListener.getInstance().getState();
+        FileSenderListener fs = FileSenderListener.getInstance();
+        boolean hasFile = fs.getGcodeFile() != null;
+        String fileName = hasFile ? fs.getGcodeFileName() : "—";
+        int total = fs.getRowsInFile() != null ? fs.getRowsInFile() : 0;
+        int sent = fs.getRowsSent() != null ? fs.getRowsSent() : 0;
+        int perc = total > 0 ? (int) Math.round(sent * 100.0 / total) : 0;
+        String elapsed = (hasFile && fs.getElapsedTime() != null) ? fs.getElapsedTime() : "—";
+        String mname = (machineName != null && !machineName.isEmpty())
+                ? machineName : "Nessuna macchina connessa";
         html.append("<header><div class=\"row\">")
                 .append("<div class=\"logo\">⚙</div>")
-                .append("<div class=\"hinfo\"><h1>GRBL Machining</h1>")
-                .append("<div class=\"sub\">")
-                .append(machineName != null && !machineName.isEmpty()
-                        ? "Connesso a: <b>" + escapeHtml(machineName) + "</b>"
-                        : "Nessuna macchina connessa")
-                .append(" &middot; Stato macchina: <b id=\"machineState\">")
-                .append(escapeHtml(state != null && !state.isEmpty() ? state : "—"))
-                .append("</b></div>");
-        if (withRing) appendJobInfo(html);
-        html.append("</div>");
+                .append("<div class=\"hinfo\">")
+                .append("<div class=\"eyebrow\">GRBL Machining &middot; connesso a</div>")
+                .append("<div class=\"mname\" id=\"machineName\">").append(escapeHtml(mname)).append("</div>")
+                .append("<div class=\"jline\">File: <b id=\"jName\">").append(escapeHtml(fileName))
+                .append("</b> &middot; Stato: <b id=\"machineState\">")
+                .append(escapeHtml(state != null && !state.isEmpty() ? state : "—")).append("</b></div>")
+                .append("<div class=\"jline\">Righe <b id=\"jSent\">").append(sent)
+                .append("</b> / <b id=\"jTotal\">").append(total).append("</b> (<b id=\"jPerc\">").append(perc)
+                .append("%</b>) &middot; Tempo <b id=\"jElapsed\">").append(escapeHtml(elapsed))
+                .append("</b> &middot; Stima <b id=\"jEta\">—</b></div>")
+                .append("</div>");
         if (withRing) {
             html.append("<div class=\"ring\">")
                     .append("<button type=\"button\" id=\"ringBtn\">Fai squillare</button>")
@@ -836,6 +853,14 @@ public class GcodeHttpServer extends NanoHTTPD {
                     .append("</div>");
         }
         html.append("</div></header>");
+    }
+
+    /** CSS for the header info block (prominent machine name + two info lines). */
+    private static String headerInfoCss() {
+        return "header .eyebrow{font-size:12px;opacity:.8;letter-spacing:.3px}"
+                + "header .mname{font-size:21px;font-weight:500;line-height:1.2;margin:1px 0 8px}"
+                + "header .jline{font-size:13.5px;opacity:.95;margin-bottom:3px}"
+                + "header .jline b{font-weight:600}";
     }
 
     /** Client logic for the header "find the phone" buttons. */
@@ -859,32 +884,6 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "})();</script>";
     }
 
-    /**
-     * Live job progress block shown in the header (only on the index). The IDs
-     * are kept in sync client-side by {@link #jobStatusScript()} polling /status.
-     */
-    private void appendJobInfo(StringBuilder html) {
-        FileSenderListener fs = FileSenderListener.getInstance();
-        boolean hasFile = fs.getGcodeFile() != null;
-        String fileName = hasFile ? fs.getGcodeFileName() : "";
-        int total = fs.getRowsInFile() != null ? fs.getRowsInFile() : 0;
-        int sent = fs.getRowsSent() != null ? fs.getRowsSent() : 0;
-        int perc = total > 0 ? (int) Math.round(sent * 100.0 / total) : 0;
-        String status = fs.getStatus() != null ? fs.getStatus() : "";
-        String elapsed = fs.getElapsedTime() != null ? fs.getElapsedTime() : "";
-        html.append("<div class=\"job\">")
-                .append("<span id=\"jobEmpty\"").append(hasFile ? " style=\"display:none\"" : "")
-                .append(">Nessun file caricato</span>")
-                .append("<span id=\"jobInfo\"").append(hasFile ? "" : " style=\"display:none\"").append(">")
-                .append("File: <b id=\"jName\">").append(escapeHtml(fileName)).append("</b>")
-                .append(" &middot; Righe <b id=\"jSent\">").append(sent).append("</b>/<b id=\"jTotal\">")
-                .append(total).append("</b> (<b id=\"jPerc\">").append(perc).append("%</b>)")
-                .append(" &middot; <b id=\"jStatus\">").append(escapeHtml(status)).append("</b>")
-                .append(" &middot; Tempo <b id=\"jElapsed\">").append(escapeHtml(elapsed)).append("</b>")
-                .append(" &middot; Stima rimanente <b id=\"jEta\">—</b>")
-                .append("</span></div>");
-    }
-
     /** JSON snapshot of machine state + current job progress, polled by the page. */
     private Response handleStatus() {
         FileSenderListener fs = FileSenderListener.getInstance();
@@ -900,8 +899,10 @@ public class GcodeHttpServer extends NanoHTTPD {
         MachineStatusListener.OverridePercents ovr = ms.getOverridePercents();
         int ovrFeed = (ovr != null) ? ovr.feed : 100;
         int ovrSpindle = (ovr != null) ? ovr.spindle : 100;
+        String machine = HttpServerManager.getMachineName();
         String json = "{"
                 + "\"state\":\"" + jsonEscape(state != null ? state : "") + "\","
+                + "\"machine\":\"" + jsonEscape(machine != null ? machine : "") + "\","
                 + "\"status\":\"" + jsonEscape(fs.getStatus() != null ? fs.getStatus() : "") + "\","
                 + "\"connected\":" + connected + ","
                 + "\"hasFile\":" + hasFile + ","
@@ -966,19 +967,17 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}"
                 + "function upd(){fetch('/status',{cache:'no-store'}).then(function(r){return r.json();})"
                 + ".then(function(d){"
+                + "set('machineName',d.connected?(d.machine||'Macchina connessa'):'Nessuna macchina connessa');"
                 + "set('machineState',d.state||'\\u2014');"
                 + "set('ovrFeed',(d.ovrFeed!=null?d.ovrFeed:100)+'%');"
                 + "set('ovrSpindle',(d.ovrSpindle!=null?d.ovrSpindle:100)+'%');"
                 + "var dis=!d.connected,cb=document.querySelectorAll('.ctrl [data-cmd]');"
                 + "for(var i=0;i<cb.length;i++){cb[i].disabled=dis;}"
-                + "var info=document.getElementById('jobInfo'),empty=document.getElementById('jobEmpty');"
-                + "if(d.hasFile){if(info)info.style.display='';if(empty)empty.style.display='none';"
-                + "set('jName',d.file);set('jSent',d.sent);set('jTotal',d.total);"
+                + "set('jName',d.hasFile?d.file:'\\u2014');set('jSent',d.sent);set('jTotal',d.total);"
                 + "var perc=d.total>0?Math.round(d.sent*100/d.total):0;set('jPerc',perc+'%');"
-                + "set('jStatus',d.status);set('jElapsed',d.elapsed);"
+                + "set('jElapsed',d.hasFile?d.elapsed:'\\u2014');"
                 + "var eta='\\u2014';if(d.streaming&&d.sent>0&&d.total>d.sent){"
                 + "eta=fmt(d.elapsedSec*(d.total-d.sent)/d.sent);}set('jEta',eta);"
-                + "}else{if(info)info.style.display='none';if(empty)empty.style.display='';}"
                 + "}).catch(function(){});}"
                 + "upd();setInterval(upd,2000);"
                 + "})();</script>";
