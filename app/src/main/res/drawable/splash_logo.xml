@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp" android:height="320dp"
+    android:viewportWidth="320" android:viewportHeight="320">
+  <path android:pathData="M142.00,178.00 L142.00,148.00 Q142.00,142.00 146.24,146.24 L155.76,155.76 Q160.00,160.00 164.24,155.76 L173.76,146.24 Q178.00,142.00 178.00,148.00 L178.00,172.00 Q178.00,178.00 178.00,184.00 L178.00,190.00 Q178.00,196.00 172.00,196.00 L130.00,196.00 Q124.00,196.00 124.00,190.00 L124.00,132.00 Q124.00,126.00 130.00,126.00 L190.00,126.00 Q196.00,126.00 196.00,132.00 L196.00,206.00 Q196.00,212.00 190.00,212.00 L114.00,212.00 Q108.00,212.00 108.00,206.00 L108.00,116.00 Q108.00,110.00 114.00,110.00 L206.00,110.00 Q212.00,110.00 212.00,116.00 L212.00,222.00 Q212.00,228.00 206.00,228.00 L98.00,228.00 Q92.00,228.00 92.00,222.00 L92.00,100.00 Q92.00,94.00 98.00,94.00 L222.00,94.00 Q228.00,94.00 228.00,100.00 L228.00,238.00 Q228.00,244.00 222.00,244.00 L82.00,244.00 Q76.00,244.00 76.00,238.00 L76.00,84.00 Q76.00,78.00 82.00,78.00 L238.00,78.00 Q244.00,78.00 244.00,84.00 L244.00,254.00 Q244.00,260.00 238.00,260.00 L66.00,260.00 Q60.00,260.00 60.00,254.00 L60.00,68.00 Q60.00,62.00 66.00,62.00 L260.00,62.00" android:strokeWidth="6.0"
+    android:strokeLineCap="round" android:strokeLineJoin="round">
+    <aapt:attr name="android:strokeColor">
+      <gradient android:type="linear"
+        android:startX="76.00" android:startY="76.00"
+        android:endX="244.00" android:endY="260.00">
+        <item android:offset="0" android:color="#FF0D47A1"/>
+        <item android:offset="1" android:color="#FF2979FF"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+  <path android:pathData="M160.00,52.00 L109.00,106.00 L211.00,106.00 Z M160.00,268.00 L109.00,214.00 L211.00,214.00 Z M52.00,160.00 L106.00,109.00 L106.00,211.00 Z M268.00,160.00 L214.00,109.00 L214.00,211.00 Z" android:fillColor="#FF00E5FF"/>
+  <path android:pathData="M196.00,126.00 L196.00,206.00 Q196.00,212.00 190.00,212.00 L114.00,212.00 Q108.00,212.00 108.00,206.00 L108.00,116.00 Q108.00,110.00 114.00,110.00 L212.00,110.00" android:strokeWidth="6.0"
+    android:strokeLineCap="round" android:strokeLineJoin="round">
+    <aapt:attr name="android:strokeColor">
+      <gradient android:type="linear"
+        android:startX="76.00" android:startY="76.00"
+        android:endX="244.00" android:endY="260.00">
+        <item android:offset="0" android:color="#FF0D47A1"/>
+        <item android:offset="1" android:color="#FF2979FF"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+  <path android:pathData="M228.00,94.00 L228.00,238.00 Q228.00,244.00 222.00,244.00 L82.00,244.00 Q76.00,244.00 76.00,238.00 L76.00,84.00 Q76.00,78.00 82.00,78.00 L244.00,78.00" android:strokeWidth="6.0"
+    android:strokeLineCap="round" android:strokeLineJoin="round">
+    <aapt:attr name="android:strokeColor">
+      <gradient android:type="linear"
+        android:startX="76.00" android:startY="76.00"
+        android:endX="244.00" android:endY="260.00">
+        <item android:offset="0" android:color="#FF0D47A1"/>
+        <item android:offset="1" android:color="#FF2979FF"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+</vector>
