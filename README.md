@@ -12,11 +12,13 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 - **3-point autolevel** — probe three points on the stock, the app computes the plane compensation and writes a `_leveled` copy of the G-code file.
 - **Z plunge analyzer** — scans the G-code before the job and flags suspicious deep/steep Z plunges (wrong zero, missing safe height), so you catch them before the bit does.
 - **G-code editor** — built-in editor with G-code syntax highlighting and search.
-- **HTTP file server** — send and fetch G-code files from your PC browser over WiFi; password protected, runs as a foreground service with the URL shown in the notification (user: `grbl`).
+- **HTTP file server with remote control** — send and fetch G-code files from your PC browser over WiFi; password protected, runs as a foreground service with the URL shown in the notification (user: `grbl`). The web page is themed to match the app and shows a live header with the machine name and status, plus controls to **pause/stop the running job** and adjust **feed and spindle overrides** in real time from across the workshop.
+- **"Make it ring"** — a button on the web page makes the host phone ring at max volume (even in silent mode) with vibration and a 30 s auto-stop, so you can find it on a noisy shop floor.
+- **Color schemes** — pick one of four schemes (slate, red, blue, teal) in Settings; the choice is applied to both the app and the web interface.
 - **CAM tab** — generate simple jobs directly on the device (lines, circles, rectangles) with multiple Z passes, saved straight into the file sender.
 - **Reworked jogging** — 4 axis separate step and continuous modes, step size cycling via the central joypad button.
 - **Restore work coordinates on connect** — optional: on reconnect, if the jog fields still hold X/Y/Z/A values, the app offers to reapply them to the machine with `G10 L20 P0` — handy to recover your zero after an accidental disconnect mid-job (only correct if the tool hasn't moved).
-- **Quality of life** — flashlight button, UI rearrangement, safety checks before starting a job.
+- **Quality of life** — flashlight button, UI rearrangement, safety checks before starting a job, and a fresh adaptive (vector) app icon with a coordinated splash screen.
 - **Modern Android** — target SDK 35; files are picked via the system picker (SAF) and stored in the app media folder, so **no storage permissions** are required; runtime Bluetooth permissions (Android 12+); tested on Android 16.
 - **No telemetry** — Firebase and push notifications removed: the app talks to your machine and nothing else.
 
