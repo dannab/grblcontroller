@@ -164,6 +164,7 @@ public class GrblBluetoothSerialService extends Service{
         super.onDestroy();
 
         disconnectService();
+        serialBluetoothCommunicationHandler.shutdown();
         mState = STATE_NONE;
         this.stop();
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){

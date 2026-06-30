@@ -284,7 +284,12 @@ public class FileStreamerIntentService extends IntentService{
             br.close();
             fileSenderListener.setRowsSent(linesSent);
 
-        }catch (IOException | NullPointerException ignored){}
+        }catch (IOException | NullPointerException e){
+            // Un errore di lettura a metà job non deve passare in silenzio:
+            // senza notifica il flusso prosegue e il job sembra completato.
+            Log.e(TAG, "Error reading gcode file during streaming", e);
+            EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_error_reading_file), true, true));
+        }
 
     }
 

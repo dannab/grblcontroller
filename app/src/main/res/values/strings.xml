@@ -376,6 +376,7 @@
     <string name="text_file_reading_in_progress">File reading in progress</string>
     <string name="text_file_checking_started">File Checking Started</string>
     <string name="text_file_streaming_started">File Streaming Started</string>
+    <string name="text_error_reading_file">Error reading the G-code file: streaming interrupted</string>
     <string name="text_starting_streaming">Starting GCODE streaming</string>
     <string name="text_check_every_thing">do check every thing is ready!</string>
     <string name="text_continue_streaming">Continue</string>

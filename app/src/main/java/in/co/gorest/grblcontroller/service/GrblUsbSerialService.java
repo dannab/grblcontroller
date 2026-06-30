@@ -158,6 +158,7 @@ public class GrblUsbSerialService extends Service {
         super.onDestroy();
 
         unregisterReceiver(usbReceiver);
+        serialUsbCommunicationHandler.shutdown();
         GrblUsbSerialService.isGrblFound = false;
         GrblUsbSerialService.SERVICE_CONNECTED = false;
 

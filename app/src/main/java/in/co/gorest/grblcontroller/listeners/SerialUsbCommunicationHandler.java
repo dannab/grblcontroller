@@ -106,4 +106,14 @@ public class SerialUsbCommunicationHandler extends SerialCommunicationHandler {
         if(grblStatusUpdater != null) grblStatusUpdater.shutdownNow();
     }
 
+    /**
+     * Da chiamare alla distruzione del service: chiude definitivamente anche
+     * il singleThreadExecutor (creato una sola volta nel costruttore), che
+     * altrimenti terrebbe vivo un thread non-daemon per ogni connessione.
+     */
+    public void shutdown(){
+        stopGrblStatusUpdateService();
+        singleThreadExecutor.shutdownNow();
+    }
+
 }
