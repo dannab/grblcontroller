@@ -28,8 +28,8 @@ android {
         applicationId "io.github.dannab.grblmachining"
         minSdkVersion 23
         targetSdkVersion 35
-        versionCode 39
-        versionName "2.58"
+        versionCode 40
+        versionName "3.0.0-beta3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
