@@ -223,11 +223,19 @@ public class GcodeHttpServer extends NanoHTTPD {
         }
         String machineName = HttpServerManager.getMachineName();
 
+        // Titolo scheda = nome macchina quando connessa, così più schede aperte
+        // su macchine diverse si distinguono nel browser. Lo stesso valore viene
+        // poi tenuto in sincrono lato client dal polling di /status.
+        String stateNow = MachineStatusListener.getInstance().getState();
+        boolean connectedNow = !MachineStatusListener.STATE_NOT_CONNECTED.equals(stateNow);
+        String pageTitle = (connectedNow && machineName != null && !machineName.isEmpty())
+                ? machineName : "GRBL Machining";
+
         StringBuilder html = new StringBuilder(4096);
         html.append("<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
                 .append("<meta name=\"theme-color\" content=\"").append(palette.primary).append("\">")
-                .append("<title>GRBL Machining — File</title>")
+                .append("<title>").append(escapeHtml(pageTitle)).append("</title>")
                 // Favicon: small SVG wrench emoji as data URI, no asset round-trip
                 .append("<link rel=\"icon\" type=\"image/svg+xml\" href=\"").append(faviconHref()).append("\">")
                 .append("<style>")
@@ -255,6 +263,16 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append(".card-body{padding:18px}")
                 .append("input[type=file]{display:block;width:100%;padding:10px;border:1px dashed #bdbdbd;")
                 .append("border-radius:6px;background:#fafafa;margin-bottom:12px}")
+                // Upload progress bar (hidden until an upload is in flight)
+                .append(".progress{display:none;margin-top:14px}")
+                .append(".progress.on{display:block}")
+                .append(".progress .bar{height:10px;background:#eceff1;border-radius:5px;overflow:hidden}")
+                .append(".progress .fill{height:100%;width:0;background:var(--accent);")
+                .append("transition:width .15s ease-out}")
+                .append(".progress .ptext{margin-top:8px;color:#616161;font-size:.86em;")
+                .append("font-variant-numeric:tabular-nums}")
+                .append(".progress.err .fill{background:#c62828}")
+                .append(".progress.err .ptext{color:#c62828}")
                 .append("button{background:var(--accent);color:var(--on-accent);border:0;border-radius:4px;")
                 .append("padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;")
                 .append("letter-spacing:.5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.2);")
@@ -366,24 +384,55 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("<p class=\"hint\">Se un file con lo stesso nome esiste, viene rinominato con un suffisso. ")
                 .append("Estensioni accettate: .nc .gcode .gco .tap .cnc .ngc .txt</p>")
                 .append("<input type=\"file\" id=\"filePicker\" name=\"file\" multiple required>")
-                .append("<button type=\"submit\">Carica</button>")
-                .append("</form></div></div>")
-                // JS: prima di inviare il form, aggiunge un hidden input "expected"
-                // per ogni file selezionato con valore "<nome>:<dimensione_in_byte>".
-                // Il server confronterà i byte effettivamente ricevuti con la
-                // dimensione dichiarata e rifiuterà i file troncati (es. a causa
-                // di una WiFi instabile a metà upload). Senza JS (curl, script)
-                // la verifica viene saltata silenziosamente.
+                .append("<button type=\"submit\" id=\"upBtn\">Carica</button>")
+                .append("</form>")
+                // Progress bar: nascosta finché non parte un upload.
+                .append("<div class=\"progress\" id=\"upProg\">")
+                .append("<div class=\"bar\"><div class=\"fill\" id=\"upFill\"></div></div>")
+                .append("<div class=\"ptext\" id=\"upText\">&nbsp;</div></div>")
+                .append("</div></div>")
+                // JS upload: invia il form via XHR così da mostrare l'avanzamento
+                // reale (upload.onprogress) — con file grandi su WiFi lento non si
+                // capirebbe altrimenti se sta caricando. Prima dell'invio aggiunge
+                // un input "expected" per ogni file ("<nome>:<byte>"): il server
+                // confronta i byte ricevuti con la dimensione dichiarata e rifiuta
+                // i file troncati (WiFi che cade a metà upload). A fine richiesta
+                // il server risponde con la index (dopo il 303) oppure con la
+                // pagina d'esito: in entrambi i casi sostituiamo il documento.
                 .append("<script>(function(){")
                 .append("var form=document.getElementById('uploadForm');")
                 .append("var picker=document.getElementById('filePicker');")
-                .append("form.addEventListener('submit',function(){")
+                .append("var prog=document.getElementById('upProg');")
+                .append("var fill=document.getElementById('upFill');")
+                .append("var ptext=document.getElementById('upText');")
+                .append("var btn=document.getElementById('upBtn');")
+                .append("form.addEventListener('submit',function(ev){")
+                .append("if(!picker.files.length)return;")
+                .append("ev.preventDefault();")
                 .append("form.querySelectorAll('input[name=\"expected\"]').forEach(function(i){i.remove();});")
                 .append("for(var i=0;i<picker.files.length;i++){")
                 .append("var f=picker.files[i];")
                 .append("var inp=document.createElement('input');")
                 .append("inp.type='hidden';inp.name='expected';inp.value=f.name+':'+f.size;")
                 .append("form.appendChild(inp);}")
+                .append("var xhr=new XMLHttpRequest();")
+                .append("xhr.open('POST',form.action,true);")
+                .append("btn.disabled=true;prog.className='progress on';")
+                .append("fill.style.width='0%';ptext.textContent='Caricamento\\u2026 0%';")
+                .append("xhr.upload.addEventListener('progress',function(e){")
+                .append("if(e.lengthComputable){var pc=Math.round(e.loaded*100/e.total);")
+                .append("fill.style.width=pc+'%';")
+                .append("ptext.textContent=pc<100?('Caricamento\\u2026 '+pc+'%')")
+                .append(":'Elaborazione sul dispositivo\\u2026';}});")
+                .append("xhr.addEventListener('load',function(){")
+                .append("fill.style.width='100%';")
+                .append("document.open();document.write(xhr.responseText);document.close();")
+                .append("if(history.replaceState&&xhr.responseURL){")
+                .append("history.replaceState({},'',xhr.responseURL);}});")
+                .append("xhr.addEventListener('error',function(){")
+                .append("btn.disabled=false;prog.className='progress on err';")
+                .append("ptext.textContent='Errore di rete durante l\\'upload. Riprova.';});")
+                .append("xhr.send(new FormData(form));")
                 .append("});")
                 .append("})();</script>");
 
@@ -968,6 +1017,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "function upd(){fetch('/status',{cache:'no-store'}).then(function(r){return r.json();})"
                 + ".then(function(d){"
                 + "set('machineName',d.connected?(d.machine||'Macchina connessa'):'Nessuna macchina connessa');"
+                + "document.title=d.connected?(d.machine||'Macchina connessa'):'GRBL Machining';"
                 + "set('machineState',d.state||'\\u2014');"
                 + "set('ovrFeed',(d.ovrFeed!=null?d.ovrFeed:100)+'%');"
                 + "set('ovrSpindle',(d.ovrSpindle!=null?d.ovrSpindle:100)+'%');"
