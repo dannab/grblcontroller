@@ -38,13 +38,10 @@ import org.greenrobot.eventbus.ThreadMode;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.events.GrblErrorEvent;
@@ -58,6 +55,7 @@ import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.model.GcodeCommand;
 import in.co.gorest.grblcontroller.util.GrblUtils;
+import in.co.gorest.grblcontroller.util.SerialRxBufferThrottle;
 
 
 public class FileStreamerIntentService extends IntentService{
@@ -66,11 +64,8 @@ public class FileStreamerIntentService extends IntentService{
 
     public static final String CHECK_MODE_ENABLED = "CHECK_MODE_ENABLED";
     public static final String SERIAL_CONNECTION_TYPE = "SERIAL_CONNECTION_TYPE";
-    private static int MAX_RX_SERIAL_BUFFER = Constants.DEFAULT_SERIAL_RX_BUFFER - 3;
-    private static int CURRENT_RX_SERIAL_BUFFER = 0;
 
-    private final LinkedList<Integer> activeCommandSizes = new LinkedList<>();
-    private final BlockingQueue<Integer> completedCommands = new ArrayBlockingQueue<>(Constants.DEFAULT_SERIAL_RX_BUFFER);
+    private final SerialRxBufferThrottle rxThrottle = new SerialRxBufferThrottle();
 
     private static volatile boolean isServiceRunning = false;
     private static volatile boolean shouldContinue = true;
@@ -142,7 +137,7 @@ public class FileStreamerIntentService extends IntentService{
         machineStatusListener = MachineStatusListener.getInstance();
 
         MachineStatusListener.CompileTimeOptions compileTimeOptions = machineStatusListener.getCompileTimeOptions();
-        if(compileTimeOptions.serialRxBuffer > 0) MAX_RX_SERIAL_BUFFER = compileTimeOptions.serialRxBuffer - 3;
+        rxThrottle.setSerialRxBufferSize(compileTimeOptions.serialRxBuffer);
         Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
 
         boolean isCheckMode = intent.getBooleanExtra(CHECK_MODE_ENABLED, false);
@@ -327,49 +322,27 @@ public class FileStreamerIntentService extends IntentService{
 
     private void waitUntilBufferRunOut(boolean dwell){
         if(dwell) streamLine(new GcodeCommand("G4P0.01"));
-
-        while(CURRENT_RX_SERIAL_BUFFER > 0){
-            try {
-                completedCommands.take();
-                if(activeCommandSizes.size() > 0) CURRENT_RX_SERIAL_BUFFER -= activeCommandSizes.removeFirst();
-            } catch (Exception e) {
-                Log.e(TAG, e.getMessage(), e);
-                return;
-            }
-        }
+        rxThrottle.waitUntilDrained();
     }
 
     private void streamLine(GcodeCommand gcodeCommand){
 
         if(machineStatusListener.getSingleStepMode()){
-            try {
-                EventBus.getDefault().post(gcodeCommand);
-                completedCommands.take();
-            } catch (InterruptedException ignored) {}
+            EventBus.getDefault().post(gcodeCommand);
+            rxThrottle.awaitSingleCompletion();
         }else{
             // Wait until there is room, if necessary.
-            while (MAX_RX_SERIAL_BUFFER < (CURRENT_RX_SERIAL_BUFFER + gcodeCommand.getSize())) {
-                try {
-                    completedCommands.take();
-                    if(activeCommandSizes.size() > 0) CURRENT_RX_SERIAL_BUFFER -= activeCommandSizes.removeFirst();
-                } catch (InterruptedException e) {
-                    Log.e(TAG, e.getMessage(), e);
-                    return;
-                }
-            }
+            if(!rxThrottle.waitForSpace(gcodeCommand.getSize())) return;
 
             if(getShouldContinue()){
-                activeCommandSizes.offer(gcodeCommand.getSize());
-                CURRENT_RX_SERIAL_BUFFER += gcodeCommand.getSize();
+                rxThrottle.commit(gcodeCommand.getSize());
                 EventBus.getDefault().post(gcodeCommand);
             }
         }
     }
 
     private void clearBuffers(){
-        CURRENT_RX_SERIAL_BUFFER = 0;
-        if(activeCommandSizes.size() > 0) activeCommandSizes.clear();
-        if(completedCommands.size() > 0) completedCommands.clear();
+        rxThrottle.clear();
     }
 
     private Notification getNotification(String title, String message){
@@ -384,9 +357,7 @@ public class FileStreamerIntentService extends IntentService{
 
     @Subscribe(threadMode = ThreadMode.BACKGROUND)
     public void onGrblOkEvent(GrblOkEvent event){
-        try {
-            completedCommands.put(1);
-        } catch (InterruptedException ignored) {}
+        rxThrottle.onCommandCompleted();
     }
 
     @Subscribe(threadMode = ThreadMode.BACKGROUND)
