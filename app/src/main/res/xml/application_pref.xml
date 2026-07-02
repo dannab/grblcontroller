@@ -80,14 +80,6 @@
     </PreferenceScreen>
 
     <PreferenceScreen
-        android:key="jogging_preferences_flashcard"
-        android:icon="@drawable/ic_open_with_black_24dp"
-        android:title="@string/text_jogging_preferences"
-        android:summary="@string/text_jogging_preferences_desc">
-
-        <Preference android:title="@string/text_jogging_preferences"/>
-
-        <PreferenceScreen
             android:key="custom_button_flashcard"
             android:icon="@drawable/ic_keyboard_black_24dp"
             android:title="@string/text_custom_buttons"
@@ -319,8 +311,6 @@
                     android:title="@string/text_confirm_first"
                     android:summary="@string/text_confirm_first_desc" />
             </PreferenceScreen>
-
-        </PreferenceScreen>
 
     </PreferenceScreen>
 

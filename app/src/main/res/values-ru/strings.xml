@@ -176,7 +176,6 @@
     <string name="text_usb_connection_baud_rate">Коэффициент бода подключения Usb</string>
     <string name="text_remember_file_location">Запомнить местоположение файла</string>
     <string name="text_remember_file_location_desc">открывает сборщик с последним используемым местоположением файла</string>
-    <string name="text_jogging_preferences">Предпочтения бегом</string>
     <string name="test_set_cordinate_system">Установить координационную систему G10 L20 P0 %s-</string>
     <string name="test_set_cordinate_system_description">изменение местоположения оси %s в текущей системе координат к заданной стоимости</string>
     <string name="text_single_step_mode">Включить режим одного шага</string>
@@ -433,7 +432,6 @@
     <!-- Пункты настроек -->
     <string name="text_startup_string">Строка запуска Grbl</string>
     <string name="text_startup_string_desc">Если у вас пользовательская прошивка на основе grbl 1.1, введите здесь полную строку запуска</string>
-    <string name="text_jogging_preferences_desc">настройка панели перемещения</string>
     <string name="text_custom_buttons_configure">настройка пользовательских кнопок и их поведения</string>
     <string name="text_custom_buttons_configuration">Настройка пользовательских кнопок</string>
     <string name="text_ignore_error_20">Игнорировать ошибку неподдерживаемой команды gcode</string>

@@ -256,7 +256,6 @@
     <string name="text_usb_connection_baud_rate">Velocità di trasmissione della connessione USB</string>
     <string name="text_remember_file_location">Ricorda la posizione del file</string>
     <string name="text_remember_file_location_desc">apre il selettore con l\'ultima posizione del file utilizzata</string>
-    <string name="text_jogging_preferences">Preferenze Jogging</string>
     <string name="test_set_cordinate_system">Imposta Sistema di Coordinate G10 L20 P0 %s-</string>
     <string name="test_set_cordinate_system_description">cambia la posizione dell\'asse %s nel sistema di coordinate corrente al valore specificato</string>
     <string name="text_single_step_mode">Abilita la modalità a passo singolo</string>
@@ -404,7 +403,6 @@
     <!-- Voci impostazioni -->
     <string name="text_startup_string">Stringa di avvio Grbl</string>
     <string name="text_startup_string_desc">Se hai un firmware personalizzato basato su grbl 1.1, inserisci qui la stringa di avvio completa</string>
-    <string name="text_jogging_preferences_desc">personalizza le preferenze del pannello jogging</string>
     <string name="text_custom_buttons_configure">configura i pulsanti personalizzati e il loro comportamento</string>
     <string name="text_custom_buttons_configuration">Configurazione pulsanti personalizzati</string>
     <string name="text_ignore_error_20">Ignora errore comando gcode non supportato</string>

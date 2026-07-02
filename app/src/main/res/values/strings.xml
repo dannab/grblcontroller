@@ -391,7 +391,6 @@
     <string name="text_usb_connection_baud_rate">Usb connection baud rate</string>
     <string name="text_remember_file_location">Remember file location</string>
     <string name="text_remember_file_location_desc">opens picker with last used file location</string>
-    <string name="text_jogging_preferences">Jogging preferences</string>
     <string name="test_set_cordinate_system">Set Coordinate System G10 L20 P0 %s-</string>
     <string name="test_set_cordinate_system_description">changes %s axis location in the current coordinate system to the given value</string>
     <string name="text_single_step_mode">Enable single step mode</string>
@@ -514,7 +513,6 @@
     <!-- Settings items formerly hardcoded in application_pref.xml -->
     <string name="text_startup_string">Grbl start-up string</string>
     <string name="text_startup_string_desc">If you have custom firmware based on grbl 1.1, enter the full start-up string here</string>
-    <string name="text_jogging_preferences_desc">customize jogging panel preferences</string>
     <string name="text_custom_buttons_configure">configure custom buttons and their behaviour</string>
     <string name="text_custom_buttons_configuration">Custom Buttons Configuration</string>
     <string name="text_ignore_error_20">Ignore unsupported gcode command error</string>
