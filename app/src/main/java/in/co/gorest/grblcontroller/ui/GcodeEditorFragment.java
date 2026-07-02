@@ -176,7 +176,7 @@ public class GcodeEditorFragment extends BaseFragment {
         if (fileNameText != null) {
             String base = currentGcodeFile != null
                     ? currentGcodeFile.getName()
-                    : "Nessun file nel File Sender";
+                    : getString(R.string.text_no_file_in_sender);
             fileNameText.setText(idle ? base : "(R/O) " + base);
         }
     }
@@ -278,7 +278,7 @@ public class GcodeEditorFragment extends BaseFragment {
                 }
             } catch (IOException e) {
                 currentGcodeFile = null;
-                postUiToast("Errore lettura file: " + e.getMessage(), true);
+                postUiToast(getString(R.string.text_file_read_error, e.getMessage()), true);
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() ->
                             loadingOverlay.setVisibility(View.GONE));
@@ -293,7 +293,7 @@ public class GcodeEditorFragment extends BaseFragment {
      */
     private void saveCurrentGcode() {
         if (currentGcodeFile == null || !isEditorLoaded) {
-            postUiToast("Nessun file da salvare", true);
+            postUiToast(getString(R.string.text_no_file_to_save), true);
             return;
         }
 
@@ -323,9 +323,9 @@ public class GcodeEditorFragment extends BaseFragment {
                     try (BufferedWriter bw = new BufferedWriter(new FileWriter(currentGcodeFile))) {
                         bw.write(unescapedContent);
                         bw.flush();
-                        postUiToast("File G-Code salvato e sincronizzato", false);
+                        postUiToast(getString(R.string.text_file_saved_synced), false);
                     } catch (IOException e) {
-                        postUiToast("Errore durante il salvataggio: " + e.getMessage(), true);
+                        postUiToast(getString(R.string.text_file_save_error, e.getMessage()), true);
                     } finally {
                         if (isAdded()) {
                             final File saved = currentGcodeFile;

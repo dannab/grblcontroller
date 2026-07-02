@@ -66,21 +66,6 @@ import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.util.GcodeLeveling;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
-
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import android.view.View;
-
-
-
 public class JoggingTabFragment extends BaseFragment implements View.OnClickListener, View.OnLongClickListener {
 
     private static final String TAG = JoggingTabFragment.class.getSimpleName();
@@ -620,11 +605,11 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             fos.write(pointsCoords.getBytes());
             fos.flush();
             EventBus.getDefault().post(new UiToastEvent(
-                    "Punto salvato: " + newPoint.trim(), true, false));
+                    getString(R.string.text_point_saved, newPoint.trim()), true, false));
         } catch (IOException e) {
             Log.e(TAG, "Errore scrittura points.txt: " + e.getMessage());
             EventBus.getDefault().post(new UiToastEvent(
-                    "Errore salvataggio punto", true, true));
+                    getString(R.string.text_point_save_error), true, true));
         }
     }
 
@@ -634,24 +619,23 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      */
     private void deletePointsFile() {
         new AlertDialog.Builder(getActivity())
-                .setTitle("Cancella punti di piazzamento")
-                .setMessage("Vuoi cancellare tutti i punti salvati in points.txt?\n"
-                        + "L'operazione è irreversibile.")
+                .setTitle(getString(R.string.text_clear_points_title))
+                .setMessage(getString(R.string.text_clear_points_desc))
                 .setPositiveButton(getString(R.string.text_yes_confirm), (dialog, which) -> {
                     File pointsFile = getPointsFile();
                     if (pointsFile != null && pointsFile.exists()) {
                         if (pointsFile.delete()) {
                             pointsCoords = "";
                             EventBus.getDefault().post(new UiToastEvent(
-                                    "File points.txt cancellato.", true, false));
+                                    getString(R.string.text_points_file_deleted), true, false));
                         } else {
                             EventBus.getDefault().post(new UiToastEvent(
-                                    "Errore durante la cancellazione.", true, true));
+                                    getString(R.string.text_points_delete_error), true, true));
                         }
                     } else {
                         pointsCoords = "";
                         EventBus.getDefault().post(new UiToastEvent(
-                                "Nessun file da cancellare.", true, false));
+                                getString(R.string.text_no_points_file), true, false));
                     }
                 })
                 .setNegativeButton(getString(R.string.text_no_confirm), null)
@@ -666,7 +650,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
         if (currentGcodeFile == null) {
             org.greenrobot.eventbus.EventBus.getDefault().post(
-                    new in.co.gorest.grblcontroller.events.UiToastEvent("Nessun file selezionato nel File Sender!", true, true));
+                    new in.co.gorest.grblcontroller.events.UiToastEvent(getString(R.string.text_no_file_in_sender), true, true));
             return;
         }
 
@@ -680,7 +664,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                         // Ora potrà andare nel primo tab, fare "Seleziona File" e troverà il file pronto.
                         org.greenrobot.eventbus.EventBus.getDefault().post(
                                 new in.co.gorest.grblcontroller.events.UiToastEvent(
-                                        "File compensato creato: " + leveledFile.getName(), true, false));
+                                        getString(R.string.text_leveled_file_created, leveledFile.getName()), true, false));
                     });
                 }
             }
@@ -885,7 +869,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
         if (cameraManager == null) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Torcia non disponibile", true, true));
+                    getString(R.string.text_torch_unavailable), true, true));
             return;
         }
 
@@ -895,7 +879,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             }
             if (torchCameraId == null) {
                 EventBus.getDefault().post(new UiToastEvent(
-                        "Nessun flash sul dispositivo", true, true));
+                        getString(R.string.text_no_flash), true, true));
                 return;
             }
 
@@ -907,7 +891,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             torchOn = false;
             updateTorchButton();
             EventBus.getDefault().post(new UiToastEvent(
-                    "Impossibile controllare la torcia", true, true));
+                    getString(R.string.text_torch_error), true, true));
         }
     }
 

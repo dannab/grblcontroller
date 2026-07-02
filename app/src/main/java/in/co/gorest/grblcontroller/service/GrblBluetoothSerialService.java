@@ -273,10 +273,13 @@ public class GrblBluetoothSerialService extends Service{
         }
         updateUserInterfaceTitle();
 
+        // Piccola pausa per lasciare assestare la connessione prima del soft
+        // reset. Era Object.wait(250), che funzionava solo perché il metodo è
+        // synchronized: Thread.sleep è l'intento reale.
         try {
-            wait(250);
+            Thread.sleep(250);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
         }
         if(!isGrblFound) serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
     }

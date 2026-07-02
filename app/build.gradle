@@ -1,16 +1,4 @@
-buildscript {
-    repositories {
-    }
-
-    dependencies {
-
-    }
-}
 apply plugin: 'com.android.application'
-
-repositories {
-    maven { url 'https://dl.bintray.com/lukaville/maven' }
-}
 
 // Firma di release: i dati stanno in keystore.properties (NON committato).
 // Senza quel file la build release resta non firmata, il debug funziona comunque.
@@ -76,14 +64,6 @@ android {
     }
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url "https://www.jitpack.io" }
-    }
-}
-
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     androidTestImplementation('androidx.test.espresso:espresso-core:3.6.1', {
@@ -100,10 +80,7 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
     implementation 'org.greenrobot:eventbus:3.3.1'
-    implementation 'com.github.warkiz:IndicatorSeekBar:v2.1.1'
     implementation 'com.github.felHR85:UsbSerial:6.1.0'
-    implementation 'com.github.nbsp-team:MaterialFilePicker:85292dceb0'
-    implementation 'com.github.satyan:sugar:1.5'
     implementation 'com.github.GrenderG:Toasty:1.5.2'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
 

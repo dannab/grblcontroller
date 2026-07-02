@@ -245,13 +245,13 @@ public class CamTabFragment extends BaseFragment {
     private void doCamCalculation() {
         if (!fromSet || !toSet) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Imposta prima i punti FROM e TO.", true, true));
+                    getString(R.string.text_cam_set_from_to_first), true, true));
             return;
         }
 
         if (Xfrom.equals(Xto) && Yfrom.equals(Yto)) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "FROM e TO coincidono — area di lavoro nulla.", true, true));
+                    getString(R.string.text_cam_from_to_equal), true, true));
             return;
         }
 
@@ -291,7 +291,7 @@ public class CamTabFragment extends BaseFragment {
 
             if (gcode.isEmpty()) {
                 EventBus.getDefault().post(new UiToastEvent(
-                        "Nessun GCode generato.", true, true));
+                        getString(R.string.text_cam_no_gcode_generated), true, true));
                 return;
             }
 
@@ -299,7 +299,7 @@ public class CamTabFragment extends BaseFragment {
 
         } catch (NumberFormatException e) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Valore non valido nei parametri CAM: " + e.getMessage(), true, true));
+                    getString(R.string.text_cam_invalid_value, e.getMessage()), true, true));
         }
     }
 
@@ -332,7 +332,7 @@ public class CamTabFragment extends BaseFragment {
         File appDir = getAppMediaDir();
         if (appDir == null) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Errore: cartella app non disponibile", true, true));
+                    getString(R.string.text_app_folder_unavailable), true, true));
             return;
         }
 
@@ -348,11 +348,11 @@ public class CamTabFragment extends BaseFragment {
             new FileSenderTabFragment.ReadFileAsyncTask().execute(jobFile);
 
             EventBus.getDefault().post(new UiToastEvent(
-                    "job.nc salvato e caricato in File Sender", true, false));
+                    getString(R.string.text_cam_job_saved), true, false));
 
         } catch (java.io.IOException e) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Errore salvataggio: " + e.getMessage(), true, true));
+                    getString(R.string.text_cam_save_error, e.getMessage()), true, true));
         }
     }
 

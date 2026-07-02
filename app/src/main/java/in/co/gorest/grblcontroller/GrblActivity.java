@@ -57,7 +57,6 @@ import androidx.viewpager.widget.ViewPager;
 
 import java.io.File;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -361,13 +360,11 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
                 try {
                     Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
                     sharingIntent.setType("text/plain");
-                    String shareBodyText = "Grbl Controller. Very cool CNC controller for grbl firmware https://goo.gl/aVnvp4";
-
-                    sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT,"Grbl Controller");
-                    sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, shareBodyText);
-                    startActivity(Intent.createChooser(sharingIntent, "Sharing Option"));
+                    sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, getString(R.string.app_name));
+                    sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, getString(R.string.text_share_body));
+                    startActivity(Intent.createChooser(sharingIntent, getString(R.string.text_app_share)));
                 }catch (ActivityNotFoundException e){
-                    showToastMessage("No application available to perform this action!", true, true);
+                    showToastMessage(getString(R.string.text_no_app_for_action), true, true);
                 }
 
                 return true;
@@ -399,27 +396,20 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     protected void setupTabLayout(){
         TabLayout tabLayout = findViewById(R.id.tab_layout);
 
-        if (isTablet(this)) {
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(32)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(32)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(32)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(32)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_object_group).colorRes(R.color.colorAccent).sizeDp(32)));       // CAM (Computer Aided Manufacturing)
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(32)));       // Visualizzatore 3D
-
-            // NUOVO: Tab Editor di codice per Tablet
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(32)));       // Editor GCode
-
-        } else {
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_arrows_alt).colorRes(R.color.colorAccent).sizeDp(21)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_file_text).colorRes(R.color.colorAccent).sizeDp(21)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_crosshairs).colorRes(R.color.colorAccent).sizeDp(21)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_television).colorRes(R.color.colorAccent).sizeDp(21)));
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_object_group).colorRes(R.color.colorAccent).sizeDp(21)));       // CAM (Computer Aided Manufacturing)
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_cube).colorRes(R.color.colorAccent).sizeDp(21)));       // Visualizzatore 3D
-
-            // NUOVO: Tab Editor di codice per Smartphone
-            tabLayout.addTab(tabLayout.newTab().setIcon(new IconDrawable(this, FontAwesomeIcons.fa_code).colorRes(R.color.colorAccent).sizeDp(21)));       // Editor GCode
+        // Icone identiche su tablet e telefono, cambia solo la dimensione.
+        int iconSizeDp = isTablet(this) ? 32 : 21;
+        FontAwesomeIcons[] tabIcons = {
+                FontAwesomeIcons.fa_arrows_alt,    // Jogging
+                FontAwesomeIcons.fa_file_text,     // File sender
+                FontAwesomeIcons.fa_crosshairs,    // Probing
+                FontAwesomeIcons.fa_television,    // Console
+                FontAwesomeIcons.fa_object_group,  // CAM (Computer Aided Manufacturing)
+                FontAwesomeIcons.fa_cube,          // Visualizzatore 3D
+                FontAwesomeIcons.fa_code,          // Editor GCode
+        };
+        for (FontAwesomeIcons icon : tabIcons) {
+            tabLayout.addTab(tabLayout.newTab().setIcon(
+                    new IconDrawable(this, icon).colorRes(R.color.colorAccent).sizeDp(iconSizeDp)));
         }
 
         tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
@@ -655,16 +645,14 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         if (isFinishing() || isDestroyed()) return;
         if (warnings == null || warnings.isEmpty()) {
             // Nessun affondo sospetto: feedback discreto, niente dialog
-            showToastMessage(String.format(Locale.US,
-                    "Check Z OK: nessun affondo > %.1f mm e > %.0f°",
+            showToastMessage(getString(R.string.text_z_drop_ok,
                     depthThresh, angleThresh), false, false);
             return;
         }
 
         // Costruisce il body: lista delle prime 30 discese sospette
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US,
-                "Soglie: profondità ≥ %.2f mm, angolo ≥ %.0f°\nFile: %s\n\n",
+        sb.append(getString(R.string.text_z_drop_thresholds,
                 depthThresh, angleThresh, file.getName()));
 
         // Trova la peggiore (più profonda + più ripida) per il titolo
@@ -672,21 +660,18 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         for (GcodeDropChecker.DropWarning w : warnings) {
             if (w.dz < worst.dz) worst = w;
         }
-        sb.append(String.format(Locale.US,
-                "Peggior affondo: ΔZ %.2f mm @ %.1f° (riga %d)\n\n",
+        sb.append(getString(R.string.text_z_drop_worst,
                 worst.dz, worst.angleDeg, worst.lineNumber));
 
         int max = Math.min(30, warnings.size());
-        sb.append(String.format(Locale.US, "Prime %d voci:\n", max));
+        sb.append(getString(R.string.text_z_drop_first_entries, max));
         for (int i = 0; i < max; i++) {
             GcodeDropChecker.DropWarning w = warnings.get(i);
-            sb.append(String.format(Locale.US,
-                    "  riga %-5d  Z: %+7.2f → %+7.2f   ΔZ %+6.2f mm   @ %4.1f°\n",
+            sb.append(getString(R.string.text_z_drop_row,
                     w.lineNumber, w.zBefore, w.zAfter, w.dz, w.angleDeg));
         }
         if (warnings.size() > max) {
-            sb.append(String.format(Locale.US,
-                    "\n…e altre %d voci non mostrate.", warnings.size() - max));
+            sb.append(getString(R.string.text_z_drop_more, warnings.size() - max));
         }
 
         TextView body = new TextView(this);
@@ -702,8 +687,7 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         vScroll.addView(hScroll);
 
         new AlertDialog.Builder(this)
-                .setTitle(String.format(Locale.US,
-                        "⚠ %d affondi Z sospetti", warnings.size()))
+                .setTitle(getString(R.string.text_z_drop_title, warnings.size()))
                 .setView(vScroll)
                 .setPositiveButton(android.R.string.ok, null)
                 .show();

@@ -23,11 +23,6 @@
   -->
 
 <resources>
-    <string name="app_shortcut_long_text_settings">Настройки приложения</string>
-    <string name="app_shortcut_short_test_about">О</string>
-    <string name="app_shortcut_short_test_help">Документация</string>
-    <string name="app_shortcut_short_test_settings">Настройки</string>
-    <string name="enable_ab_axis_description">Добавление двух дополнительных осей A и B к панели управления оси</string>
     <string name="probe_plus_tlo">Зонд {fa-plus 14dp} TLO</string>
     <string name="text_app_about">О</string>
     <string name="text_app_rating">Оценить приложение</string>
@@ -54,9 +49,7 @@
     <string name="text_check_every_thing">убедитесь все ли готово!</string>
     <string name="text_check_machine_position">Проверить положение станка</string>
     <string name="text_check_mode_off">Проверка {fa-toggle-off 16dp}</string>
-    <string name="text_check_mode_off_large">Проверка {fa-toggle-off 24dp}</string>
     <string name="text_check_mode_on">Проверка {fa-toggle-on 16dp @color/colorAccent}</string>
-    <string name="text_check_mode_on_large">Проверка {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_clear_console">Четкие консольные сообщения?</string>
     <string name="text_clear_console_description">Это очистит всю историю терминала</string>
     <string name="text_configure_custom_button">настройки названия и функций кнопки</string>
@@ -77,7 +70,6 @@
     <string name="text_custom_buttons">Пользовательские кнопки</string>
     <string name="text_custom_buttons_desc">несколько команд должны быть разделены новой строкой</string>
     <string name="text_default_connection">Соединение по умолчанию</string>
-    <string name="text_delete_notification">Вы действительно хотите удалить это уведомление?</string>
     <string name="text_device_connection_was_lost">Соединение с устройством разорвано</string>
     <string name="text_disconnect">Отключите!</string>
     <string name="text_disconnect_confirm">вы действительно хотите разорвать соединение?</string>
@@ -86,7 +78,6 @@
     <string name="text_dynamic_tlo_desc">TLO будет применяться с разницей последнего положения зонда и текущей позиции зонда. Нажмите \"Да\", чтобы продолжить.</string>
     <string name="text_dynamic_tool_length_offset">G 43,1: Динамическая коррекция длины инструмента.</string>
     <string name="text_empty_command">Пустая команда</string>
-    <string name="text_enable_ab_axis">Добавить оси A и B</string>
     <string name="text_enable_custom_buttons">Добавить пользовательские кнопки</string>
     <string name="text_enable_custom_buttons_desc">добавляет четыре пользовательские кнопки на панель ручного управления.</string>
     <string name="text_file_checking_started">Проверка файла начата</string>
@@ -94,26 +85,15 @@
     <string name="text_file_reading_in_progress">Идёт чтение файла</string>
     <string name="text_file_streaming_started">Трансляция файла начата</string>
     <string name="text_flood_off">СОЖ {fa-toggle-off 16dp}</string>
-    <string name="text_flood_off_large">СОЖ {fa-toggle-off 24dp}</string>
     <string name="text_flood_on">СОЖ {fa-toggle-on 16dp @color/colorAccent}</string>
-    <string name="text_flood_on_large">СОЖ {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_gcode_length_warning">ВНИМАНИЕ! Команда Gcode длинной свыше 80 символов найдена в строке</string>
     <string name="text_go_to_zero_position">переместить оси в нулевое положение текущей системы координат | G0</string>
-    <string name="text_go_to_zero_position_in_current_wpos">переместить в X0 Y0 Z0 в текущей системе координат</string>
-    <string name="text_grbl_alarm_format">Тревога: %d %s</string>
-    <string name="text_grbl_error_format">Ошибка:%d %s</string>
+    <string name="text_grbl_alarm_format">Тревога: %1$d %2$s</string>
+    <string name="text_grbl_error_format">Ошибка:%1$d %2$s</string>
     <string name="text_grbl_soft_reset">мягкая перезагрузка Grbl!</string>
     <string name="text_grbl_soft_reset_desc">Выполнить мягкую перезагрузку станка?</string>
     <string name="text_grbl_unsupported">Поддерживается только GRBL версии %s или выше</string>
-    <string name="text_haptic_feedback">Тактильный отклик</string>
-    <string name="text_haptic_feedback_description">нажатия кнопок сопровождаются коротким вибро-сигналом</string>
     <string name="text_homing_cycle">Самонаводящийся цикл $H</string>
-    <string name="text_inches">Дюймы</string>
-    <string name="text_jogging_max_steps">Максимальный шаг перемещения осей X и Y</string>
-    <string name="text_jogging_max_steps_desc">максимальное значение слайдера осей X и Y</string>
-    <string name="text_jogging_max_steps_desc_z">максимальное значение слайдера оси Z</string>
-    <string name="text_jogging_max_steps_z">Максимальный шаг перемещения оси Z</string>
-    <string name="text_jogging_step_and_feed">Шаг перемещения и скорость подачи</string>
     <string name="text_keep_screen_on">Держите экран на</string>
     <string name="text_keep_screen_on_description">запрещает спящий режим экрана во время работы</string>
     <string name="text_last_probe_location_unknown">Последнее положение контактного измерителя не известно</string>
@@ -126,14 +106,11 @@
     <string name="text_manual_tool_change">Ручная смена инструмента</string>
     <string name="text_mist_disabled">Система Масляный туман не возможна во время компиляции.</string>
     <string name="text_mist_off">Туман {fa-toggle-off 16dp}</string>
-    <string name="text_mist_off_large">Туман {fa-toggle-off 24dp}</string>
     <string name="text_mist_on">Туман {fa-toggle-on 16dp @color/colorAccent}</string>
-    <string name="text_mist_on_large">Туман {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_move">Переместить</string>
     <string name="text_no_bluetooth_adapter">Не найден Bluetooth адаптер!</string>
     <string name="text_no_bluetooth_permission">Невозможно запустить bluetooth, проверьте наличие разрешения системой</string>
     <string name="text_no_confirm">Нет</string>
-    <string name="text_no_external_read_permission">Невозможно прочесть внешнюю память, проверьте наличие разрешения системой</string>
     <string name="text_no_gcode_file_selected">Файл Gcode не выбран</string>
     <string name="text_no_paired_devices">Нет сопряженного устройства</string>
     <string name="text_no_usb_device">Нет USB устройства</string>
@@ -142,7 +119,6 @@
     <string name="text_not_connected">Не соединено</string>
     <string name="text_ok">Хорошо</string>
     <string name="text_on_button">на кнопку</string>
-    <string name="text_only_internal_storage_supported">Поддерживается только внутренняя память</string>
     <string name="text_overrides_fs">Превышения F:S</string>
     <string name="text_overrides_fsv">Превышения F:S:V</string>
     <string name="text_paired_devices">Выберете устройство сопряжения</string>
@@ -156,31 +132,22 @@
     <string name="text_probing_feed_rate">Скорость подачи</string>
     <string name="text_probing_help">1. У зондирования с первым инструментом. 2. Изменение инструмента. 3. Зонд снова с  \"зонд + TLO \".</string>
     <string name="text_probing_tab_heading">Зондирование | Смещение длины инструмента {fa-info-circle 16dp @color/colorAccent}</string>
-    <string name="text_quick_jogging">Кнопки быстрого шагового перемещения</string>
-    <string name="text_quick_jogging_desc">настройте кнопки быстрого шагового перемещения</string>
     <string name="text_reset">Сброс</string>
-    <string name="text_return_to_zero_position">Вернуться в нулевое положение</string>
     <string name="text_save_coordinate_system">Сохранить систему координат</string>
     <string name="text_save_coordinate_system_desc">сохранить текущее положение в системе координат</string>
     <string name="text_select_paired_device">Выберете устройство сопряжения</string>
     <string name="text_selected_coordinate_system">Выбранная система координат</string>
     <string name="text_send">Отослать</string>
     <string name="text_send_custom_command">отослать пользовательские команды на исполнение</string>
-    <string name="text_set_all_axes_zero">установить нулевое значение всех осей в текущей системе координат | G10 L20 P0 X0Y0Z0</string>
     <string name="text_set_axis_location_in_current_wpos">установить нулевое значение для выбранной позиции осей в текущей системе координат |</string>
-    <string name="text_set_coordinate_system">G10 L20 Установить систему координат</string>
     <string name="text_settings">Настройки</string>
     <string name="text_short_click">короткое нажатие</string>
     <string name="text_short_click_commands">Команды при коротком нажатии</string>
     <string name="text_short_click_desc">команды отсылаемые после короткого нажатия на кнопку</string>
-    <string name="text_sleep_after_job">Сон после завершения</string>
-    <string name="text_sleep_after_job_desc">перевести станок в обесточеный спящий режим командой $SLP</string>
     <string name="text_soft_reset_confirm">Подтверждение мягкой перезагрузки</string>
     <string name="text_soft_reset_confirm_desc">Запрашивать подтверждение перед мягкой перезагрузкой</string>
     <string name="text_spindle_off">Шпиндель {fa-toggle-off 18dp}</string>
-    <string name="text_spindle_off_large">Шпиндель {fa-toggle-off 24dp}</string>
     <string name="text_spindle_on">Шпиндель {fa-toggle-on 16dp @color/colorAccent}</string>
-    <string name="text_spindle_on_large">Шпиндель {fa-toggle-on 24dp @color/colorAccent}</string>
     <string name="text_start_probe">Зонд</string>
     <string name="text_starting_streaming">Начинается трансляция GCODE</string>
     <string name="text_straight_probe">G38.3: Прямое контактное измерение</string>
@@ -199,9 +166,7 @@
     <string name="text_verbose_output">Подробный вывод</string>
     <string name="text_yes_confirm">Да</string>
     <string name="text_zero_selected_axis">Нулевая выбранная ось</string>
-    <string name="app_shortcut_long_text_about">О</string>
-    <string name="text_app_rating_summary">если Grbl Controller вам понравился, вы можете выразить свою признательность.</string>
-    <string name="app_shortcut_long_text_help">Пользовательская документация</string>
+    <string name="text_app_rating_summary">если GRBL Machining вам понравился, вы можете выразить свою признательность.</string>
     <string name="text_bluetooth_service_foreground_message">Отвечает за все Bluetooth соединения.</string>
     <string name="text_check_machine_position_description">предотвращает трансляцию файла, если инструмент находится не в нулевой позиции</string>
     <string name="text_straight_probe_desc">Зонд к заготовке, остановите на контакте. Убедитесь, что ваша Настройка зонда правильная и нажмите Да, чтобы начать зондирование</string>
@@ -214,7 +179,6 @@
     <string name="text_jogging_preferences">Предпочтения бегом</string>
     <string name="test_set_cordinate_system">Установить координационную систему G10 L20 P0 %s-</string>
     <string name="test_set_cordinate_system_description">изменение местоположения оси %s в текущей системе координат к заданной стоимости</string>
-    <string name="text_delete_command_history_confirm">Вы хотите удалить эту команду из истории?</string>
     <string name="text_single_step_mode">Включить режим одного шага</string>
     <string name="text_single_step_mode_description">посылает строку gcode к grbl и ждет ок или ошибки, сообщение ответа перед отправкой следующей строки gcode</string>
     <string name="text_warning_error_20">WARNING: You should not enable this unless you know what you are doing.</string>
@@ -239,15 +203,7 @@
         <item>1</item>
     </string-array>
 
-    <string-array name="preference_entries_gcode_file_picker_types">
-        <item>simple file picker</item>
-        <item>full file picker</item>
-    </string-array>
 
-    <string-array name="preference_values_gcode_file_picker_types">
-        <item>simple</item>
-        <item>full</item>
-    </string-array>
 
     <string-array name="preference_entries_update_pool_interval">
         <item>100 Milli seconds</item>
@@ -353,5 +309,142 @@
         <item>rectangle profile with cornering</item>
         <item>cut on line</item>
     </string-array>
+
+    <!-- HTTP-сервер -->
+    <string name="text_http_server_section">HTTP-сервер файлов</string>
+    <string name="text_http_server_section_desc">Передача файлов G-code на/с ПК через браузер</string>
+    <string name="text_http_server_enabled">Включить HTTP-сервер</string>
+    <string name="text_http_server_enabled_desc">Когда включён, откройте http://ip-планшета:порт на ПК для скачивания/загрузки файлов</string>
+    <string name="text_http_server_port">Порт TCP</string>
+    <string name="text_http_server_port_desc">По умолчанию 8888. Допустимые значения 1024-65535.</string>
+    <string name="text_http_server_password">Пароль (обязателен)</string>
+    <string name="text_http_server_password_desc">Мин. 4 символа. Пользователь: grbl. Без пароля сервер не запустится.</string>
+    <string name="text_http_server_info">Состояние сервера</string>
+    <string name="text_http_server_off">HTTP-сервер не активен</string>
+    <string name="text_http_server_login_hint">пользователь: %1$s</string>
+    <string name="text_http_server_no_password">Сервер не запущен: задайте пароль длиной не менее 4 символов</string>
+    <string name="text_http_server_notif_title">HTTP-сервер GRBL активен</string>
+    <string name="text_http_server_notif_no_ip">Ожидание сети (порт %1$d)</string>
+    <string name="text_http_server_channel_name">HTTP-сервер</string>
+    <string name="text_http_server_channel_desc">Постоянное уведомление, пока работает HTTP-сервер передачи файлов</string>
+
+    <!-- Цветовая схема -->
+    <string name="text_color_scheme">Цветовая схема</string>
+    <string name="text_color_scheme_desc">Цвета приложения и веб-интерфейса</string>
+    <string name="text_color_scheme_changed">Цветовая схема применена</string>
+
+    <!-- Восстановление рабочих координат -->
+    <string name="text_restore_wpos_on_connect">Восстанавливать рабочие координаты при подключении</string>
+    <string name="text_restore_wpos_on_connect_desc">При подключении, если в полях X/Y/Z/A остались значения, спросить, применить ли их к станку командой G10 L20 P0</string>
+    <string name="text_restore_wpos_title">Восстановить рабочие координаты?</string>
+    <string name="text_restore_wpos_desc">Установить рабочие координаты станка в значения, оставшиеся в полях?\n\nX %1$.3f  Y %2$.3f  Z %3$.3f  A %4$.3f\n\nКорректно, только если инструмент всё ещё в том же физическом положении.</string>
+
+    <!-- Контроль резких погружений Z -->
+    <string name="text_check_z_drop_enabled">Проверять погружения Z при загрузке</string>
+    <string name="text_check_z_drop_enabled_desc">При открытии файла GCode анализирует опускания Z и предупреждает о слишком глубоких и крутых движениях (вероятные ошибки CAM)</string>
+    <string name="text_check_z_drop_depth">Порог глубины (мм)</string>
+    <string name="text_check_z_drop_depth_desc">Оцениваются только опускания Z не менее этого количества миллиметров</string>
+    <string name="text_check_z_drop_angle">Порог угла (°)</string>
+    <string name="text_check_z_drop_angle_desc">Отмечаются только опускания с углом к плоскости XY не менее этого значения. 0° = горизонталь, 90° = чистое погружение по Z</string>
+    <string name="text_z_drop_ok">Проверка Z OK: нет погружений &gt; %1$.1f мм и &gt; %2$.0f°</string>
+    <string name="text_z_drop_thresholds">Пороги: глубина ≥ %1$.2f мм, угол ≥ %2$.0f°\nФайл: %3$s\n\n</string>
+    <string name="text_z_drop_worst">Худшее погружение: ΔZ %1$.2f мм @ %2$.1f° (строка %3$d)\n\n</string>
+    <string name="text_z_drop_first_entries">Первые %1$d записей:\n</string>
+    <string name="text_z_drop_row">"  строка %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f мм   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_more">\n…и ещё %1$d записей не показано.</string>
+    <string name="text_z_drop_title">⚠ %1$d подозрительных погружений Z</string>
+
+    <!-- Система координат -->
+    <string name="text_select_coordinate_system">Система координат</string>
+
+    <!-- Сообщения времени выполнения -->
+    <string name="text_error_reading_file">Ошибка чтения файла G-code: передача прервана</string>
+    <string name="text_restart_required">Требуется перезапуск приложения</string>
+    <string name="text_no_app_for_action">Нет приложения для выполнения этого действия!</string>
+    <string name="text_share_body">GRBL Machining — приложение управления ЧПУ для прошивки GRBL</string>
+    <string name="text_usb_otg_connection">Подключение USB OTG</string>
+    <string name="text_usb_otg_connection_desc">Чтобы подключить или отключить устройство, просто вставьте или выньте USB-кабель.</string>
+
+    <!-- Запуск с указанной строки -->
+    <string name="text_run_from_line_title">Запуск со строки</string>
+    <string name="text_run_from_line_message">Введите номер строки файла, с которой начать передачу (нумерация как в редакторе).</string>
+    <string name="text_run_from_line_hint">Номер строки</string>
+    <string name="text_run_from_line_invalid">Недопустимый номер строки</string>
+    <string name="text_run_from_line_needs_idle">Доступно только когда станок в состоянии IDLE и нет выполняемой работы</string>
+    <string name="text_run_from_line_open_editor">Открыть редактор</string>
+    <string name="text_run_from_line_scanning">Сканирование файла…</string>
+    <string name="text_run_from_line_out_of_range">Строка вне диапазона (в файле %1$d строк)</string>
+    <string name="text_run_from_line_unknown">н/д</string>
+    <string name="text_run_from_line_summary">Запуск со строки %1$d.\nСтанок должен находиться в:\n\n%2$s</string>
+    <string name="text_run_from_line_safe_z">Безопасная высота Z (рабочие коорд.) для позиционирования</string>
+    <string name="text_run_from_line_auto">Перейти автоматически</string>
+    <string name="text_run_from_line_manual">Позиционировал вручную</string>
+    <string name="text_run_from_line_spindle_warning_title">Шпиндель запустится</string>
+    <string name="text_run_from_line_spindle_warning">На этой строке шпиндель/СОЖ были включены. Преамбула включит их снова (%1$s S%2$d). Отойдите и продолжить?</string>
+
+    <!-- Выбор файлов / импорт -->
+    <string name="text_file_source_app_folder">Папка приложения (USB/WiFi)</string>
+    <string name="text_file_source_other">Другое расположение (WhatsApp, почта…)</string>
+    <string name="text_app_folder_unavailable">Папка приложения недоступна</string>
+    <string name="text_no_gcode_found_title">Файл GCode не найден</string>
+    <string name="text_no_gcode_found_desc">Перенесите файлы GCode в:\n\n%1$s\n\nзатем откройте это окно снова.</string>
+    <string name="text_browse_elsewhere">Искать в другом месте</string>
+    <string name="text_select_gcode_file">Выбрать файл GCode</string>
+    <string name="text_file_imported">Файл импортирован: %1$s</string>
+    <string name="text_file_import_error">Ошибка импорта файла</string>
+    <string name="text_machine_not_at_zero">Станок не в нулевой позиции</string>
+
+    <!-- Редактор GCode -->
+    <string name="text_no_file_in_sender">Нет файла в File Sender</string>
+    <string name="text_file_read_error">Ошибка чтения файла: %1$s</string>
+    <string name="text_no_file_to_save">Нет файла для сохранения</string>
+    <string name="text_file_saved_synced">Файл G-Code сохранён и синхронизирован</string>
+    <string name="text_file_save_error">Ошибка при сохранении: %1$s</string>
+
+    <!-- CAM -->
+    <string name="text_cam_set_from_to_first">Сначала задайте точки FROM и TO.</string>
+    <string name="text_cam_from_to_equal">FROM и TO совпадают — рабочая область пуста.</string>
+    <string name="text_cam_no_gcode_generated">GCode не сгенерирован.</string>
+    <string name="text_cam_invalid_value">Недопустимое значение в параметрах CAM: %1$s</string>
+    <string name="text_cam_job_saved">job.nc сохранён и загружен в File Sender</string>
+    <string name="text_cam_save_error">Ошибка сохранения: %1$s</string>
+
+    <!-- Точки позиционирования / фонарик -->
+    <string name="text_point_saved">Точка сохранена: %1$s</string>
+    <string name="text_point_save_error">Ошибка сохранения точки</string>
+    <string name="text_clear_points_title">Удалить точки позиционирования</string>
+    <string name="text_clear_points_desc">Удалить все точки, сохранённые в points.txt?\nОперация необратима.</string>
+    <string name="text_points_file_deleted">points.txt удалён.</string>
+    <string name="text_points_delete_error">Ошибка при удалении.</string>
+    <string name="text_no_points_file">Нет файла для удаления.</string>
+    <string name="text_leveled_file_created">Скомпенсированный файл создан: %1$s</string>
+    <string name="text_torch_unavailable">Фонарик недоступен</string>
+    <string name="text_no_flash">На устройстве нет вспышки</string>
+    <string name="text_torch_error">Не удалось управлять фонариком</string>
+
+    <!-- Автовыравнивание -->
+    <string name="text_leveling_no_points_file">points.txt не найден! Сначала выполните измерение 3 точек.</string>
+    <string name="text_leveling_no_source">Не выбран корректный исходный файл G-Code.</string>
+    <string name="text_leveling_points_read_error">Ошибка чтения points.txt: %1$s</string>
+    <string name="text_leveling_wrong_point_count">points.txt содержит %1$d точек. Требуется ровно 3.</string>
+    <string name="text_leveling_collinear">Геометрическая ошибка: 3 измеренные точки лежат на одной прямой!</string>
+    <string name="text_leveling_processing_error">Ошибка при обработке файла: %1$s</string>
+
+    <!-- Пункты настроек -->
+    <string name="text_startup_string">Строка запуска Grbl</string>
+    <string name="text_startup_string_desc">Если у вас пользовательская прошивка на основе grbl 1.1, введите здесь полную строку запуска</string>
+    <string name="text_jogging_preferences_desc">настройка панели перемещения</string>
+    <string name="text_custom_buttons_configure">настройка пользовательских кнопок и их поведения</string>
+    <string name="text_custom_buttons_configuration">Настройка пользовательских кнопок</string>
+    <string name="text_ignore_error_20">Игнорировать ошибку неподдерживаемой команды gcode</string>
+    <string name="text_ignore_error_20_desc">игнорирует ошибку grbl: неподдерживаемая или недопустимая команда g-code в блоке.</string>
+
+    <!-- Каналы уведомлений -->
+    <string name="channel_general_name">Общие</string>
+    <string name="channel_general_desc">новости приложения, функции и информация об обновлениях.</string>
+    <string name="channel_bug_tracker_name">Bug tracker</string>
+    <string name="channel_bug_tracker_desc">уведомления о недавних ошибках приложения, проблемах и их решениях.</string>
+    <string name="channel_service_name">Служба</string>
+    <string name="channel_service_desc">Служебное уведомление, когда приложение работает на переднем плане.</string>
 
 </resources>

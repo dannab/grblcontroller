@@ -42,52 +42,29 @@
 
             </RelativeLayout>
 
-            <ViewSwitcher
-                android:id="@+id/console_view_switcher"
+            <RelativeLayout
+                android:padding="8dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <RelativeLayout
+                <TextView
+                    android:text="@{console.messages}"
+                    android:minHeight="250dp"
+                    android:maxLines="16"
                     android:padding="8dp"
+                    android:gravity="bottom"
+                    android:id="@+id/console_logger"
+                    android:scrollbars="vertical"
+                    android:scrollbarStyle="insideInset"
+                    android:overScrollMode="always"
+                    android:fadeScrollbars="false"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_border_edit_text"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    tools:ignore="SmallSp" />
 
-                    <TextView
-                        android:text="@{console.messages}"
-                        android:minHeight="250dp"
-                        android:maxLines="16"
-                        android:padding="8dp"
-                        android:gravity="bottom"
-                        android:id="@+id/console_logger"
-                        android:scrollbars="vertical"
-                        android:scrollbarStyle="insideInset"
-                        android:overScrollMode="always"
-                        android:fadeScrollbars="false"
-                        android:textSize="12sp"
-                        android:background="@drawable/rounded_border_edit_text"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        tools:ignore="SmallSp" />
-
-                </RelativeLayout>
-
-                <RelativeLayout
-                    android:padding="8dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp"
-                        android:background="@drawable/rounded_border_edit_text"
-                        android:id="@+id/recycler_view"
-                        android:layout_width="match_parent"
-                        android:layout_height="250dp"
-                        android:scrollbars="vertical"/>
-
-                </RelativeLayout>
-
-            </ViewSwitcher>
+            </RelativeLayout>
 
             <TableLayout
                 android:padding="4dp"
@@ -104,7 +81,7 @@
                         android:maxLength="78"
                         android:maxLines="1"
                         android:inputType="textCapCharacters"
-                        android:layout_weight="0.60"
+                        android:layout_weight="0.80"
                         android:background="@drawable/rounded_border_edit_text"
                         android:layout_width="0dp"
                         android:layout_gravity="center_vertical"
@@ -118,18 +95,6 @@
                         android:padding="16dp"
                         android:textSize="24sp"
                         android:id="@+id/send_command"
-                        android:layout_width="0dp"
-                        android:layout_weight="0.20"
-                        android:gravity="center"
-                        android:layout_gravity="center_vertical"
-                        android:layout_height="wrap_content"
-                        tools:ignore="HardcodedText" />
-
-                    <com.joanzapata.iconify.widget.IconButton
-                        android:padding="16dp"
-                        android:textSize="24sp"
-                        android:text="{fa-history 24dp @color/colorAccent}"
-                        android:id="@+id/console_history"
                         android:layout_width="0dp"
                         android:layout_weight="0.20"
                         android:gravity="center"

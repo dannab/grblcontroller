@@ -20,28 +20,6 @@
  *  *
  *
  */
-/*
- *
- *  *  /**
- *  *  * Copyright (C) 2017  Grbl Controller Contributors
- *  *  *
- *  *  * This program is free software; you can redistribute it and/or modify
- *  *  * it under the terms of the GNU General Public License as published by
- *  *  * the Free Software Foundation; either version 2 of the License, or
- *  *  * (at your option) any later version.
- *  *  *
- *  *  * This program is distributed in the hope that it will be useful,
- *  *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  *  * GNU General Public License for more details.
- *  *  *
- *  *  * You should have received a copy of the GNU General Public License along
- *  *  * with this program; if not, write to the Free Software Foundation, Inc.,
- *  *  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *  *  * <http://www.gnu.org/licenses/>
- *  *
- *
- */
 
 package in.co.gorest.grblcontroller.service;
 
@@ -57,7 +35,6 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -96,17 +73,12 @@ public class GrblUsbSerialService extends Service {
     public static final String ACTION_USB_DISCONNECTED = "com.felhr.usbservice.USB_DISCONNECTED";
     public static final String ACTION_CDC_DRIVER_NOT_WORKING = "com.felhr.connectivityservices.ACTION_CDC_DRIVER_NOT_WORKING";
     public static final String ACTION_USB_DEVICE_NOT_WORKING = "com.felhr.connectivityservices.ACTION_USB_DEVICE_NOT_WORKING";
-    public static final int MESSAGE_FROM_SERIAL_PORT = 0;
-    public static final int CTS_CHANGE = 1;
-    public static final int DSR_CHANGE = 2;
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
     public static boolean SERVICE_CONNECTED = false;
     private static final byte[] BYTE_NEW_LINE = { 0x0A };
 
     private final IBinder binder = new UsbSerialBinder();
 
-    private Context context;
-    private Handler mHandler;
     private UsbManager usbManager;
     private UsbDevice device;
     private UsbDeviceConnection connection;
@@ -127,7 +99,6 @@ public class GrblUsbSerialService extends Service {
     public void onCreate() {
         super.onCreate();
 
-        this.context = this;
         serialPortConnected = false;
         GrblUsbSerialService.SERVICE_CONNECTED = true;
 
@@ -186,11 +157,6 @@ public class GrblUsbSerialService extends Service {
     }
 
 
-    public void setMessageHandler(Handler grblServiceMessageHandler) {
-        this.mHandler = grblServiceMessageHandler;
-    }
-
-
     /*
      *  Data received from serial port will be received here. Just populate onReceivedData with your code
      *  In this particular example. byte stream is converted to String and send to UI thread to
@@ -220,26 +186,6 @@ public class GrblUsbSerialService extends Service {
 
 
     /*
-     * State changes in the CTS line will be received here
-     */
-    private final UsbSerialInterface.UsbCTSCallback ctsCallback = new UsbSerialInterface.UsbCTSCallback() {
-        @Override
-        public void onCTSChanged(boolean state) {
-            if(mHandler != null) mHandler.obtainMessage(CTS_CHANGE).sendToTarget();
-        }
-    };
-
-    /*
-     * State changes in the DSR line will be received here
-     */
-    private final UsbSerialInterface.UsbDSRCallback dsrCallback = new UsbSerialInterface.UsbDSRCallback() {
-        @Override
-        public void onDSRChanged(boolean state) {
-            if(mHandler != null) mHandler.obtainMessage(DSR_CHANGE).sendToTarget();
-        }
-    };
-
-    /*
      * Different notifications from OS will be received here (USB attached, detached, permission responses...)
      * About BroadcastReceiver: http://developer.android.com/reference/android/content/BroadcastReceiver.html
      */
@@ -249,19 +195,16 @@ public class GrblUsbSerialService extends Service {
             if(Objects.equals(arg1.getAction(), ACTION_USB_PERMISSION)){
                 boolean granted = Objects.requireNonNull(arg1.getExtras()).getBoolean(UsbManager.EXTRA_PERMISSION_GRANTED);
                 if(granted){
-                    Intent intent = new Intent(ACTION_USB_PERMISSION_GRANTED);
-                    arg0.sendBroadcast(intent);
+                    sendInternalBroadcast(ACTION_USB_PERMISSION_GRANTED);
                     connection = usbManager.openDevice(device);
                     new ConnectionThread().start();
                 }else{
-                    Intent intent = new Intent(ACTION_USB_PERMISSION_NOT_GRANTED);
-                    arg0.sendBroadcast(intent);
+                    sendInternalBroadcast(ACTION_USB_PERMISSION_NOT_GRANTED);
                 }
             }else if(Objects.equals(arg1.getAction(), ACTION_USB_ATTACHED)) {
                 if(!serialPortConnected) findSerialPortDevice();
             } else if (Objects.equals(arg1.getAction(), ACTION_USB_DETACHED)) {
-                Intent intent = new Intent(ACTION_USB_DISCONNECTED);
-                arg0.sendBroadcast(intent);
+                sendInternalBroadcast(ACTION_USB_DISCONNECTED);
                 serialUsbCommunicationHandler.stopGrblStatusUpdateService();
                 if(serialPortConnected){
                     serialPort.close();
@@ -297,19 +240,26 @@ public class GrblUsbSerialService extends Service {
                 }
                 if (!keep) {
                     // There is no USB devices connected (but usb host were listed). Send an intent to MainActivity.
-                    Intent intent = new Intent(ACTION_NO_USB);
-                    sendBroadcast(intent);
+                    sendInternalBroadcast(ACTION_NO_USB);
                 }
             } else {
                 // There is no USB devices connected. Send an intent to MainActivity
-                Intent intent = new Intent(ACTION_NO_USB);
-                sendBroadcast(intent);
+                sendInternalBroadcast(ACTION_NO_USB);
             }
         }catch (NullPointerException e){
             // There is no USB devices connected. Send an intent to MainActivity
-            Intent intent = new Intent(ACTION_NO_USB);
-            sendBroadcast(intent);
+            sendInternalBroadcast(ACTION_NO_USB);
         }
+    }
+
+    /**
+     * Invia un broadcast interno all'app. Il setPackage è obbligatorio: da
+     * Android 14 (target 34+) i broadcast impliciti NON vengono consegnati ai
+     * receiver registrati a runtime come NOT_EXPORTED (UsbConnectionActivity),
+     * quindi senza package esplicito i messaggi di stato USB si perdono.
+     */
+    private void sendInternalBroadcast(String action) {
+        sendBroadcast(new Intent(action).setPackage(getPackageName()));
     }
 
     private void setFilter() {
@@ -366,8 +316,6 @@ public class GrblUsbSerialService extends Service {
                      */
                     serialPort.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
                     serialPort.read(mCallback);
-                    //serialPort.getCTS(ctsCallback);
-                    //serialPort.getDSR(dsrCallback);
 
                     //
                     // Some Arduinos would need some sleep because firmware wait some time to know whether a new sketch is going
@@ -381,23 +329,19 @@ public class GrblUsbSerialService extends Service {
 
                     // Everything went as expected. Send an intent to MainActivity
                     serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
-                    Intent intent = new Intent(ACTION_USB_READY);
-                    context.sendBroadcast(intent);
+                    sendInternalBroadcast(ACTION_USB_READY);
                 } else {
                     // Serial port could not be opened, maybe an I/O error or if CDC driver was chosen, it does not really fit
                     // Send an Intent to Main Activity
-                    Intent intent;
                     if (serialPort instanceof CDCSerialDevice) {
-                        intent = new Intent(ACTION_CDC_DRIVER_NOT_WORKING);
+                        sendInternalBroadcast(ACTION_CDC_DRIVER_NOT_WORKING);
                     } else {
-                        intent = new Intent(ACTION_USB_DEVICE_NOT_WORKING);
+                        sendInternalBroadcast(ACTION_USB_DEVICE_NOT_WORKING);
                     }
-                    context.sendBroadcast(intent);
                 }
             } else {
                 // No driver for given device, even generic CDC driver could not be loaded
-                Intent intent = new Intent(ACTION_USB_NOT_SUPPORTED);
-                context.sendBroadcast(intent);
+                sendInternalBroadcast(ACTION_USB_NOT_SUPPORTED);
             }
         }
     }

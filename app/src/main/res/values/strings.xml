@@ -34,13 +34,9 @@
     <string name="preference_jogging_feed_rate" translatable="false">jogging_feed_rate</string>
     <string name="preference_jogging_in_inches" translatable="false">jogging_in_inches</string>
     <string name="preference_active_wpos" translatable="false">active_wpos</string>
-    <string name="preference_jogging_max_step_size" translatable="false">jogging_max_step_size</string>
-    <string name="preference_jogging_max_step_size_z" translatable="false">jogging_max_step_size_z</string>
-    <string name="preference_jogging_max_step_size_a" translatable="false">jogging_max_step_size_a</string>
     <string name="preference_jogging_max_feed_rate" translatable="false">jogging_max_feed_rate</string>
     <string name="preference_streaming_stop_button_behaviour" translatable="false">streaming_stop_button_behaviour</string>
     <string name="preference_last_connected_device" translatable="false">last_connected_device</string>
-    <string name="preference_sleep_after_job" translatable="false">sleep_after_job</string>
     <string name="preference_probing_feed_rate" translatable="false">preference_probing_feed_rate</string>
     <string name="preference_probing_plate_thickness" translatable="false">probing_plate_thickness</string>
     <string name="preference_probing_distance" translatable="false">probing_distance</string>
@@ -67,17 +63,8 @@
     <string name="preference_check_z_drop_enabled" translatable="false">check_z_drop_enabled</string>
     <string name="preference_check_z_drop_depth" translatable="false">check_z_drop_depth</string>
     <string name="preference_check_z_drop_angle" translatable="false">check_z_drop_angle</string>
-    <string name="preference_enable_haptic_feedback" translatable="false">enable_haptic_feedback</string>
     <string name="preference_confirm_grbl_soft_reset" translatable="false">confirm_grbl_soft_reset</string>
-    <string name="preference_gcode_file_picker_type" translatable="false">gcode_file_picker_type</string>
     <string name="preference_enable_additional_axis" translatable="false">enable_additional_axis</string>
-    <string name="preference_jog_xy_step_small" translatable="false">preference_jog_xy_step_small</string>
-    <string name="preference_jog_xy_step_medium" translatable="false">preference_jog_xy_step_medium</string>
-    <string name="preference_jog_xy_step_high" translatable="false">preference_jog_xy_step_high</string>
-    <string name="preference_jog_z_step_small" translatable="false">preference_jog_z_step_small</string>
-    <string name="preference_jog_z_step_medium" translatable="false">preference_jog_z_step_medium</string>
-    <string name="preference_jog_z_step_high" translatable="false">preference_jog_z_step_high</string>
-    <string name="default_storage_type" translatable="false">default_storage_type</string>
     <string translatable="false" name="preference_ignore_error_20">preference_ignore_error_20</string>
     <string translatable="false" name="preference_update_pool_interval">preference_update_pool_interval</string>
     <string name="usb_serial_baud_rate" translatable="false">usb_serial_baud_rate</string>
@@ -92,21 +79,21 @@
     <string name="preference_http_server_info" translatable="false">preference_http_server_info</string>
 
     <string name="text_http_server_section">File HTTP server</string>
-    <string name="text_http_server_section_desc">Trasferisci file G-code da/verso il PC via browser</string>
-    <string name="text_http_server_enabled">Abilita server HTTP</string>
-    <string name="text_http_server_enabled_desc">Quando attivo, dal PC apri http://ip-tablet:porta per scaricare/caricare file</string>
-    <string name="text_http_server_port">Porta TCP</string>
-    <string name="text_http_server_port_desc">Default 8888. Valori validi 1024-65535.</string>
-    <string name="text_http_server_password">Password (obbligatoria)</string>
-    <string name="text_http_server_password_desc">Min 4 caratteri. User: grbl. Senza password il server non parte.</string>
-    <string name="text_http_server_info">Stato server</string>
-    <string name="text_http_server_off">Server HTTP non attivo</string>
-    <string name="text_http_server_login_hint">utente: %1$s</string>
-    <string name="text_http_server_no_password">Server non avviato: imposta una password di almeno 4 caratteri</string>
-    <string name="text_http_server_notif_title">GRBL HTTP server attivo</string>
-    <string name="text_http_server_notif_no_ip">In attesa di rete (porta %1$d)</string>
-    <string name="text_http_server_channel_name">Server HTTP</string>
-    <string name="text_http_server_channel_desc">Notifica persistente quando il server HTTP per il trasferimento file è attivo</string>
+    <string name="text_http_server_section_desc">Transfer G-code files to/from the PC via browser</string>
+    <string name="text_http_server_enabled">Enable HTTP server</string>
+    <string name="text_http_server_enabled_desc">When active, open http://tablet-ip:port from the PC to download/upload files</string>
+    <string name="text_http_server_port">TCP port</string>
+    <string name="text_http_server_port_desc">Default 8888. Valid values 1024-65535.</string>
+    <string name="text_http_server_password">Password (required)</string>
+    <string name="text_http_server_password_desc">Min 4 characters. User: grbl. Without a password the server will not start.</string>
+    <string name="text_http_server_info">Server status</string>
+    <string name="text_http_server_off">HTTP server not active</string>
+    <string name="text_http_server_login_hint">user: %1$s</string>
+    <string name="text_http_server_no_password">Server not started: set a password of at least 4 characters</string>
+    <string name="text_http_server_notif_title">GRBL HTTP server active</string>
+    <string name="text_http_server_notif_no_ip">Waiting for network (port %1$d)</string>
+    <string name="text_http_server_channel_name">HTTP server</string>
+    <string name="text_http_server_channel_desc">Persistent notification while the file transfer HTTP server is active</string>
 
 
 
@@ -121,7 +108,7 @@
     <string name="text_reset">Reset</string>
     <string name="text_connect">Connect</string>
     <string name="text_grbl_unsupported">Only grbl version %s or above is supported</string>
-    <string name="text_app_rating_summary">If you like Grbl Controller, you can show your appreciation here.</string>
+    <string name="text_app_rating_summary">If you like GRBL Machining, you can show your appreciation here.</string>
     <string name="text_app_rating">Rate Application</string>
     <string name="text_bluetooth_adapter_error">Bluetooth Adapter Error, please restart your phone</string>
     <string name="text_unable_to_connect_to_device">Unable to connect to device</string>
@@ -160,15 +147,9 @@
     <string name="text_restore_wpos_on_connect">Restore work coordinates on connect</string>
     <string name="text_restore_wpos_on_connect_desc">On connect, if the X/Y/Z/A fields still hold values, ask whether to reapply them to the machine with G10 L20 P0</string>
     <string name="text_restore_wpos_title">Restore work coordinates?</string>
-    <string name="text_restore_wpos_desc">Set the machine work coordinates to the values left in the fields?\n\nX %1$s  Y %2$s  Z %3$s  A %4$s\n\nOnly correct if the tool is still in the same physical position.</string>
+    <string name="text_restore_wpos_desc">Set the machine work coordinates to the values left in the fields?\n\nX %1$.3f  Y %2$.3f  Z %3$.3f  A %4$.3f\n\nOnly correct if the tool is still in the same physical position.</string>
     <string name="text_soft_reset_confirm">Soft reset confirmation</string>
     <string name="text_soft_reset_confirm_desc">ask for confirmation before doing soft reset</string>
-    <string name="text_sleep_after_job">Sleep after job</string>
-    <string name="text_sleep_after_job_desc">put machine into a de-powered sleep mode using $SLP command</string>
-    <string name="text_jogging_max_steps">Jogging max step size for XY</string>
-    <string name="text_jogging_max_steps_z">Jogging max step size for Z</string>
-    <string name="text_jogging_max_steps_desc">seek bar maximum value for axis X and Y</string>
-    <string name="text_jogging_max_steps_desc_z">seek bar maximum value for Z axis</string>
     <string name="text_keep_screen_on">Stay awake</string>
     <string name="text_keep_screen_on_description">screen will never sleep during the job</string>
     <string name="text_enable_custom_buttons">Enable custom buttons</string>
@@ -191,24 +172,17 @@
     <string name="text_custom_button_3">Custom button 3</string>
     <string name="text_button_3_behaviour">Configure Custom Button 3 Behaviour</string>
     <string name="text_custom_button_4">Custom button 4</string>
-    <string name="text_quick_jogging">Quick Jog Step Buttons</string>
-    <string name="text_quick_jogging_desc">configure quick jogging buttons</string>
     <string name="text_button_4_behaviour">Configure Custom Button 4 Behaviour</string>
     <string name="text_default_connection">Default connection</string>
     <string name="text_streaming_stop_button_behaviour">Streaming stop button behaviour</string>
     <string name="text_check_machine_position">Check machine position</string>
     <string name="text_check_machine_position_description">prevent file streaming, if machine is not at zero position</string>
-    <string name="text_check_z_drop_enabled">Controlla affondi Z al caricamento</string>
-    <string name="text_check_z_drop_enabled_desc">All\'apertura di un file GCode analizza le discese di Z e avvisa se ci sono movimenti troppo profondi e troppo ripidi (probabili errori di CAM)</string>
-    <string name="text_check_z_drop_depth">Profondità di attenzione (mm)</string>
-    <string name="text_check_z_drop_depth_desc">Solo le discese di Z di almeno questi millimetri vengono valutate</string>
-    <string name="text_check_z_drop_angle">Angolo di attenzione (°)</string>
-    <string name="text_check_z_drop_angle_desc">Solo le discese il cui angolo rispetto al piano XY è almeno questo vengono segnalate. 0° = orizzontale, 90° = plunge puro in Z</string>
-    <string name="text_haptic_feedback">Haptic feedback</string>
-    <string name="text_haptic_feedback_description">enable short vibration when buttons are touched</string>
-    <string name="text_only_internal_storage_supported">Only internal storage is supported</string>
-    <string name="text_enable_ab_axis">Enable AB Axis</string>
-    <string name="enable_ab_axis_description">enable two additional A and B axis in jogging control tab</string>
+    <string name="text_check_z_drop_enabled">Check Z plunges on file load</string>
+    <string name="text_check_z_drop_enabled_desc">When a GCode file is opened, analyse Z descents and warn about moves that are too deep and too steep (likely CAM errors)</string>
+    <string name="text_check_z_drop_depth">Attention depth (mm)</string>
+    <string name="text_check_z_drop_depth_desc">Only Z descents of at least this many millimetres are evaluated</string>
+    <string name="text_check_z_drop_angle">Attention angle (°)</string>
+    <string name="text_check_z_drop_angle_desc">Only descents whose angle to the XY plane is at least this are reported. 0° = horizontal, 90° = pure Z plunge</string>
     <string name="text_grbl_status_update_interval">Status update interval</string>
     <string name="text_grbl_status_update_interval_summary">%s (if you have slow cpu or very old phone then increase this value, default value is 150)</string>
 
@@ -246,15 +220,7 @@
         <item>1</item>
     </string-array>
 
-    <string-array name="preference_entries_gcode_file_picker_types">
-        <item>simple file picker</item>
-        <item>full file picker</item>
-    </string-array>
 
-    <string-array name="preference_values_gcode_file_picker_types">
-        <item>simple</item>
-        <item>full</item>
-    </string-array>
 
     <string-array name="preference_entries_update_pool_interval">
         <item>100 Milli seconds</item>
@@ -311,9 +277,8 @@
     <string name="text_paired_devices">Choose a paired device</string>
     <string name="text_machine_not_idle">Machine not idle</string>
     <string name="text_no_gcode_file_selected">No gcode file selected</string>
-    <string name="text_no_external_read_permission">Unable to read external storage, check permissions</string>
-    <string name="text_grbl_alarm_format">Alarm:%d %s</string>
-    <string name="text_grbl_error_format">Error:%d %s</string>
+    <string name="text_grbl_alarm_format">Alarm:%1$d %2$s</string>
+    <string name="text_grbl_error_format">Error:%1$d %2$s</string>
     <string name="text_bluetooth_service_foreground_message">This will handle all Bluetooth communication.</string>
     <string name="text_usb_service_foreground_message">This will handle all Usb communication.</string>
     <string name="text_bluetooth_service">Bluetooth service</string>
@@ -353,10 +318,6 @@
     <string name="text_selected_coordinate_system">"Selected coordinate system "</string>
     <string name="text_homing_cycle">Homing cycle $H</string>
     <string name="text_do_homing_cycle">**DISABILITATO**Perform homing cycle?</string>
-    <string name="text_set_coordinate_system">G10 L20 Set coordinate system</string>
-    <string name="text_set_all_axes_zero">set all axis location in current coordinate system to zero | G10 L20 P0 X0Y0Z0A0</string>
-    <string name="text_return_to_zero_position">Return to Zero position</string>
-    <string name="text_go_to_zero_position_in_current_wpos">Go to position X0 Y0 Z0 in current coordinates system</string>
     <string name="text_empty_command">Empty command</string>
     <string name="text_long_click">long click</string>
     <string name="text_short_click">short click</string>
@@ -368,8 +329,6 @@
     <string name="text_select_coordinate_system">Coordinate system</string>
     <string name="text_save_coordinate_system">Save coordinate system</string>
     <string name="text_save_coordinate_system_desc">save current position to coordinate system</string>
-    <string name="text_jogging_step_and_feed">Jogging step and feed</string>
-    <string name="text_inches">Inches</string>
 
     <!-- File Sender Tab -->
     <string name="text_mist_disabled">Mist coolant is not enabled while compiling</string>
@@ -406,20 +365,12 @@
     <string name="text_overrides_fs">Overrides F:S</string>
     <string name="text_check_mode_on">Check {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_check_mode_off">Check {fa-toggle-off 16dp}</string>
-    <string name="text_check_mode_on_large">Check {fa-toggle-on 24dp @color/colorAccent}</string>
-    <string name="text_check_mode_off_large">Check {fa-toggle-off 24dp}</string>
     <string name="text_spindle_on">Spindle {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_spindle_off">Spindle {fa-toggle-off 18dp}</string>
-    <string name="text_spindle_on_large">Spindle {fa-toggle-on 24dp @color/colorAccent}</string>
-    <string name="text_spindle_off_large">Spindle {fa-toggle-off 24dp}</string>
     <string name="text_flood_on">Flood {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_flood_off">Flood {fa-toggle-off 16dp}</string>
-    <string name="text_flood_on_large">Flood {fa-toggle-on 24dp @color/colorAccent}</string>
-    <string name="text_flood_off_large">Flood {fa-toggle-off 24dp}</string>
     <string name="text_mist_on">Mist {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_mist_off">Mist {fa-toggle-off 16dp}</string>
-    <string name="text_mist_on_large">Mist {fa-toggle-on 24dp @color/colorAccent}</string>
-    <string name="text_mist_off_large">Mist {fa-toggle-off 24dp}</string>
 
     <!-- Console Tab -->
     <string name="text_clear_console">Clear console messages?</string>
@@ -427,16 +378,9 @@
     <string name="text_verbose_output">Verbose output</string>
 
     <!-- Application Shortcuts -->
-    <string name="app_shortcut_short_test_settings">Settings</string>
-    <string name="app_shortcut_long_text_settings">Application Settings</string>
-    <string name="app_shortcut_short_test_about">About</string>
-    <string name="app_shortcut_long_text_about">About</string>
-    <string name="app_shortcut_short_test_help">Documentation</string>
-    <string name="app_shortcut_long_text_help">Application Documentation Guide</string>
 
     <string name="text_power_management_warning_title">Warning! battery optimisation is enabled</string>
     <string name="text_power_management_warning_description">For long running jobs, disable android battery optimisation for this application.</string>
-    <string name="text_delete_notification">Do you really want to delete this notification?</string>
     <string name="text_usb_device_connected">USB device connected</string>
     <string name="text_no_usb_permission">No usb permission</string>
     <string name="text_usb_permission_not_granted">USB Permission not granted</string>
@@ -450,7 +394,6 @@
     <string name="text_jogging_preferences">Jogging preferences</string>
     <string name="test_set_cordinate_system">Set Coordinate System G10 L20 P0 %s-</string>
     <string name="test_set_cordinate_system_description">changes %s axis location in the current coordinate system to the given value</string>
-    <string name="text_delete_command_history_confirm">Do you want to delete this command from history?</string>
     <string name="text_single_step_mode">Enable single step mode</string>
     <string name="text_single_step_mode_description">sends a line of gcode to grbl and waits for an OK or error: response message before sending the next line of gcode</string>
     <string name="text_warning_error_20">WARNING: You should not enable this unless you know what you are doing.</string>
@@ -503,6 +446,87 @@
     <string name="job_type">Job type</string>
     <string name="on_the_fly_cam">On the fly cam</string>
     <string name="error_z_step_greater_than_z_deep">error Z step greater than Z deep check and retry</string>
+
+    <!-- Runtime messages formerly hardcoded in Java -->
+    <string name="text_restart_required">Application restart required</string>
+    <string name="text_no_app_for_action">No application available to perform this action!</string>
+    <string name="text_share_body">GRBL Machining — CNC controller app for GRBL firmware</string>
+    <string name="text_usb_otg_connection">USB OTG connection</string>
+    <string name="text_usb_otg_connection_desc">To connect or disconnect a device, just plug or unplug the USB cable.</string>
+
+    <!-- Z plunge check dialog -->
+    <string name="text_z_drop_ok">Z check OK: no plunge &gt; %1$.1f mm and &gt; %2$.0f°</string>
+    <string name="text_z_drop_thresholds">Thresholds: depth ≥ %1$.2f mm, angle ≥ %2$.0f°\nFile: %3$s\n\n</string>
+    <string name="text_z_drop_worst">Worst plunge: ΔZ %1$.2f mm @ %2$.1f° (line %3$d)\n\n</string>
+    <string name="text_z_drop_first_entries">First %1$d entries:\n</string>
+    <string name="text_z_drop_row">"  line %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_more">\n…and %1$d more entries not shown.</string>
+    <string name="text_z_drop_title">⚠ %1$d suspicious Z plunges</string>
+
+    <!-- File picker / import -->
+    <string name="text_file_source_app_folder">App folder (USB/WiFi)</string>
+    <string name="text_file_source_other">Other location (WhatsApp, email…)</string>
+    <string name="text_app_folder_unavailable">App folder not available</string>
+    <string name="text_no_gcode_found_title">No GCode file found</string>
+    <string name="text_no_gcode_found_desc">Transfer your GCode files to:\n\n%1$s\n\nthen open this dialog again.</string>
+    <string name="text_browse_elsewhere">Browse elsewhere</string>
+    <string name="text_select_gcode_file">Select GCode file</string>
+    <string name="text_file_imported">File imported: %1$s</string>
+    <string name="text_file_import_error">File import error</string>
+    <string name="text_machine_not_at_zero">Machine is not at zero position</string>
+
+    <!-- GCode editor -->
+    <string name="text_no_file_in_sender">No file loaded in the File Sender</string>
+    <string name="text_file_read_error">Error reading file: %1$s</string>
+    <string name="text_no_file_to_save">No file to save</string>
+    <string name="text_file_saved_synced">G-Code file saved and reloaded</string>
+    <string name="text_file_save_error">Error while saving: %1$s</string>
+
+    <!-- CAM tab -->
+    <string name="text_cam_set_from_to_first">Set the FROM and TO points first.</string>
+    <string name="text_cam_from_to_equal">FROM and TO coincide — empty working area.</string>
+    <string name="text_cam_no_gcode_generated">No GCode generated.</string>
+    <string name="text_cam_invalid_value">Invalid value in CAM parameters: %1$s</string>
+    <string name="text_cam_job_saved">job.nc saved and loaded into the File Sender</string>
+    <string name="text_cam_save_error">Save error: %1$s</string>
+
+    <!-- Placement points / torch (jogging tab) -->
+    <string name="text_point_saved">Point saved: %1$s</string>
+    <string name="text_point_save_error">Error saving point</string>
+    <string name="text_clear_points_title">Delete placement points</string>
+    <string name="text_clear_points_desc">Delete all points saved in points.txt?\nThis cannot be undone.</string>
+    <string name="text_points_file_deleted">points.txt deleted.</string>
+    <string name="text_points_delete_error">Error while deleting.</string>
+    <string name="text_no_points_file">No file to delete.</string>
+    <string name="text_leveled_file_created">Compensated file created: %1$s</string>
+    <string name="text_torch_unavailable">Torch not available</string>
+    <string name="text_no_flash">No flash on this device</string>
+    <string name="text_torch_error">Unable to control the torch</string>
+
+    <!-- Autolevel errors -->
+    <string name="text_leveling_no_points_file">points.txt not found! Probe the 3 points first.</string>
+    <string name="text_leveling_no_source">No valid source G-Code file selected.</string>
+    <string name="text_leveling_points_read_error">Error reading points.txt: %1$s</string>
+    <string name="text_leveling_wrong_point_count">points.txt contains %1$d points. Exactly 3 are required.</string>
+    <string name="text_leveling_collinear">Geometry error: the 3 probed points are collinear!</string>
+    <string name="text_leveling_processing_error">Error while processing the file: %1$s</string>
+
+    <!-- Settings items formerly hardcoded in application_pref.xml -->
+    <string name="text_startup_string">Grbl start-up string</string>
+    <string name="text_startup_string_desc">If you have custom firmware based on grbl 1.1, enter the full start-up string here</string>
+    <string name="text_jogging_preferences_desc">customize jogging panel preferences</string>
+    <string name="text_custom_buttons_configure">configure custom buttons and their behaviour</string>
+    <string name="text_custom_buttons_configuration">Custom Buttons Configuration</string>
+    <string name="text_ignore_error_20">Ignore unsupported gcode command error</string>
+    <string name="text_ignore_error_20_desc">ignores the grbl error: unsupported or invalid g-code command found in block.</string>
+
+    <!-- Notification channels (shown in Android system settings) -->
+    <string name="channel_general_name">General</string>
+    <string name="channel_general_desc">application specific news, features and updates information.</string>
+    <string name="channel_bug_tracker_name">Bug tracker</string>
+    <string name="channel_bug_tracker_desc">notifications about recent application bugs, issues and resolutions.</string>
+    <string name="channel_service_name">Service</string>
+    <string name="channel_service_desc">Service notification when app is working in foreground.</string>
 
     <string-array name="job_type_list">
         <item>rectangle facing feeding X</item>

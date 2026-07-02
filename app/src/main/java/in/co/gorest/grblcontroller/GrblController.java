@@ -21,16 +21,17 @@
 
 package in.co.gorest.grblcontroller;
 
+import android.app.Application;
+
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.joanzapata.iconify.Iconify;
 import com.joanzapata.iconify.fonts.FontAwesomeModule;
-import com.orm.SugarApp;
 
 import es.dmoral.toasty.Toasty;
 import in.co.gorest.grblcontroller.service.HttpServerManager;
 
-public class GrblController extends SugarApp {
+public class GrblController extends Application {
 
     private static GrblController grblController;
 

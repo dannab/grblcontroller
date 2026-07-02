@@ -82,18 +82,4 @@
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <!--
-    <style name="FilePickerTheme" parent="LibAppTheme">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowFullscreen">true</item>
-    </style>
-    -->
-
-    <style name="PickerTabLayout" parent="Widget.Design.TabLayout">
-        <item name="tabBackground">@color/colorWhite</item>
-        <item name="tabGravity">fill</item>
-        <item name="tabMaxWidth">0dp</item>
-    </style>
 </resources>

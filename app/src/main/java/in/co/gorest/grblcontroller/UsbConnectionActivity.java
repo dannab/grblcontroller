@@ -33,9 +33,7 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
 
@@ -59,13 +57,11 @@ import in.co.gorest.grblcontroller.util.GrblUtils;
 public class UsbConnectionActivity extends GrblActivity{
 
     private GrblUsbSerialService grblUsbSerialService;
-    private GrblServiceMessageHandler grblServiceMessageHandler;
     private boolean mBound = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        grblServiceMessageHandler = new GrblServiceMessageHandler();
 
         Intent intent = new Intent(getApplicationContext(), GrblUsbSerialService.class);
         bindService(intent, usbConnection, Context.BIND_AUTO_CREATE);
@@ -92,7 +88,6 @@ public class UsbConnectionActivity extends GrblActivity{
         onGcodeCommandReceived("$10=1");
         unregisterReceiver(mUsbReceiver);
         if(mBound){
-            grblUsbSerialService.setMessageHandler(null);
             unbindService(usbConnection);
             mBound = false;
         }
@@ -118,8 +113,8 @@ public class UsbConnectionActivity extends GrblActivity{
 
             case R.id.action_connect:
                 AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this)
-                        .setTitle("USB OTG Connection")
-                        .setMessage("To connect or disconnect a device, just plug or unplug the usb cable.")
+                        .setTitle(getString(R.string.text_usb_otg_connection))
+                        .setMessage(getString(R.string.text_usb_otg_connection_desc))
                         .setPositiveButton(getString(R.string.text_ok), (dialog, which) -> { })
                         .setCancelable(false);
 
@@ -165,25 +160,6 @@ public class UsbConnectionActivity extends GrblActivity{
     }
 
     /*
-     * This handler will be passed to UsbService. Data received from serial port is displayed through this handler
-     */
-    private static class GrblServiceMessageHandler extends Handler {
-
-        public GrblServiceMessageHandler() {
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case GrblUsbSerialService.MESSAGE_FROM_SERIAL_PORT:
-                case GrblUsbSerialService.CTS_CHANGE:
-                case GrblUsbSerialService.DSR_CHANGE:
-                    break;
-            }
-        }
-    }
-
-    /*
      * Notifications from UsbService will be received here.
      */
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
@@ -192,7 +168,7 @@ public class UsbConnectionActivity extends GrblActivity{
 
             String intentAction = intent.getAction();
             if(intentAction == null){
-                showToastMessage("Unknown error", true, true);
+                showToastMessage(getString(R.string.text_unknown_error), true, true);
                 return;
             }
 
@@ -234,7 +210,6 @@ public class UsbConnectionActivity extends GrblActivity{
         public void onServiceConnected(ComponentName className, IBinder service) {
             grblUsbSerialService = ((GrblUsbSerialService.UsbSerialBinder) service).getService();
             mBound = true;
-            grblUsbSerialService.setMessageHandler(grblServiceMessageHandler);
             grblUsbSerialService.setStatusUpdatePoolInterval(Long.parseLong(sharedPref.getString(getString(R.string.preference_update_pool_interval), String.valueOf(Constants.GRBL_STATUS_UPDATE_INTERVAL))));
         }
 

@@ -2,7 +2,6 @@
 <resources>
     <!-- Default scheme (Industrial slate) — referenced by the base AppTheme -->
     <color name="colorPrimary">#37474f</color>
-    <color name="colorPrimaryLight">#62727b</color>
     <color name="colorPrimaryDark">#263238</color>
     <color name="colorAccent">#ffa000</color>
 
@@ -22,7 +21,6 @@
     <color name="teal_primary">#00796b</color>
     <color name="teal_primary_dark">#004d40</color>
     <color name="teal_accent">#ff6e40</color>
-    <color name="colorPrimaryText">#ffffff</color>
     <color name="colorWhite">#ffffff</color>
     <color name="colorDivider">#bdbdbd</color>
     <color name="colorBlack">#000000</color>

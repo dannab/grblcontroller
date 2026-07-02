@@ -222,8 +222,8 @@ public class FileSenderTabFragment extends BaseFragment
         new AlertDialog.Builder(getActivity())
                 .setTitle(getString(R.string.text_no_gcode_file_selected))
                 .setItems(new String[]{
-                        "Cartella app (USB/WiFi)",
-                        "Altro percorso (WhatsApp, email...)"
+                        getString(R.string.text_file_source_app_folder),
+                        getString(R.string.text_file_source_other)
                 }, (dialog, which) -> {
                     if (which == 0) {
                         showInternalFileBrowser();
@@ -250,7 +250,7 @@ public class FileSenderTabFragment extends BaseFragment
         File appDir = getAppMediaDir();
         if (appDir == null || !appDir.exists()) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Cartella app non disponibile", true, true));
+                    getString(R.string.text_app_folder_unavailable), true, true));
             return;
         }
 
@@ -273,12 +273,10 @@ public class FileSenderTabFragment extends BaseFragment
 
         if (gcodeFiles.isEmpty()) {
             new AlertDialog.Builder(getActivity())
-                    .setTitle("Nessun file GCode trovato")
-                    .setMessage("Trasferisci i file GCode in:\n\n"
-                            + appDir.getAbsolutePath()
-                            + "\n\nPoi riapri questo dialog.")
-                    .setPositiveButton("OK", null)
-                    .setNeutralButton("Cerca altrove", (d, w) -> openSafPicker())
+                    .setTitle(getString(R.string.text_no_gcode_found_title))
+                    .setMessage(getString(R.string.text_no_gcode_found_desc, appDir.getAbsolutePath()))
+                    .setPositiveButton(getString(R.string.text_ok), null)
+                    .setNeutralButton(getString(R.string.text_browse_elsewhere), (d, w) -> openSafPicker())
                     .show();
             return;
         }
@@ -293,12 +291,12 @@ public class FileSenderTabFragment extends BaseFragment
 
         final List<File> finalList = gcodeFiles;
         new AlertDialog.Builder(getActivity())
-                .setTitle("Seleziona file GCode")
+                .setTitle(getString(R.string.text_select_gcode_file))
                 .setItems(fileNames, (dialog, which) -> {
                     File selected = finalList.get(which);
                     loadFile(selected);
                 })
-                .setNeutralButton("Cerca altrove", (d, w) -> openSafPicker())
+                .setNeutralButton(getString(R.string.text_browse_elsewhere), (d, w) -> openSafPicker())
                 .setNegativeButton(getString(R.string.text_cancel), null)
                 .show();
     }
@@ -334,7 +332,7 @@ public class FileSenderTabFragment extends BaseFragment
         File destDir = getAppMediaDir();
         if (destDir == null) {
             EventBus.getDefault().post(new UiToastEvent(
-                    "Errore: cartella app non disponibile", true, true));
+                    getString(R.string.text_app_folder_unavailable), true, true));
             return;
         }
 
@@ -368,10 +366,10 @@ public class FileSenderTabFragment extends BaseFragment
                 if (success) {
                     loadFile(finalDestFile);
                     EventBus.getDefault().post(new UiToastEvent(
-                            "File importato: " + finalFileName, true, false));
+                            getString(R.string.text_file_imported, finalFileName), true, false));
                 } else {
                     EventBus.getDefault().post(new UiToastEvent(
-                            "Errore importazione file", true, true));
+                            getString(R.string.text_file_import_error), true, true));
                 }
             }
         }.execute();
@@ -460,7 +458,7 @@ public class FileSenderTabFragment extends BaseFragment
                         false);
                 if (checkMachinePosition && !machineStatus.getWorkPosition().atZero()) {
                     EventBus.getDefault().post(new UiToastEvent(
-                            "Machine is not at zero position", true, true));
+                            getString(R.string.text_machine_not_at_zero), true, true));
                     return;
                 }
 

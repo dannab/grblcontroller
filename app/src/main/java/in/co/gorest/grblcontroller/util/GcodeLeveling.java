@@ -32,7 +32,15 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import in.co.gorest.grblcontroller.GrblController;
+import in.co.gorest.grblcontroller.R;
+
 public class GcodeLeveling {
+
+    /** Scorciatoia per le stringhe localizzate in una utility senza Context. */
+    private static String str(int resId, Object... args) {
+        return GrblController.getInstance().getString(resId, args);
+    }
 
     public interface LevelingCallback {
         void onSuccess(File leveledFile);
@@ -53,11 +61,11 @@ public class GcodeLeveling {
     public static void applyAutolevel(final File pointsFile, final File gcodeFile, final LevelingCallback callback) {
 
         if (pointsFile == null || !pointsFile.exists()) {
-            callback.onError("File points.txt non trovato! Esegui prima il probing dei 3 punti.");
+            callback.onError(str(R.string.text_leveling_no_points_file));
             return;
         }
         if (gcodeFile == null || !gcodeFile.exists()) {
-            callback.onError("Nessun file G-Code di origine valido selezionato.");
+            callback.onError(str(R.string.text_leveling_no_source));
             return;
         }
 
@@ -88,12 +96,12 @@ public class GcodeLeveling {
                     }
                 }
             } catch (Exception e) {
-                callback.onError("Errore lettura points.txt: " + e.getMessage());
+                callback.onError(str(R.string.text_leveling_points_read_error, e.getMessage()));
                 return;
             }
 
             if (lineCount != 3) {
-                callback.onError("Il file points.txt contiene " + lineCount + " punti. Ne servono esattamente 3.");
+                callback.onError(str(R.string.text_leveling_wrong_point_count, lineCount));
                 return;
             }
 
@@ -116,7 +124,7 @@ public class GcodeLeveling {
             double D = -(A * x1 + B * y1 + C * z1);
 
             if (Math.abs(C) < 0.000001) {
-                callback.onError("Errore geometrico: I 3 punti di probing sono allineati!");
+                callback.onError(str(R.string.text_leveling_collinear));
                 return;
             }
 
@@ -266,7 +274,7 @@ public class GcodeLeveling {
                 callback.onSuccess(leveledFile);
 
             } catch (Exception e) {
-                callback.onError("Errore durante l'elaborazione del file: " + e.getMessage());
+                callback.onError(str(R.string.text_leveling_processing_error, e.getMessage()));
             }
         }).start();
     }
