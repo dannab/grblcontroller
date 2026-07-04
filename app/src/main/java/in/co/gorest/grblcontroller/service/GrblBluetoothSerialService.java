@@ -23,7 +23,6 @@ package in.co.gorest.grblcontroller.service;
 
 
 import android.annotation.SuppressLint;
-import android.app.Notification;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -36,12 +35,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import androidx.core.app.NotificationCompat;
 import android.util.Log;
 
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -51,15 +47,12 @@ import java.io.OutputStream;
 import java.util.UUID;
 
 import in.co.gorest.grblcontroller.R;
-import in.co.gorest.grblcontroller.events.GrblRealTimeCommandEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
-import in.co.gorest.grblcontroller.helpers.NotificationHelper;
-import in.co.gorest.grblcontroller.listeners.SerialBluetoothCommunicationHandler;
+import in.co.gorest.grblcontroller.listeners.SerialCommunicationHandler;
 import in.co.gorest.grblcontroller.model.Constants;
-import in.co.gorest.grblcontroller.model.GcodeCommand;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
-public class GrblBluetoothSerialService extends Service{
+public class GrblBluetoothSerialService extends GrblSerialService{
 
     private static final String TAG = GrblBluetoothSerialService.class.getSimpleName();
     public static final String KEY_MAC_ADDRESS = "KEY_MAC_ADDRESS";
@@ -67,7 +60,6 @@ public class GrblBluetoothSerialService extends Service{
     // Name for the SDP record when creating server socket
     private static final String NAME_SECURE = "HC-05";
     private static final String NAME_INSECURE = "HC-05";
-    private static final byte[] BYTE_NEWLINE = { 0x0A };
 
     // Unique UUID for this application
     private static final UUID MY_UUID_SECURE = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -87,12 +79,7 @@ public class GrblBluetoothSerialService extends Service{
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
 
-    public static volatile boolean isGrblFound = false;
-
-    SerialBluetoothCommunicationHandler serialBluetoothCommunicationHandler;
     private final IBinder mBinder = new GrblSerialServiceBinder();
-
-    private long statusUpdatePoolInterval = Constants.GRBL_STATUS_UPDATE_INTERVAL;
 
     @Override
     public void onCreate(){
@@ -107,10 +94,11 @@ public class GrblBluetoothSerialService extends Service{
             stopSelf();
         }else{
             if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
-                startForeground(Constants.BLUETOOTH_SERVICE_NOTIFICATION_ID, this.getNotification(null));
+                startForeground(Constants.BLUETOOTH_SERVICE_NOTIFICATION_ID,
+                        getServiceNotification(getString(R.string.text_bluetooth_service), getString(R.string.text_bluetooth_service_foreground_message)));
             }
 
-            serialBluetoothCommunicationHandler = new SerialBluetoothCommunicationHandler(this);
+            serialCommunicationHandler = new SerialCommunicationHandler(this);
             EventBus.getDefault().register(this);
         }
     }
@@ -154,9 +142,9 @@ public class GrblBluetoothSerialService extends Service{
     }
 
     public void disconnectService(){
-        serialBluetoothCommunicationHandler.stopGrblStatusUpdateService();
+        serialCommunicationHandler.stopGrblStatusUpdateService();
         this.stop();
-        isGrblFound = false;
+        setGrblFound(false);
     }
 
     @Override
@@ -164,7 +152,7 @@ public class GrblBluetoothSerialService extends Service{
         super.onDestroy();
 
         disconnectService();
-        serialBluetoothCommunicationHandler.shutdown();
+        serialCommunicationHandler.shutdown();
         mState = STATE_NONE;
         this.stop();
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
@@ -281,7 +269,7 @@ public class GrblBluetoothSerialService extends Service{
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        if(!isGrblFound) serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
+        if(!isGrblFound()) serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
     }
 
     synchronized void stop() {
@@ -522,7 +510,7 @@ public class GrblBluetoothSerialService extends Service{
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(mmInStream))){
                     String readMessage;
                     while((readMessage = reader.readLine()) != null) {
-                        serialBluetoothCommunicationHandler.obtainMessage(Constants.MESSAGE_READ, readMessage.length(), -1, readMessage).sendToTarget();
+                        serialCommunicationHandler.obtainMessage(Constants.MESSAGE_READ, readMessage.length(), -1, readMessage).sendToTarget();
                     }
                 } catch(IOException | NullPointerException e) {
                     Log.e(TAG, "disconnected", e);
@@ -549,55 +537,14 @@ public class GrblBluetoothSerialService extends Service{
         }
     }
 
-    private void serialWriteBytes(byte[] b) {
+    @Override
+    protected void serialWriteBytes(byte[] b) {
         ConnectedThread r;
         synchronized (this) {
             if (mState != STATE_CONNECTED) return;
             r = mConnectedThread;
         }
         r.write(b);
-    }
-
-    public void serialWriteString(String s){
-        byte[] buffer = s.getBytes();
-        this.serialWriteBytes(buffer);
-        this.serialWriteBytes(BYTE_NEWLINE);
-        serialBluetoothCommunicationHandler.obtainMessage(Constants.MESSAGE_WRITE, s.length(), -1, s).sendToTarget();
-    }
-
-    public void serialWriteByte(byte b){
-        byte[] c = {b};
-        serialWriteBytes(c);
-    }
-
-    private Notification getNotification(String message){
-
-        if(message == null) message = getString(R.string.text_bluetooth_service_foreground_message);
-
-        return new NotificationCompat.Builder(getApplicationContext(), NotificationHelper.CHANNEL_SERVICE_ID)
-                .setContentTitle(getString(R.string.text_bluetooth_service))
-                .setContentText(message)
-                .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setColor(getResources().getColor(R.color.colorPrimary))
-                .setAutoCancel(true).build();
-    }
-
-    public long getStatusUpdatePoolInterval(){
-        return this.statusUpdatePoolInterval;
-    }
-
-    public void setStatusUpdatePoolInterval(long poolInterval){
-        this.statusUpdatePoolInterval = poolInterval;
-    }
-
-    @Subscribe(threadMode = ThreadMode.BACKGROUND)
-    public void onGrblGcodeSendEvent(GcodeCommand event){
-        serialWriteString(event.getCommandString());
-    }
-
-    @Subscribe(threadMode = ThreadMode.BACKGROUND)
-    public void onGrblRealTimeCommandEvent(GrblRealTimeCommandEvent grblRealTimeCommandEvent){
-        serialWriteByte(grblRealTimeCommandEvent.getCommand());
     }
 
 }

@@ -49,10 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.Locale;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentJoggingTabBinding;
@@ -65,6 +62,7 @@ import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.util.GcodeLeveling;
 import in.co.gorest.grblcontroller.util.GrblUtils;
+import in.co.gorest.grblcontroller.util.SerialRxBufferThrottle;
 
 public class JoggingTabFragment extends BaseFragment implements View.OnClickListener, View.OnLongClickListener {
 
@@ -75,8 +73,9 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     private MachineStatusListener machineStatus;
     private EnhancedSharedPreferences sharedPref;
-    private BlockingQueue<Integer> completedCommands;
     private CustomCommandsAsyncTask customCommandsAsyncTask;
+    /** Throttle del task pulsanti custom in corso; letto anche dal thread EventBus. */
+    private volatile SerialRxBufferThrottle customCommandsThrottle;
 
     /**
      * Sistema di coordinate (G54..G57) attualmente attivo lato app.
@@ -987,19 +986,13 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     private class CustomCommandsAsyncTask extends AsyncTask<String, Integer, Integer> {
 
-        private int MAX_RX_SERIAL_BUFFER = Constants.DEFAULT_SERIAL_RX_BUFFER - 3;
-        private int CURRENT_RX_SERIAL_BUFFER;
-        private LinkedList<Integer> activeCommandSizes;
+        private SerialRxBufferThrottle rxThrottle;
 
         protected void onPreExecute() {
-            MachineStatusListener.CompileTimeOptions compileTimeOptions =
-                    MachineStatusListener.getInstance().getCompileTimeOptions();
-            if (compileTimeOptions.serialRxBuffer > 0)
-                MAX_RX_SERIAL_BUFFER = compileTimeOptions.serialRxBuffer - 3;
-
-            completedCommands = new ArrayBlockingQueue<>(Constants.DEFAULT_SERIAL_RX_BUFFER);
-            activeCommandSizes = new LinkedList<>();
-            CURRENT_RX_SERIAL_BUFFER = 0;
+            rxThrottle = new SerialRxBufferThrottle();
+            rxThrottle.setSerialRxBufferSize(
+                    MachineStatusListener.getInstance().getCompileTimeOptions().serialRxBuffer);
+            customCommandsThrottle = rxThrottle;
         }
 
         protected Integer doInBackground(String... commands) {
@@ -1013,18 +1006,8 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
         private void streamLine(String gcodeCommand) {
             int commandSize = gcodeCommand.length() + 1;
-            while (MAX_RX_SERIAL_BUFFER < (CURRENT_RX_SERIAL_BUFFER + commandSize)) {
-                try {
-                    completedCommands.take();
-                    if (activeCommandSizes.size() > 0)
-                        CURRENT_RX_SERIAL_BUFFER -= activeCommandSizes.removeFirst();
-                } catch (InterruptedException e) {
-                    Log.e(TAG, e.getMessage(), e);
-                    return;
-                }
-            }
-            activeCommandSizes.offer(commandSize);
-            CURRENT_RX_SERIAL_BUFFER += commandSize;
+            if (!rxThrottle.waitForSpace(commandSize)) return;
+            rxThrottle.commit(commandSize);
             fragmentInteractionListener.onGcodeCommandReceived(gcodeCommand);
         }
     }
@@ -1205,9 +1188,10 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     @Subscribe(threadMode = ThreadMode.BACKGROUND)
     public void onGrblOkEvent(GrblOkEvent event) {
-        if (customCommandsAsyncTask != null
+        SerialRxBufferThrottle throttle = customCommandsThrottle;
+        if (throttle != null && customCommandsAsyncTask != null
                 && customCommandsAsyncTask.getStatus() == AsyncTask.Status.RUNNING) {
-            completedCommands.offer(1);
+            throttle.onCommandCompleted();
         }
     }
 }

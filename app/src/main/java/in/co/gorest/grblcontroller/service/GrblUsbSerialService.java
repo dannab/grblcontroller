@@ -23,7 +23,6 @@
 
 package in.co.gorest.grblcontroller.service;
 
-import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -36,7 +35,6 @@ import android.hardware.usb.UsbManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import com.felhr.usbserial.CDCSerialDevice;
@@ -44,8 +42,6 @@ import com.felhr.usbserial.UsbSerialDevice;
 import com.felhr.usbserial.UsbSerialInterface;
 
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -53,15 +49,12 @@ import java.util.Map;
 import java.util.Objects;
 
 import in.co.gorest.grblcontroller.R;
-import in.co.gorest.grblcontroller.events.GrblRealTimeCommandEvent;
-import in.co.gorest.grblcontroller.helpers.NotificationHelper;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
-import in.co.gorest.grblcontroller.listeners.SerialUsbCommunicationHandler;
+import in.co.gorest.grblcontroller.listeners.SerialCommunicationHandler;
 import in.co.gorest.grblcontroller.model.Constants;
-import in.co.gorest.grblcontroller.model.GcodeCommand;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
-public class GrblUsbSerialService extends Service {
+public class GrblUsbSerialService extends GrblSerialService {
 
     public static final String ACTION_USB_READY = "com.felhr.connectivityservices.USB_READY";
     public static final String ACTION_USB_ATTACHED = "android.hardware.usb.action.USB_DEVICE_ATTACHED";
@@ -74,8 +67,6 @@ public class GrblUsbSerialService extends Service {
     public static final String ACTION_CDC_DRIVER_NOT_WORKING = "com.felhr.connectivityservices.ACTION_CDC_DRIVER_NOT_WORKING";
     public static final String ACTION_USB_DEVICE_NOT_WORKING = "com.felhr.connectivityservices.ACTION_USB_DEVICE_NOT_WORKING";
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
-    public static boolean SERVICE_CONNECTED = false;
-    private static final byte[] BYTE_NEW_LINE = { 0x0A };
 
     private final IBinder binder = new UsbSerialBinder();
 
@@ -85,11 +76,6 @@ public class GrblUsbSerialService extends Service {
     private UsbSerialDevice serialPort;
 
     private boolean serialPortConnected;
-    public static volatile boolean isGrblFound = false;
-
-    private SerialUsbCommunicationHandler serialUsbCommunicationHandler;
-
-    private long statusUpdatePoolInterval = Constants.GRBL_STATUS_UPDATE_INTERVAL;
 
     /*
      * onCreate will be executed when service is started. It configures an IntentFilter to listen for
@@ -100,17 +86,17 @@ public class GrblUsbSerialService extends Service {
         super.onCreate();
 
         serialPortConnected = false;
-        GrblUsbSerialService.SERVICE_CONNECTED = true;
 
         setFilter();
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         findSerialPortDevice();
 
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
-            startForeground(Constants.USB_OTG_SERVICE_NOTIFICATION_ID, this.getNotification(null));
+            startForeground(Constants.USB_OTG_SERVICE_NOTIFICATION_ID,
+                    getServiceNotification(getString(R.string.text_usb_service), getString(R.string.text_usb_service_foreground_message)));
         }
 
-        serialUsbCommunicationHandler = new SerialUsbCommunicationHandler(this);
+        serialCommunicationHandler = new SerialCommunicationHandler(this);
         EventBus.getDefault().register(this);
     }
 
@@ -129,9 +115,8 @@ public class GrblUsbSerialService extends Service {
         super.onDestroy();
 
         unregisterReceiver(usbReceiver);
-        serialUsbCommunicationHandler.shutdown();
-        GrblUsbSerialService.isGrblFound = false;
-        GrblUsbSerialService.SERVICE_CONNECTED = false;
+        serialCommunicationHandler.shutdown();
+        setGrblFound(false);
 
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
             stopForeground(true);
@@ -140,22 +125,10 @@ public class GrblUsbSerialService extends Service {
         EventBus.getDefault().unregister(this);
     }
 
-    public void serialWriteByte(byte b){
-        byte[] c = {b};
-        serialWriteBytes(c);
-    }
-
-    public void serialWriteBytes(byte[] data) {
+    @Override
+    protected void serialWriteBytes(byte[] data) {
         if (serialPort != null) serialPort.write(data);
     }
-
-    public void serialWriteString(String s){
-        this.serialWriteBytes(s.getBytes());
-        this.serialWriteBytes(BYTE_NEW_LINE);
-        //Log.d("SERIAL WRITE", s);
-        serialUsbCommunicationHandler.obtainMessage(Constants.MESSAGE_WRITE, s.length(), -1, s).sendToTarget();
-    }
-
 
     /*
      *  Data received from serial port will be received here. Just populate onReceivedData with your code
@@ -175,7 +148,7 @@ public class GrblUsbSerialService extends Service {
                 while((newLineIndex = rxBuffer.indexOf("\n")) != -1){
                     String readMessage = rxBuffer.substring(0, newLineIndex);
                     rxBuffer.delete(0, newLineIndex+1);
-                    serialUsbCommunicationHandler.obtainMessage(Constants.MESSAGE_READ, readMessage.length(), -1, readMessage).sendToTarget();
+                    serialCommunicationHandler.obtainMessage(Constants.MESSAGE_READ, readMessage.length(), -1, readMessage).sendToTarget();
                 }
 
             }catch (Exception ignored){
@@ -205,7 +178,7 @@ public class GrblUsbSerialService extends Service {
                 if(!serialPortConnected) findSerialPortDevice();
             } else if (Objects.equals(arg1.getAction(), ACTION_USB_DETACHED)) {
                 sendInternalBroadcast(ACTION_USB_DISCONNECTED);
-                serialUsbCommunicationHandler.stopGrblStatusUpdateService();
+                serialCommunicationHandler.stopGrblStatusUpdateService();
                 if(serialPortConnected){
                     serialPort.close();
                 }
@@ -344,36 +317,6 @@ public class GrblUsbSerialService extends Service {
                 sendInternalBroadcast(ACTION_USB_NOT_SUPPORTED);
             }
         }
-    }
-
-    public long getStatusUpdatePoolInterval(){
-        return this.statusUpdatePoolInterval;
-    }
-
-    public void setStatusUpdatePoolInterval(long poolInterval){
-        this.statusUpdatePoolInterval = poolInterval;
-    }
-
-    @Subscribe(threadMode = ThreadMode.BACKGROUND)
-    public void onGrblGcodeSendEvent(GcodeCommand event){
-        serialWriteString(event.getCommandString());
-    }
-
-    @Subscribe(threadMode = ThreadMode.BACKGROUND)
-    public void onGrblRealTimeCommandEvent(GrblRealTimeCommandEvent grblRealTimeCommandEvent){
-        serialWriteByte(grblRealTimeCommandEvent.getCommand());
-    }
-
-    private Notification getNotification(String message){
-
-        if(message == null) message = getString(R.string.text_usb_service_foreground_message);
-
-        return new NotificationCompat.Builder(getApplicationContext(), NotificationHelper.CHANNEL_SERVICE_ID)
-                .setContentTitle(getString(R.string.text_usb_service))
-                .setContentText(message)
-                .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setColor(getResources().getColor(R.color.colorPrimary))
-                .setAutoCancel(true).build();
     }
 
 }

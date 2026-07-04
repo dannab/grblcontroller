@@ -24,10 +24,17 @@
 package in.co.gorest.grblcontroller.listeners;
 
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 
 import org.greenrobot.eventbus.EventBus;
+
+import java.lang.ref.WeakReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import in.co.gorest.grblcontroller.GrblController;
 import in.co.gorest.grblcontroller.R;
@@ -40,12 +47,18 @@ import in.co.gorest.grblcontroller.events.GrblSettingMessageEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.model.Position;
+import in.co.gorest.grblcontroller.service.GrblSerialService;
 import in.co.gorest.grblcontroller.util.GrblLookups;
 import in.co.gorest.grblcontroller.util.GrblUtils;
 
 import static org.greenrobot.eventbus.EventBus.TAG;
 
-public abstract class SerialCommunicationHandler extends Handler {
+/**
+ * Handler unico dei messaggi seriali per entrambi i trasporti (Bluetooth e
+ * USB): prima esisteva in due copie identiche, SerialBluetoothCommunicationHandler
+ * e SerialUsbCommunicationHandler, che differivano solo per il tipo del service.
+ */
+public class SerialCommunicationHandler extends Handler {
 
     protected final MachineStatusListener machineStatus;
 
@@ -55,12 +68,87 @@ public abstract class SerialCommunicationHandler extends Handler {
 
     private final String[] startUpCommands = {GrblUtils.GRBL_BUILD_INFO_COMMAND, GrblUtils.GRBL_VIEW_SETTINGS_COMMAND, GrblUtils.GRBL_VIEW_PARSER_STATE_COMMAND, GrblUtils.GRBL_VIEW_GCODE_PARAMETERS_COMMAND};
 
-    public SerialCommunicationHandler(){
+    private final ExecutorService singleThreadExecutor;
+    private ScheduledExecutorService grblStatusUpdater = null;
+
+    private final WeakReference<GrblSerialService> mService;
+
+    public SerialCommunicationHandler(GrblSerialService grblSerialService){
 
         machineStatus = MachineStatusListener.getInstance();
         GrblAlarms = new GrblLookups(GrblController.getInstance(), "alarm_codes");
         GrblErrors = new GrblLookups(GrblController.getInstance(), "error_codes");
         GrblSettings = new GrblLookups(GrblController.getInstance(), "setting_codes");
+
+        mService = new WeakReference<>(grblSerialService);
+        singleThreadExecutor = Executors.newSingleThreadExecutor();
+    }
+
+    @Override
+    public void handleMessage(Message msg){
+
+        final GrblSerialService grblSerialService = mService.get();
+        if(grblSerialService == null) return;
+
+        switch(msg.what){
+            case Constants.MESSAGE_READ:
+                if(msg.arg1 > 0){
+                    final String message = (String) msg.obj;
+                    if(!singleThreadExecutor.isShutdown()){
+                        singleThreadExecutor.submit(() -> onSerialRead(message.trim(), grblSerialService));
+                    }
+                }
+                break;
+
+            case Constants.MESSAGE_WRITE:
+                final String message = (String) msg.obj;
+                EventBus.getDefault().post(new ConsoleMessageEvent(message));
+                break;
+        }
+
+    }
+
+    private void onSerialRead(String message, final GrblSerialService grblSerialService){
+
+        boolean isVersionString = onSerialRead(message);
+        if(isVersionString){
+            grblSerialService.setGrblFound(true);
+
+            Handler handler = new Handler(Looper.getMainLooper());
+
+            long delayMillis = grblSerialService.getStatusUpdatePoolInterval();
+            for(final String startUpCommand: this.getStartUpCommands()){
+                handler.postDelayed(() -> grblSerialService.serialWriteString(startUpCommand), delayMillis);
+
+                delayMillis = delayMillis + grblSerialService.getStatusUpdatePoolInterval();
+            }
+
+            startGrblStatusUpdateService(grblSerialService);
+        }
+
+    }
+
+    private void startGrblStatusUpdateService(final GrblSerialService grblSerialService){
+
+        stopGrblStatusUpdateService();
+
+        grblStatusUpdater = Executors.newScheduledThreadPool(1);
+        grblStatusUpdater.scheduleWithFixedDelay(() -> grblSerialService.serialWriteByte(GrblUtils.GRBL_STATUS_COMMAND), grblSerialService.getStatusUpdatePoolInterval(), grblSerialService.getStatusUpdatePoolInterval(), TimeUnit.MILLISECONDS);
+
+    }
+
+    public void stopGrblStatusUpdateService(){
+        if(grblStatusUpdater != null) grblStatusUpdater.shutdownNow();
+    }
+
+    /**
+     * Da chiamare alla distruzione del service: chiude definitivamente anche
+     * il singleThreadExecutor (creato una sola volta nel costruttore), che
+     * altrimenti terrebbe vivo un thread non-daemon per ogni connessione.
+     */
+    public void shutdown(){
+        stopGrblStatusUpdateService();
+        singleThreadExecutor.shutdownNow();
     }
 
     protected boolean onSerialRead(String message){
@@ -244,7 +332,5 @@ public abstract class SerialCommunicationHandler extends Handler {
     public String[] getStartUpCommands(){
         return this.startUpCommands;
     }
-
-    public abstract void handleMessage(Message msg);
 
 }
