@@ -879,6 +879,9 @@ public class GcodeHttpServer extends NanoHTTPD {
         int sent = fs.getRowsSent() != null ? fs.getRowsSent() : 0;
         int perc = total > 0 ? (int) Math.round(sent * 100.0 / total) : 0;
         String elapsed = (hasFile && fs.getElapsedTime() != null) ? fs.getElapsedTime() : "—";
+        // Ultimo commento del GCode in esecuzione (stessa info del File Sender);
+        // la riga è nascosta finché non c'è nulla da mostrare.
+        String comment = (hasFile && fs.getLastComment() != null) ? fs.getLastComment() : "";
         String mname = (machineName != null && !machineName.isEmpty())
                 ? machineName : "Nessuna macchina connessa";
         html.append("<header><div class=\"row\">")
@@ -889,6 +892,9 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("<div class=\"jline\">File: <b id=\"jName\">").append(escapeHtml(fileName))
                 .append("</b> &middot; Stato: <b id=\"machineState\">")
                 .append(escapeHtml(state != null && !state.isEmpty() ? state : "—")).append("</b></div>")
+                .append("<div class=\"jline\" id=\"jCommentLine\"")
+                .append(comment.isEmpty() ? " style=\"display:none\"" : "")
+                .append("><b id=\"jComment\">").append(escapeHtml(comment)).append("</b></div>")
                 .append("<div class=\"jline\">Righe <b id=\"jSent\">").append(sent)
                 .append("</b> / <b id=\"jTotal\">").append(total).append("</b> (<b id=\"jPerc\">").append(perc)
                 .append("%</b>) &middot; Tempo <b id=\"jElapsed\">").append(escapeHtml(elapsed))
@@ -957,6 +963,7 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "\"hasFile\":" + hasFile + ","
                 + "\"streaming\":" + streaming + ","
                 + "\"file\":\"" + jsonEscape(hasFile ? fs.getGcodeFileName() : "") + "\","
+                + "\"comment\":\"" + jsonEscape(hasFile && fs.getLastComment() != null ? fs.getLastComment() : "") + "\","
                 + "\"sent\":" + sent + ","
                 + "\"total\":" + total + ","
                 + "\"elapsed\":\"" + jsonEscape(fs.getElapsedTime() != null ? fs.getElapsedTime() : "") + "\","
@@ -1024,6 +1031,8 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "var dis=!d.connected,cb=document.querySelectorAll('.ctrl [data-cmd]');"
                 + "for(var i=0;i<cb.length;i++){cb[i].disabled=dis;}"
                 + "set('jName',d.hasFile?d.file:'\\u2014');set('jSent',d.sent);set('jTotal',d.total);"
+                + "var cm=(d.hasFile&&d.comment)?d.comment:'';set('jComment',cm);"
+                + "var cl=document.getElementById('jCommentLine');if(cl)cl.style.display=cm?'':'none';"
                 + "var perc=d.total>0?Math.round(d.sent*100/d.total):0;set('jPerc',perc+'%');"
                 + "set('jElapsed',d.hasFile?d.elapsed:'\\u2014');"
                 + "var eta='\\u2014';if(d.streaming&&d.sent>0&&d.total>d.sent){"
