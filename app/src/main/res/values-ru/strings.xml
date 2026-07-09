@@ -347,9 +347,9 @@
     <string name="text_check_z_drop_angle_desc">Отмечаются только опускания с углом к плоскости XY не менее этого значения. 0° = горизонталь, 90° = чистое погружение по Z</string>
     <string name="text_z_drop_ok">Проверка Z OK: нет погружений &gt; %1$.1f мм и &gt; %2$.0f°</string>
     <string name="text_z_drop_thresholds">Пороги: глубина ≥ %1$.2f мм, угол ≥ %2$.0f°\nФайл: %3$s\n\n</string>
-    <string name="text_z_drop_worst">Худшее погружение: ΔZ %1$.2f мм @ %2$.1f° (строка %3$d)\n\n</string>
+    <string name="text_z_drop_worst">Худшее погружение: ΔZ %1$.2f мм @ %2$.1f° (строка %3$s)\n\n</string>
     <string name="text_z_drop_first_entries">Первые %1$d записей:\n</string>
-    <string name="text_z_drop_row">"  строка %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f мм   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_row">"  строка %1$-11s  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f мм   @ %5$4.1f°\n"</string>
     <string name="text_z_drop_more">\n…и ещё %1$d записей не показано.</string>
     <string name="text_z_drop_title">⚠ %1$d подозрительных погружений Z</string>
 

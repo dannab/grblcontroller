@@ -620,10 +620,12 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
         final float depthThresh = parseFloatPref(R.string.preference_check_z_drop_depth, 1.0f);
         final float angleThresh = parseFloatPref(R.string.preference_check_z_drop_angle, 60f);
+        final boolean ignoreG0  = sharedPref.getBoolean(
+                getString(R.string.preference_check_z_drop_ignore_g0), false);
 
         zDropExecutor.submit(() -> {
             final List<GcodeDropChecker.DropWarning> warnings =
-                    GcodeDropChecker.check(file, depthThresh, angleThresh);
+                    GcodeDropChecker.check(file, depthThresh, angleThresh, ignoreG0);
             runOnUiThread(() -> showZDropDialog(file, warnings, depthThresh, angleThresh));
         });
     }
@@ -637,6 +639,12 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    /** "1234" per un affondo su singola riga, "1234–1250" per una corsa di discesa. */
+    private static String lineRange(GcodeDropChecker.DropWarning w) {
+        if (w.lineNumber == w.lineNumberEnd) return String.valueOf(w.lineNumber);
+        return w.lineNumber + "–" + w.lineNumberEnd;
     }
 
     private void showZDropDialog(File file,
@@ -661,14 +669,14 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
             if (w.dz < worst.dz) worst = w;
         }
         sb.append(getString(R.string.text_z_drop_worst,
-                worst.dz, worst.angleDeg, worst.lineNumber));
+                worst.dz, worst.angleDeg, lineRange(worst)));
 
         int max = Math.min(30, warnings.size());
         sb.append(getString(R.string.text_z_drop_first_entries, max));
         for (int i = 0; i < max; i++) {
             GcodeDropChecker.DropWarning w = warnings.get(i);
             sb.append(getString(R.string.text_z_drop_row,
-                    w.lineNumber, w.zBefore, w.zAfter, w.dz, w.angleDeg));
+                    lineRange(w), w.zBefore, w.zAfter, w.dz, w.angleDeg));
         }
         if (warnings.size() > max) {
             sb.append(getString(R.string.text_z_drop_more, warnings.size() - max));

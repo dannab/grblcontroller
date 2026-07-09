@@ -51,40 +51,101 @@ public class GcodeDropChecker {
     private static final String TAG = GcodeDropChecker.class.getSimpleName();
 
     public static class DropWarning {
-        public final int   lineNumber;
+        public final int   lineNumber;     // prima riga della corsa di discesa
+        public final int   lineNumberEnd;  // ultima riga (== lineNumber se singolo blocco)
+        public final int   segments;       // quanti segmenti compongono la corsa
         public final float zBefore;
         public final float zAfter;
         public final float dz;
         public final float angleDeg;
 
-        public DropWarning(int lineNumber, float zBefore, float zAfter,
+        public DropWarning(int lineNumber, int lineNumberEnd, int segments,
+                           float zBefore, float zAfter,
                            float dz, float angleDeg) {
-            this.lineNumber = lineNumber;
-            this.zBefore    = zBefore;
-            this.zAfter     = zAfter;
-            this.dz         = dz;
-            this.angleDeg   = angleDeg;
+            this.lineNumber    = lineNumber;
+            this.lineNumberEnd = lineNumberEnd;
+            this.segments      = segments;
+            this.zBefore       = zBefore;
+            this.zAfter        = zAfter;
+            this.dz            = dz;
+            this.angleDeg      = angleDeg;
+        }
+    }
+
+    /**
+     * Stato di una "corsa di discesa": catena di segmenti consecutivi tutti
+     * in discesa ripida. Tipico degli affondi in cavità nel parallel finishing,
+     * dove il CAM spezza la discesa in tanti segmentini ognuno sotto soglia.
+     */
+    private static class DescentRun {
+        int   startLine = -1;
+        int   endLine   = -1;
+        int   segments  = 0;
+        float zStart    = 0;
+        float zEnd      = 0;
+        float dxySum    = 0;
+
+        boolean isActive() { return startLine >= 0; }
+
+        void start(int line, float zBefore) {
+            startLine = line;
+            zStart    = zBefore;
+            segments  = 0;
+            dxySum    = 0;
+        }
+
+        void extend(int line, float zAfter, float dxy) {
+            endLine = line;
+            zEnd    = zAfter;
+            dxySum += dxy;
+            segments++;
+        }
+
+        void reset() { startLine = -1; }
+
+        /** Se la corsa accumulata supera la profondità di soglia, produce il warning. */
+        void flushInto(List<DropWarning> warnings, float depthThresholdMm) {
+            if (!isActive()) return;
+            float cumDz = zEnd - zStart; // negativo
+            if (-cumDz >= depthThresholdMm) {
+                float angleDeg = (float) Math.toDegrees(Math.atan2(-cumDz, dxySum));
+                warnings.add(new DropWarning(startLine, endLine, segments,
+                        zStart, zEnd, cumDz, angleDeg));
+            }
+            reset();
         }
     }
 
     /**
      * Esegue il check in modo sincrono (chiamare in background thread).
      *
+     * Rilevamento a "corsa di discesa": i segmenti consecutivi in discesa
+     * ripida (angolo ≥ soglia) vengono accumulati; quando la corsa si
+     * interrompe (Z risale, il movimento si appiattisce, o il file finisce)
+     * la profondità CUMULATIVA della corsa viene confrontata con la soglia.
+     * Così un affondo da 4 mm spezzato dal CAM in 20 segmenti da 0.2 mm
+     * viene rilevato come un'unica discesa da 4 mm.
+     *
      * @param file               file gcode da analizzare
-     * @param depthThresholdMm   profondità minima della discesa per scatenare warning (mm, > 0)
-     * @param angleThresholdDeg  angolo minimo della discesa per scatenare warning (gradi, 0..90)
+     * @param depthThresholdMm   profondità minima della corsa di discesa (mm, > 0)
+     * @param angleThresholdDeg  angolo minimo di ogni segmento della corsa (gradi, 0..90)
+     * @param ignoreRapids       se true, i movimenti G0 (rapidi) non vengono segnalati
      * @return lista di warning (può essere vuota); mai null
      */
     public static List<DropWarning> check(File file,
                                           float depthThresholdMm,
-                                          float angleThresholdDeg) {
+                                          float angleThresholdDeg,
+                                          boolean ignoreRapids) {
         List<DropWarning> warnings = new ArrayList<>();
         if (file == null || !file.exists()) return warnings;
+
+        DescentRun run = new DescentRun();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             float x = 0, y = 0, z = 0;
             boolean isAbsolute = true;
+            int modalMotion = 0; // modale attivo: 0=G0, 1=G1, 2=G2, 3=G3
             int lineNo = 0;
 
             while ((line = reader.readLine()) != null) {
@@ -100,6 +161,13 @@ public class GcodeDropChecker {
 
                 if (containsGCode(line, 90)) isAbsolute = true;
                 if (containsGCode(line, 91)) isAbsolute = false;
+
+                // Aggiorna il modale di movimento: una riga "Z-5" senza G
+                // eredita l'ultimo G0/G1/G2/G3 visto
+                if (containsGCode(line, 0)) modalMotion = 0;
+                if (containsGCode(line, 1)) modalMotion = 1;
+                if (containsGCode(line, 2)) modalMotion = 2;
+                if (containsGCode(line, 3)) modalMotion = 3;
 
                 float nx = parseCoord(line, 'X', x);
                 float ny = parseCoord(line, 'Y', y);
@@ -118,22 +186,34 @@ public class GcodeDropChecker {
                     float dy  = ny - y;
                     float dxy = (float) Math.sqrt(dx * dx + dy * dy);
 
-                    // Calcola angolo solo se è una discesa
-                    if (dz < 0) {
-                        float absDz = -dz;
+                    boolean isRapid = (modalMotion == 0);
+
+                    // Il segmento appartiene a una corsa di discesa se:
+                    // scende, è ripido, e non è un G0 da ignorare
+                    boolean steepDescent = false;
+                    if (dz < 0 && !(ignoreRapids && isRapid)) {
                         // angolo rispetto al piano XY:
                         // - dxy=0 (plunge puro) -> 90°
                         // - dz piccolo, dxy grande -> ~0°
-                        float angleDeg = (float) Math.toDegrees(Math.atan2(absDz, dxy));
+                        float angleDeg = (float) Math.toDegrees(Math.atan2(-dz, dxy));
+                        steepDescent = angleDeg >= angleThresholdDeg;
+                    }
 
-                        if (absDz >= depthThresholdMm && angleDeg >= angleThresholdDeg) {
-                            warnings.add(new DropWarning(lineNo, z, nz, dz, angleDeg));
-                        }
+                    if (steepDescent) {
+                        if (!run.isActive()) run.start(lineNo, z);
+                        run.extend(lineNo, nz, dxy);
+                    } else {
+                        // Corsa interrotta: valuta la profondità cumulativa
+                        run.flushInto(warnings, depthThresholdMm);
                     }
 
                     x = nx; y = ny; z = nz;
                 }
             }
+
+            // Corsa eventualmente ancora aperta a fine file
+            run.flushInto(warnings, depthThresholdMm);
+
         } catch (IOException e) {
             Log.e(TAG, "Errore lettura file: " + e.getMessage());
         }

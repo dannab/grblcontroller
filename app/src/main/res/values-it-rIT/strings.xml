@@ -338,9 +338,9 @@
     <string name="text_check_z_drop_angle_desc">Solo le discese il cui angolo rispetto al piano XY è almeno questo vengono segnalate. 0° = orizzontale, 90° = plunge puro in Z</string>
     <string name="text_z_drop_ok">Check Z OK: nessun affondo &gt; %1$.1f mm e &gt; %2$.0f°</string>
     <string name="text_z_drop_thresholds">Soglie: profondità ≥ %1$.2f mm, angolo ≥ %2$.0f°\nFile: %3$s\n\n</string>
-    <string name="text_z_drop_worst">Peggior affondo: ΔZ %1$.2f mm @ %2$.1f° (riga %3$d)\n\n</string>
+    <string name="text_z_drop_worst">Peggior affondo: ΔZ %1$.2f mm @ %2$.1f° (riga %3$s)\n\n</string>
     <string name="text_z_drop_first_entries">Prime %1$d voci:\n</string>
-    <string name="text_z_drop_row">"  riga %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_row">"  riga %1$-11s  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
     <string name="text_z_drop_more">\n…e altre %1$d voci non mostrate.</string>
     <string name="text_z_drop_title">⚠ %1$d affondi Z sospetti</string>
 

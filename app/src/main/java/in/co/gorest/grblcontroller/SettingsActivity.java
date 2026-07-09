@@ -68,6 +68,30 @@ public class SettingsActivity extends AppCompatActivity {
 
             getPreferenceScreen().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
             updateHttpServerInfo();
+            updateZDropInfo();
+        }
+
+        /**
+         * Mostra al primo livello lo stato del controllo affondi Z:
+         * se attivo, riepiloga le soglie correnti; se spento, la descrizione statica.
+         */
+        private void updateZDropInfo() {
+            android.preference.Preference screen =
+                    getPreferenceScreen().findPreference("z_drop_check_flashcard");
+            if (screen == null) return;
+            SharedPreferences sp = getPreferenceManager().getSharedPreferences();
+            boolean enabled = sp.getBoolean(getString(R.string.preference_check_z_drop_enabled), false);
+            if (enabled) {
+                String depth = sp.getString(getString(R.string.preference_check_z_drop_depth), "1.0");
+                String angle = sp.getString(getString(R.string.preference_check_z_drop_angle), "60");
+                String status = getString(R.string.text_check_z_drop_status_on, depth, angle);
+                if (sp.getBoolean(getString(R.string.preference_check_z_drop_ignore_g0), false)) {
+                    status += " • " + getString(R.string.text_check_z_drop_g0_excluded);
+                }
+                screen.setSummary(status);
+            } else {
+                screen.setSummary(getString(R.string.text_check_z_drop_section_desc));
+            }
         }
 
         private void updateHttpServerInfo() {
@@ -113,6 +137,13 @@ public class SettingsActivity extends AppCompatActivity {
                     || key.equals(getString(R.string.preference_http_server_password))){
                 HttpServerManager.getInstance().restart(getActivity().getApplicationContext());
                 updateHttpServerInfo();
+            }
+
+            if(key.equals(getString(R.string.preference_check_z_drop_enabled))
+                    || key.equals(getString(R.string.preference_check_z_drop_depth))
+                    || key.equals(getString(R.string.preference_check_z_drop_angle))
+                    || key.equals(getString(R.string.preference_check_z_drop_ignore_g0))){
+                updateZDropInfo();
             }
 
             if(key.equals(getString(R.string.preference_color_scheme))){

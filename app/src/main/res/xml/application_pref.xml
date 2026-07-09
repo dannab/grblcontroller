@@ -350,6 +350,48 @@
 
     </PreferenceScreen>
 
+    <!-- Controllo affondi Z al caricamento file (jump detection) -->
+    <PreferenceScreen
+        android:key="z_drop_check_flashcard"
+        android:icon="@drawable/ic_warning_black_24dp"
+        android:title="@string/text_check_z_drop_section"
+        android:summary="@string/text_check_z_drop_section_desc">
+
+        <SwitchPreference
+            android:icon="@drawable/ic_warning_black_24dp"
+            android:defaultValue="false"
+            android:key="@string/preference_check_z_drop_enabled"
+            android:title="@string/text_check_z_drop_enabled"
+            android:summary="@string/text_check_z_drop_enabled_desc" />
+
+        <EditTextPreference
+            android:icon="@drawable/ic_format_list_numbered_black_24dp"
+            android:dependency="@string/preference_check_z_drop_enabled"
+            android:key="@string/preference_check_z_drop_depth"
+            android:title="@string/text_check_z_drop_depth"
+            android:summary="@string/text_check_z_drop_depth_desc"
+            android:inputType="numberDecimal"
+            android:defaultValue="1.0" />
+
+        <EditTextPreference
+            android:icon="@drawable/ic_format_list_numbered_black_24dp"
+            android:dependency="@string/preference_check_z_drop_enabled"
+            android:key="@string/preference_check_z_drop_angle"
+            android:title="@string/text_check_z_drop_angle"
+            android:summary="@string/text_check_z_drop_angle_desc"
+            android:inputType="numberDecimal"
+            android:defaultValue="60" />
+
+        <SwitchPreference
+            android:icon="@drawable/ic_swap_horizontal_black_24dp"
+            android:dependency="@string/preference_check_z_drop_enabled"
+            android:defaultValue="false"
+            android:key="@string/preference_check_z_drop_ignore_g0"
+            android:title="@string/text_check_z_drop_ignore_g0"
+            android:summary="@string/text_check_z_drop_ignore_g0_desc" />
+
+    </PreferenceScreen>
+
     <SwitchPreference
         android:icon="@drawable/ic_power_settings_new_black_24dp"
         android:defaultValue="true"
@@ -363,32 +405,6 @@
         android:key="@string/preference_check_machine_position_before_job"
         android:title="@string/text_check_machine_position"
         android:summary="@string/text_check_machine_position_description" />
-
-    <!-- Controllo affondi Z al caricamento file -->
-    <SwitchPreference
-        android:icon="@drawable/ic_warning_black_24dp"
-        android:defaultValue="false"
-        android:key="@string/preference_check_z_drop_enabled"
-        android:title="@string/text_check_z_drop_enabled"
-        android:summary="@string/text_check_z_drop_enabled_desc" />
-
-    <EditTextPreference
-        android:icon="@drawable/ic_format_list_numbered_black_24dp"
-        android:dependency="@string/preference_check_z_drop_enabled"
-        android:key="@string/preference_check_z_drop_depth"
-        android:title="@string/text_check_z_drop_depth"
-        android:summary="@string/text_check_z_drop_depth_desc"
-        android:inputType="numberDecimal"
-        android:defaultValue="1.0" />
-
-    <EditTextPreference
-        android:icon="@drawable/ic_format_list_numbered_black_24dp"
-        android:dependency="@string/preference_check_z_drop_enabled"
-        android:key="@string/preference_check_z_drop_angle"
-        android:title="@string/text_check_z_drop_angle"
-        android:summary="@string/text_check_z_drop_angle_desc"
-        android:inputType="numberDecimal"
-        android:defaultValue="60" />
 
     <ListPreference
         android:key="@string/preference_streaming_stop_button_behaviour"

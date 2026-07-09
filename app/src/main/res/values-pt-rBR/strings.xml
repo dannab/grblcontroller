@@ -364,9 +364,9 @@
     <string name="text_check_z_drop_angle_desc">Apenas descidas cujo ângulo em relação ao plano XY seja pelo menos este são reportadas. 0° = horizontal, 90° = mergulho puro em Z</string>
     <string name="text_z_drop_ok">Verificação Z OK: nenhum mergulho &gt; %1$.1f mm e &gt; %2$.0f°</string>
     <string name="text_z_drop_thresholds">Limites: profundidade ≥ %1$.2f mm, ângulo ≥ %2$.0f°\nArquivo: %3$s\n\n</string>
-    <string name="text_z_drop_worst">Pior mergulho: ΔZ %1$.2f mm @ %2$.1f° (linha %3$d)\n\n</string>
+    <string name="text_z_drop_worst">Pior mergulho: ΔZ %1$.2f mm @ %2$.1f° (linha %3$s)\n\n</string>
     <string name="text_z_drop_first_entries">Primeiras %1$d entradas:\n</string>
-    <string name="text_z_drop_row">"  linha %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_row">"  linha %1$-11s  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
     <string name="text_z_drop_more">\n…e mais %1$d entradas não exibidas.</string>
     <string name="text_z_drop_title">⚠ %1$d mergulhos Z suspeitos</string>
 

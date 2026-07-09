@@ -63,6 +63,7 @@
     <string name="preference_check_z_drop_enabled" translatable="false">check_z_drop_enabled</string>
     <string name="preference_check_z_drop_depth" translatable="false">check_z_drop_depth</string>
     <string name="preference_check_z_drop_angle" translatable="false">check_z_drop_angle</string>
+    <string name="preference_check_z_drop_ignore_g0" translatable="false">check_z_drop_ignore_g0</string>
     <string name="preference_confirm_grbl_soft_reset" translatable="false">confirm_grbl_soft_reset</string>
     <string name="preference_enable_additional_axis" translatable="false">enable_additional_axis</string>
     <string translatable="false" name="preference_ignore_error_20">preference_ignore_error_20</string>
@@ -177,12 +178,18 @@
     <string name="text_streaming_stop_button_behaviour">Streaming stop button behaviour</string>
     <string name="text_check_machine_position">Check machine position</string>
     <string name="text_check_machine_position_description">prevent file streaming, if machine is not at zero position</string>
+    <string name="text_check_z_drop_section">Z plunge detection</string>
+    <string name="text_check_z_drop_section_desc">warn on file load about Z descents that are too deep and too steep (likely CAM errors)</string>
+    <string name="text_check_z_drop_status_on">ACTIVE — warns if descent ≥ %1$s mm and angle ≥ %2$s°</string>
     <string name="text_check_z_drop_enabled">Check Z plunges on file load</string>
     <string name="text_check_z_drop_enabled_desc">When a GCode file is opened, analyse Z descents and warn about moves that are too deep and too steep (likely CAM errors)</string>
     <string name="text_check_z_drop_depth">Attention depth (mm)</string>
     <string name="text_check_z_drop_depth_desc">Only Z descents of at least this many millimetres are evaluated</string>
     <string name="text_check_z_drop_angle">Attention angle (°)</string>
     <string name="text_check_z_drop_angle_desc">Only descents whose angle to the XY plane is at least this are reported. 0° = horizontal, 90° = pure Z plunge</string>
+    <string name="text_check_z_drop_ignore_g0">Ignore G0 rapid moves</string>
+    <string name="text_check_z_drop_ignore_g0_desc">Do not report plunges made with G0 (rapid) moves, only those in feed moves (G1/G2/G3)</string>
+    <string name="text_check_z_drop_g0_excluded">G0 excluded</string>
     <string name="text_grbl_status_update_interval">Status update interval</string>
     <string name="text_grbl_status_update_interval_summary">%s (if you have slow cpu or very old phone then increase this value, default value is 150)</string>
 
@@ -456,9 +463,9 @@
     <!-- Z plunge check dialog -->
     <string name="text_z_drop_ok">Z check OK: no plunge &gt; %1$.1f mm and &gt; %2$.0f°</string>
     <string name="text_z_drop_thresholds">Thresholds: depth ≥ %1$.2f mm, angle ≥ %2$.0f°\nFile: %3$s\n\n</string>
-    <string name="text_z_drop_worst">Worst plunge: ΔZ %1$.2f mm @ %2$.1f° (line %3$d)\n\n</string>
+    <string name="text_z_drop_worst">Worst plunge: ΔZ %1$.2f mm @ %2$.1f° (line %3$s)\n\n</string>
     <string name="text_z_drop_first_entries">First %1$d entries:\n</string>
-    <string name="text_z_drop_row">"  line %1$-5d  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
+    <string name="text_z_drop_row">"  line %1$-11s  Z: %2$+7.2f → %3$+7.2f   ΔZ %4$+6.2f mm   @ %5$4.1f°\n"</string>
     <string name="text_z_drop_more">\n…and %1$d more entries not shown.</string>
     <string name="text_z_drop_title">⚠ %1$d suspicious Z plunges</string>
 
