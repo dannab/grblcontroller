@@ -12,3 +12,5 @@ gradle
 keystore.properties
 *.jks
 *.keystore
+/MARZ/*
+

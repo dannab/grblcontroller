@@ -21,6 +21,7 @@
     <color name="teal_primary">#00796b</color>
     <color name="teal_primary_dark">#004d40</color>
     <color name="teal_accent">#ff6e40</color>
+    <color name="colorAlarm">#d50000</color>
     <color name="colorWhite">#ffffff</color>
     <color name="colorDivider">#bdbdbd</color>
     <color name="colorBlack">#000000</color>
