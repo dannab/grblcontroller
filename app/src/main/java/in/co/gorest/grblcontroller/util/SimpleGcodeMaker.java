@@ -147,7 +147,10 @@ public class SimpleGcodeMaker {
         path.append("G01 Y").append(f(this.yt)).append("\n");
         path.append("G01 X").append(f(this.xf)).append("\n");
         path.append("G01 Y").append(f(this.yf)).append("\n");
-        return ZLoop(path.toString(), this.xf, this.yf, true);
+        // L'incisione segue un contorno chiuso: al termine di ogni giro
+        // l'utensile e' gia' sul punto iniziale. La passata successiva puo'
+        // quindi scendere direttamente, senza una retrazione intermedia.
+        return ZLoop(path.toString(), this.xf, this.yf, false);
     }
 
     public String cutRectangle(double offset, boolean aprox_pass, boolean invert_direction) {

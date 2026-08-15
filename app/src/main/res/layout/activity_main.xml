@@ -115,7 +115,7 @@
 
                             <TextView
                                 android:text="X"
-                                android:textColor="@{machineStatus.enabledPins.x ? @color/colorPrimary : @android:color/tertiary_text_dark}"
+                                android:textColor="@{machineStatus.enabledPins.x ? @color/colorAlarm : @android:color/tertiary_text_dark}"
                                 tools:ignore="HardcodedText" />
 
                             <TextView android:text='@{String.format("%.3f", machineStatus.machinePosition.cordX)}' />
@@ -141,7 +141,7 @@
 
                             <TextView
                                 android:text="Y"
-                                android:textColor="@{machineStatus.enabledPins.y ? @color/colorPrimary : @android:color/tertiary_text_dark}"
+                                android:textColor="@{machineStatus.enabledPins.y ? @color/colorAlarm : @android:color/tertiary_text_dark}"
                                 tools:ignore="HardcodedText" />
 
                             <TextView android:text='@{String.format("%.3f", machineStatus.machinePosition.cordY)}' />
@@ -167,7 +167,7 @@
 
                             <TextView
                                 android:text="Z"
-                                android:textColor="@{machineStatus.enabledPins.z ? @color/colorPrimary : @android:color/tertiary_text_dark}"
+                                android:textColor="@{machineStatus.enabledPins.z ? @color/colorAlarm : @android:color/tertiary_text_dark}"
                                 tools:ignore="HardcodedText" />
 
                             <TextView android:text='@{String.format("%.3f", machineStatus.machinePosition.cordZ)}' />
