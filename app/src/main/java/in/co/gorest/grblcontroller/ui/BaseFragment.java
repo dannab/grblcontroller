@@ -54,11 +54,6 @@ public class BaseFragment extends Fragment {
     private boolean jogStateSeen;
     private long jogReleaseStartedAt;
 
-    /**
-     * Runs independently from ACTION_UP. Continuous jog is allowed only while
-     * the actual Android jog button remains physically pressed. Any loss of the
-     * pressed state causes an immediate realtime 0x85 cancel.
-     */
     private final Runnable jogSafetyWatchdog = new Runnable() {
         @Override
         public void run() {
@@ -67,6 +62,13 @@ public class BaseFragment extends Fragment {
             MachineStatusListener status = MachineStatusListener.getInstance();
             boolean grblJog = Constants.MACHINE_STATUS_JOG.equals(status.getState());
             if (grblJog) jogStateSeen = true;
+
+            // Android may set View.isPressed() just after the ACTION_DOWN listener.
+            // If the button was not yet identifiable when $J was sent, resolve it
+            // again on the first watchdog cycles instead of cancelling immediately.
+            if (activeContinuousJogButton == null) {
+                activeContinuousJogButton = findPressedJogButton();
+            }
 
             boolean stillPressed = activeContinuousJogButton != null
                     && activeContinuousJogButton.isShown()
@@ -78,9 +80,6 @@ public class BaseFragment extends Fragment {
             }
 
             if (JogSafetyController.isCancelPending()) {
-                // Keep the global command lock until GRBL has actually left JOG.
-                // If JOG was never observed because press/release was faster than
-                // a status report, retain the lock briefly then fail safe open.
                 boolean safelyStopped = jogStateSeen && !grblJog;
                 boolean statusNeverCaughtJog = !jogStateSeen
                         && jogReleaseStartedAt > 0
@@ -97,10 +96,6 @@ public class BaseFragment extends Fragment {
         }
     };
 
-    /**
-     * Safety proxy shared by every fragment. While continuous jog owns the
-     * machine, commands from all tabs are filtered globally.
-     */
     private final OnFragmentInteractionListener safeInteractionListener =
             new OnFragmentInteractionListener() {
                 @Override
@@ -109,6 +104,8 @@ public class BaseFragment extends Fragment {
 
                     if (isContinuousJogCommand(command)) {
                         if (!beginJogSafetyLock()) return;
+                        // The owner command is the only normal command allowed to
+                        // bypass the lock. From this point the channel is exclusive.
                         rawFragmentInteractionListener.onGcodeCommandReceived(command);
                         return;
                     }
@@ -162,8 +159,6 @@ public class BaseFragment extends Fragment {
 
     @Override
     public void onPause() {
-        // Leaving the jogging screen while a continuous jog is active is always
-        // interpreted as a lost operator hold: cancel before doing anything else.
         if (JogSafetyController.isLocked()) requestPriorityJogCancel();
         super.onPause();
         hideSoftKeyboard();
@@ -172,7 +167,6 @@ public class BaseFragment extends Fragment {
     private boolean isContinuousJogCommand(String command) {
         if (!(this instanceof JoggingTabFragment) || command == null) return false;
         String normalized = command.replace(" ", "").toUpperCase();
-        // Current JoggingTabFragment uses 9999.0 exclusively for continuous jog.
         return normalized.startsWith("$J=")
                 && (normalized.contains("9999.0") || normalized.contains("9999"));
     }
@@ -183,9 +177,6 @@ public class BaseFragment extends Fragment {
         activeContinuousJogButton = findPressedJogButton();
         jogStateSeen = false;
         jogReleaseStartedAt = 0;
-
-        // isPressed() may be updated by Android immediately after ACTION_DOWN,
-        // therefore the first independent verification is delayed one cycle.
         jogSafetyHandler.removeCallbacks(jogSafetyWatchdog);
         jogSafetyHandler.postDelayed(jogSafetyWatchdog, JOG_WATCHDOG_INTERVAL_MS);
         return true;
@@ -222,8 +213,8 @@ public class BaseFragment extends Fragment {
             jogReleaseStartedAt = SystemClock.uptimeMillis();
         }
 
-        // Bypass the normal command path intentionally: stop has priority over
-        // every other activity in the application.
+        // Stop bypasses the normal command gate deliberately: it has absolute
+        // priority over all application activity while a jog owns the machine.
         if (rawFragmentInteractionListener != null) {
             rawFragmentInteractionListener.onGrblRealTimeCommandReceived(
                     GrblUtils.GRBL_JOG_CANCEL_COMMAND);
@@ -249,9 +240,6 @@ public class BaseFragment extends Fragment {
         JogSafetyController.unlock();
     }
 
-    /**
-     * Nasconde la tastiera virtuale e toglie il focus dalla view corrente.
-     */
     protected void hideSoftKeyboard() {
         Activity activity = getActivity();
         if (activity == null) return;
@@ -265,9 +253,7 @@ public class BaseFragment extends Fragment {
         if (imm == null) return;
 
         IBinder token = focused.getWindowToken();
-        if (token != null) {
-            imm.hideSoftInputFromWindow(token, 0);
-        }
+        if (token != null) imm.hideSoftInputFromWindow(token, 0);
         focused.clearFocus();
     }
 
