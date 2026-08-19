@@ -31,23 +31,57 @@ import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
+import in.co.gorest.grblcontroller.util.JogSafetyController;
+
 public class BaseFragment extends Fragment {
 
     OnFragmentInteractionListener fragmentInteractionListener;
+    private OnFragmentInteractionListener rawFragmentInteractionListener;
+
+    /**
+     * Safety proxy shared by every fragment. When a continuous jog owns the
+     * machine, normal commands from any tab are rejected before they reach the
+     * Activity/serial layer. Safety/status realtime bytes remain available.
+     */
+    private final OnFragmentInteractionListener safeInteractionListener =
+            new OnFragmentInteractionListener() {
+                @Override
+                public void onGcodeCommandReceived(String command) {
+                    if (rawFragmentInteractionListener != null
+                            && JogSafetyController.allowGcode(command)) {
+                        rawFragmentInteractionListener.onGcodeCommandReceived(command);
+                    }
+                }
+
+                @Override
+                public void onGrblRealTimeCommandReceived(byte command) {
+                    if (rawFragmentInteractionListener != null
+                            && JogSafetyController.allowRealtime(command)) {
+                        rawFragmentInteractionListener.onGrblRealTimeCommandReceived(command);
+                    }
+                }
+            };
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
     }
 
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         if (context instanceof OnFragmentInteractionListener) {
-            fragmentInteractionListener = (OnFragmentInteractionListener) context;
+            rawFragmentInteractionListener = (OnFragmentInteractionListener) context;
+            fragmentInteractionListener = safeInteractionListener;
         } else {
             throw new RuntimeException(context + " must implement OnFragmentInteractionListener");
         }
+    }
+
+    @Override
+    public void onDetach() {
+        fragmentInteractionListener = null;
+        rawFragmentInteractionListener = null;
+        super.onDetach();
     }
 
     /**
@@ -73,9 +107,6 @@ public class BaseFragment extends Fragment {
         if (activity == null) return;
 
         View focused = activity.getCurrentFocus();
-        // Fallback alla root view del fragment se nessuna view ha il focus —
-        // copre anche il caso in cui la tastiera resta su per un piccolo lag
-        // tra il cambio focus e il page swipe.
         if (focused == null) focused = getView();
         if (focused == null) return;
 
