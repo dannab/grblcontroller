@@ -5,10 +5,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Global safety gate used while a manual continuous jog is active.
  *
- * While locked, normal G-code is rejected application-wide. Only jog commands
- * and a small set of realtime safety/status commands are allowed to pass.
- * The lock is intentionally kept until the jogging UI confirms that GRBL has
- * left JOG state after a cancel request.
+ * The first continuous $J command acquires the lock and is sent directly by
+ * BaseFragment. After that, the normal G-code channel is completely closed
+ * until GRBL has stopped. Only selected realtime safety/status bytes can pass.
  */
 public final class JogSafetyController {
 
@@ -40,20 +39,15 @@ public final class JogSafetyController {
         return CANCEL_PENDING.get();
     }
 
-    /**
-     * During the jog lock, only actual jog commands are allowed on the normal
-     * G-code channel. Everything else is dropped before reaching the activity.
-     */
+    /** No normal G-code is accepted after a continuous jog owns the machine. */
     public static boolean allowGcode(String command) {
-        if (!LOCKED.get()) return true;
-        if (command == null) return false;
-        return command.trim().toUpperCase().startsWith("$J=");
+        return !LOCKED.get();
     }
 
     /**
      * Realtime commands that remain valid while jog is locked:
      *  ?    status query
-     *  !    feed hold / emergency deceleration path
+     *  !    feed hold / safety deceleration path
      *  0x84 safety door
      *  0x85 jog cancel
      *  0x18 soft reset
