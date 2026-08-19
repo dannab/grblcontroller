@@ -24,13 +24,20 @@ package in.co.gorest.grblcontroller.ui;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
+import in.co.gorest.grblcontroller.R;
+import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
+import in.co.gorest.grblcontroller.model.Constants;
+import in.co.gorest.grblcontroller.util.GrblUtils;
 import in.co.gorest.grblcontroller.util.JogSafetyController;
 
 public class BaseFragment extends Fragment {
@@ -38,26 +45,93 @@ public class BaseFragment extends Fragment {
     OnFragmentInteractionListener fragmentInteractionListener;
     private OnFragmentInteractionListener rawFragmentInteractionListener;
 
+    private static final long JOG_WATCHDOG_INTERVAL_MS = 35L;
+    private static final long JOG_CANCEL_RETRY_MS = 60L;
+    private static final long JOG_RELEASE_UNLOCK_TIMEOUT_MS = 1200L;
+
+    private final Handler jogSafetyHandler = new Handler(Looper.getMainLooper());
+    private View activeContinuousJogButton;
+    private boolean jogStateSeen;
+    private long jogReleaseStartedAt;
+
     /**
-     * Safety proxy shared by every fragment. When a continuous jog owns the
-     * machine, normal commands from any tab are rejected before they reach the
-     * Activity/serial layer. Safety/status realtime bytes remain available.
+     * Runs independently from ACTION_UP. Continuous jog is allowed only while
+     * the actual Android jog button remains physically pressed. Any loss of the
+     * pressed state causes an immediate realtime 0x85 cancel.
+     */
+    private final Runnable jogSafetyWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (!JogSafetyController.isLocked()) return;
+
+            MachineStatusListener status = MachineStatusListener.getInstance();
+            boolean grblJog = Constants.MACHINE_STATUS_JOG.equals(status.getState());
+            if (grblJog) jogStateSeen = true;
+
+            boolean stillPressed = activeContinuousJogButton != null
+                    && activeContinuousJogButton.isShown()
+                    && activeContinuousJogButton.isEnabled()
+                    && activeContinuousJogButton.isPressed();
+
+            if (!stillPressed && !JogSafetyController.isCancelPending()) {
+                requestPriorityJogCancel();
+            }
+
+            if (JogSafetyController.isCancelPending()) {
+                // Keep the global command lock until GRBL has actually left JOG.
+                // If JOG was never observed because press/release was faster than
+                // a status report, retain the lock briefly then fail safe open.
+                boolean safelyStopped = jogStateSeen && !grblJog;
+                boolean statusNeverCaughtJog = !jogStateSeen
+                        && jogReleaseStartedAt > 0
+                        && SystemClock.uptimeMillis() - jogReleaseStartedAt
+                        >= JOG_RELEASE_UNLOCK_TIMEOUT_MS;
+
+                if (safelyStopped || statusNeverCaughtJog) {
+                    finishJogSafetyLock();
+                    return;
+                }
+            }
+
+            jogSafetyHandler.postDelayed(this, JOG_WATCHDOG_INTERVAL_MS);
+        }
+    };
+
+    /**
+     * Safety proxy shared by every fragment. While continuous jog owns the
+     * machine, commands from all tabs are filtered globally.
      */
     private final OnFragmentInteractionListener safeInteractionListener =
             new OnFragmentInteractionListener() {
                 @Override
                 public void onGcodeCommandReceived(String command) {
-                    if (rawFragmentInteractionListener != null
-                            && JogSafetyController.allowGcode(command)) {
+                    if (rawFragmentInteractionListener == null) return;
+
+                    if (isContinuousJogCommand(command)) {
+                        if (!beginJogSafetyLock()) return;
+                        rawFragmentInteractionListener.onGcodeCommandReceived(command);
+                        return;
+                    }
+
+                    if (JogSafetyController.allowGcode(command)) {
                         rawFragmentInteractionListener.onGcodeCommandReceived(command);
                     }
                 }
 
                 @Override
                 public void onGrblRealTimeCommandReceived(byte command) {
-                    if (rawFragmentInteractionListener != null
-                            && JogSafetyController.allowRealtime(command)) {
-                        rawFragmentInteractionListener.onGrblRealTimeCommandReceived(command);
+                    if (rawFragmentInteractionListener == null) return;
+                    if (!JogSafetyController.allowRealtime(command)) return;
+
+                    rawFragmentInteractionListener.onGrblRealTimeCommandReceived(command);
+
+                    if (command == GrblUtils.GRBL_JOG_CANCEL_COMMAND
+                            && JogSafetyController.isLocked()) {
+                        JogSafetyController.markCancelPending();
+                        if (jogReleaseStartedAt == 0) {
+                            jogReleaseStartedAt = SystemClock.uptimeMillis();
+                        }
+                        ensureJogWatchdogRunning();
                     }
                 }
             };
@@ -79,28 +153,104 @@ public class BaseFragment extends Fragment {
 
     @Override
     public void onDetach() {
+        if (JogSafetyController.isLocked()) requestPriorityJogCancel();
+        jogSafetyHandler.removeCallbacks(jogSafetyWatchdog);
         fragmentInteractionListener = null;
         rawFragmentInteractionListener = null;
         super.onDetach();
     }
 
-    /**
-     * Quando il fragment esce dalla pagina visibile (cambio tab nel ViewPager,
-     * apertura di un'activity, ecc.) la tastiera virtuale resta su se un EditText
-     * aveva il focus, perché il focus non viene mai rimosso. Lo facciamo qui in
-     * modo centralizzato — tutte le sottoclassi chiamano super.onPause() quindi
-     * questo hook viene applicato uniformemente senza dover toccare ogni fragment.
-     */
     @Override
     public void onPause() {
+        // Leaving the jogging screen while a continuous jog is active is always
+        // interpreted as a lost operator hold: cancel before doing anything else.
+        if (JogSafetyController.isLocked()) requestPriorityJogCancel();
         super.onPause();
         hideSoftKeyboard();
     }
 
+    private boolean isContinuousJogCommand(String command) {
+        if (!(this instanceof JoggingTabFragment) || command == null) return false;
+        String normalized = command.replace(" ", "").toUpperCase();
+        // Current JoggingTabFragment uses 9999.0 exclusively for continuous jog.
+        return normalized.startsWith("$J=")
+                && (normalized.contains("9999.0") || normalized.contains("9999"));
+    }
+
+    private boolean beginJogSafetyLock() {
+        if (!JogSafetyController.tryLock()) return false;
+
+        activeContinuousJogButton = findPressedJogButton();
+        jogStateSeen = false;
+        jogReleaseStartedAt = 0;
+
+        // isPressed() may be updated by Android immediately after ACTION_DOWN,
+        // therefore the first independent verification is delayed one cycle.
+        jogSafetyHandler.removeCallbacks(jogSafetyWatchdog);
+        jogSafetyHandler.postDelayed(jogSafetyWatchdog, JOG_WATCHDOG_INTERVAL_MS);
+        return true;
+    }
+
+    private void ensureJogWatchdogRunning() {
+        jogSafetyHandler.removeCallbacks(jogSafetyWatchdog);
+        jogSafetyHandler.post(jogSafetyWatchdog);
+    }
+
+    private View findPressedJogButton() {
+        View root = getView();
+        if (root == null) return null;
+
+        int[] ids = {
+                R.id.jog_y_positive, R.id.jog_x_positive, R.id.jog_z_positive,
+                R.id.jog_xy_top_left, R.id.jog_xy_top_right,
+                R.id.jog_xy_bottom_left, R.id.jog_xy_bottom_right,
+                R.id.jog_y_negative, R.id.jog_x_negative, R.id.jog_z_negative,
+                R.id.jog_a_positive, R.id.jog_a_negative
+        };
+        for (int id : ids) {
+            View v = root.findViewById(id);
+            if (v != null && v.isPressed()) return v;
+        }
+        return null;
+    }
+
+    private void requestPriorityJogCancel() {
+        if (!JogSafetyController.isLocked()) return;
+
+        JogSafetyController.markCancelPending();
+        if (jogReleaseStartedAt == 0) {
+            jogReleaseStartedAt = SystemClock.uptimeMillis();
+        }
+
+        // Bypass the normal command path intentionally: stop has priority over
+        // every other activity in the application.
+        if (rawFragmentInteractionListener != null) {
+            rawFragmentInteractionListener.onGrblRealTimeCommandReceived(
+                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+
+            jogSafetyHandler.postDelayed(() -> {
+                if (JogSafetyController.isLocked()
+                        && Constants.MACHINE_STATUS_JOG.equals(
+                                MachineStatusListener.getInstance().getState())
+                        && rawFragmentInteractionListener != null) {
+                    rawFragmentInteractionListener.onGrblRealTimeCommandReceived(
+                            GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+                }
+            }, JOG_CANCEL_RETRY_MS);
+        }
+        ensureJogWatchdogRunning();
+    }
+
+    private void finishJogSafetyLock() {
+        jogSafetyHandler.removeCallbacks(jogSafetyWatchdog);
+        activeContinuousJogButton = null;
+        jogStateSeen = false;
+        jogReleaseStartedAt = 0;
+        JogSafetyController.unlock();
+    }
+
     /**
      * Nasconde la tastiera virtuale e toglie il focus dalla view corrente.
-     * Funziona anche se la view col focus appartiene a un altro fragment dentro
-     * la stessa activity (ViewPager con offscreen limit > 0).
      */
     protected void hideSoftKeyboard() {
         Activity activity = getActivity();
