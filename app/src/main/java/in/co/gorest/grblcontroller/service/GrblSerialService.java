@@ -23,6 +23,8 @@ package in.co.gorest.grblcontroller.service;
 
 import android.app.Notification;
 import android.app.Service;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.core.app.NotificationCompat;
 
@@ -35,6 +37,7 @@ import in.co.gorest.grblcontroller.helpers.NotificationHelper;
 import in.co.gorest.grblcontroller.listeners.SerialCommunicationHandler;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.model.GcodeCommand;
+import in.co.gorest.grblcontroller.util.GrblUtils;
 
 /**
  * Base comune dei due service seriali (Bluetooth e USB OTG).
@@ -49,8 +52,19 @@ public abstract class GrblSerialService extends Service {
 
     private static final byte[] BYTE_NEWLINE = { 0x0A };
 
+    /**
+     * Un cancel jog viene ripetuto quattro volte senza consultare lo stato
+     * macchina. I realtime command vengono interpretati fuori dal normale
+     * flusso G-code; la breve spaziatura copre la finestra in cui il $J puo'
+     * essere stato ricevuto ma non ancora essere entrato in stato JOG.
+     */
+    private static final int JOG_CANCEL_BURST_COUNT = 4;
+    private static final long JOG_CANCEL_BURST_INTERVAL_MS = 25L;
+
     protected SerialCommunicationHandler serialCommunicationHandler;
     private long statusUpdatePoolInterval = Constants.GRBL_STATUS_UPDATE_INTERVAL;
+    private final Handler jogCancelHandler = new Handler(Looper.getMainLooper());
+    private boolean jogCancelBurstActive = false;
 
     /** true dal primo banner GRBL valido fino alla disconnessione. */
     private volatile boolean grblFound = false;
@@ -61,12 +75,38 @@ public abstract class GrblSerialService extends Service {
 
     /**
      * Scrive i byte grezzi sul canale fisico (socket Bluetooth o porta USB).
-     * Deve essere un no-op se il canale non è connesso.
+     * Deve essere un no-op se il canale non e' connesso.
      */
     protected abstract void serialWriteBytes(byte[] b);
 
     public void serialWriteByte(byte b) {
-        serialWriteBytes(new byte[]{ b });
+        if (b != GrblUtils.GRBL_JOG_CANCEL_COMMAND) {
+            serialWriteBytes(new byte[]{ b });
+            return;
+        }
+
+        // Ogni richiesta 0x85 genera una sola raffica. Se durante la raffica
+        // arriva un altro 0x85, non ne avviamo una seconda sovrapposta.
+        synchronized (this) {
+            if (jogCancelBurstActive) return;
+            jogCancelBurstActive = true;
+        }
+
+        // Primo cancel immediato.
+        serialWriteBytes(new byte[]{ GrblUtils.GRBL_JOG_CANCEL_COMMAND });
+
+        // Altri tre cancel sempre inviati, indipendentemente da Idle/Jog/Hold.
+        for (int i = 1; i < JOG_CANCEL_BURST_COUNT; i++) {
+            final int attempt = i;
+            jogCancelHandler.postDelayed(() -> {
+                serialWriteBytes(new byte[]{ GrblUtils.GRBL_JOG_CANCEL_COMMAND });
+                if (attempt == JOG_CANCEL_BURST_COUNT - 1) {
+                    synchronized (GrblSerialService.this) {
+                        jogCancelBurstActive = false;
+                    }
+                }
+            }, JOG_CANCEL_BURST_INTERVAL_MS * i);
+        }
     }
 
     public void serialWriteString(String s) {
