@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User manual | GRBL Machining</title>
+  <meta name="description" content="GRBL Machining user manual: connection, jogging, G-code files, hidden controls, CAM, probing and browser control.">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/site.css" rel="stylesheet">
+  <link href="css/font-awesome.min.css" rel="stylesheet">
+  <link href="css/manuale.css" rel="stylesheet">
+</head>
+<body>
+<div id="siteNavigation"></div>
+<header class="manual-hero"><div class="container">
+  <p>Official English user manual · <a href="manuale.html" style="color:#fff;text-decoration:underline">Versione italiana</a></p>
+  <h1>GRBL Machining</h1>
+  <p>A practical guide to connecting your CNC, moving the axes, preparing and running jobs, and discovering the features available through long presses.</p>
+</div></header>
+
+<main class="container manual-wrap"><div class="row">
+<aside class="col-md-3"><nav class="manual-toc" aria-label="Manual contents">
+  <h3>Contents</h3>
+  <a href="#safety">Before you start</a><a href="#connection">Connection</a><a href="#interface">Interface</a>
+  <a href="#hidden">Long-press actions</a><a href="#jogging">Jogging and coordinates</a><a href="#files">Files and jobs</a>
+  <a href="#editor">Editor and visualizer</a><a href="#console">Console</a><a href="#probing">Probing and TLO</a>
+  <a href="#leveling">Auto-leveling</a><a href="#cam">On-the-fly CAM</a><a href="#web">Browser control</a><a href="#settings">Settings</a>
+</nav></aside>
+
+<article class="col-md-9 manual-content">
+<section id="safety"><h2>Before you start</h2>
+  <div class="danger"><strong>A CNC machine may move without warning.</strong> Keep the emergency stop within reach, test unfamiliar procedures clear of the workpiece, and never leave the machine unattended.</div>
+  <p>The app communicates with GRBL 1.1 and FluidNC controllers over Bluetooth or USB OTG. Before the first job, verify axis directions, units, homing, limits and the work origin.</p>
+</section>
+
+<section id="connection"><h2>Connect the machine</h2>
+  <ol class="step-list"><li>Switch on the CNC controller.</li><li>Tap the connection icon in the top bar.</li><li>Choose <strong>Bluetooth</strong> or <strong>USB OTG</strong>, then select the device.</li><li>Wait for the machine state and coordinates to update.</li></ol>
+  <div class="tip"><strong>Bluetooth serial:</strong> for GRBL 1.1, an HC-05/HC-06 module normally uses 115200 baud, 8 data bits, no parity and 1 stop bit.</div>
+  <p>If work-position restoration is enabled, the app may offer to reapply the saved position with <code>G10 L20 P0</code> after reconnecting. Accept only if neither the tool nor the machine has moved.</p>
+</section>
+
+<section id="interface"><h2>App layout</h2>
+  <p>The main tabs cover file streaming, jogging, probing, console, CAM, editing and visualization. Machine state, coordinates and connection/reset commands remain at the top.</p>
+  <ul class="step-list"><li><strong>File Sender:</strong> load, check and stream G-code; control pause, stop and overrides.</li><li><strong>Jogging:</strong> move X/Y/Z/A and manage work zeros, G54–G57, homing, points and flashlight.</li><li><strong>Probing:</strong> Z probing and tool-length compensation.</li><li><strong>Console:</strong> send commands and read controller responses.</li><li><strong>CAM:</strong> generate simple geometric jobs on the device.</li></ul>
+</section>
+
+<section id="hidden"><h2>Long-press actions <span class="badge-long">IMPORTANT</span></h2>
+  <p>These actions are not immediately visible. A long press means holding the button for about one second.</p>
+  <div class="table-responsive"><table class="table table-bordered action-table"><thead><tr><th>Button</th><th>Short tap</th><th>Long press</th></tr></thead><tbody>
+    <tr><td>Play ▶</td><td>Start from the beginning</td><td>Open “Run from line”</td></tr>
+    <tr><td>XY step centre</td><td>Cycle 1 → 0.1 → 0.01 mm</td><td>Switch step/continuous for X, Y and A</td></tr>
+    <tr><td>Z step</td><td>Cycle 1 → 0.1 → 0.01 mm</td><td>Switch step/continuous for Z</td></tr>
+    <tr><td>X/Y/Z/A zero</td><td>Set that work axis to zero after confirmation</td><td>Rapid-move that axis to work zero</td></tr>
+    <tr><td>G54–G57</td><td>Select the coordinate system</td><td>Save the current work position in the active system</td></tr>
+    <tr><td>Get point</td><td>Save current X/Y/Z to <code>points.txt</code></td><td>Delete all saved points after confirmation</td></tr>
+    <tr><td>Leveling</td><td>No action</td><td>Generate a leveled copy of the loaded file</td></tr>
+    <tr><td>Feed override ±</td><td>Increase or decrease feed override</td><td>Reset feed to 100%</td></tr>
+    <tr><td>Spindle override ±</td><td>Increase or decrease spindle override</td><td>Reset spindle to 100%</td></tr>
+    <tr><td>Custom buttons</td><td>Run configured short-tap commands</td><td>Run configured long-press commands</td></tr>
+    <tr><td>Last message panel</td><td>—</td><td>Show the last app notification again</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="jogging"><h2>Jogging, zeros and points</h2>
+  <img class="manual-shot" src="images/grbl-machining-jog.png" alt="GRBL Machining Jog screen"><span class="shot-caption">Jog screen in Demo mode, with simulated coordinates and controls available without a machine.</span>
+  <p>In <strong>step mode</strong>, each tap moves by the displayed distance. <strong>Continuous mode</strong> is identified by the <span class="continuous-icon" title="Continuous X/Y/A movement"><i class="fa fa-arrows" aria-hidden="true"></i></span> icon for X/Y/A and the <span class="continuous-icon" title="Continuous Z movement"><i class="fa fa-arrows-v" aria-hidden="true"></i></span> icon for Z. Hold an arrow to move and release it to send jog cancel. X/Y/A and Z have separate step modes.</p>
+  <div class="danger"><strong>Warning — feature under improvement:</strong> use continuous movement with great care. Under some conditions the command might not stop as expected, causing the machine to jam or reach a limit. Test it initially at low speed, keep the travel path clear and be ready to use the emergency stop.</div>
+  <div class="warning">Before using “go to zero”, make sure the path is clear: it uses a rapid move. If Z must move too, first raise the tool to a safe height.</div>
+  <p>The bell unlocks an alarm (<code>$X</code>), the home icon starts homing after confirmation, and the light bulb controls the phone flashlight. Four custom buttons can each hold multiple commands and separate short/long actions.</p>
+</section>
+
+<section id="files"><h2>Load and run a G-code file</h2>
+  <img class="manual-shot" src="images/grbl-machining-file-sender.png" alt="GRBL Machining File Sender"><span class="shot-caption">File Sender in Demo mode with a sample file and active controls.</span>
+  <ol class="step-list"><li>Tap the file selector and choose the app folder or Android system picker.</li><li>Check the origin, Z height, tool, workholding and <strong>Idle</strong> state.</li><li>Open the visualizer and inspect the toolpath.</li><li>Press Play, review the safety summary and confirm.</li><li>Use pause/resume during the job; Stop ends the job.</li></ol>
+  <h3>Run from line</h3><p>Long-press Play, enter the line number shown in the editor and follow the procedure. The app reconstructs the preceding modal state—including units, plane, coordinate system, distance mode, feed, spindle and coolant—then offers automatic positioning at a safe Z or manual placement.</p>
+  <div class="danger"><strong>Run from line:</strong> always verify the physical position, work origin and tool. The app warns before restarting a spindle or coolant that was active at the selected line.</div>
+  <p>When enabled, Z-plunge detection checks the file during loading and warns about unusually deep, steep descents. It is a safety aid, not a substitute for inspecting the toolpath.</p>
+</section>
+
+<section id="editor"><h2>Editor and visualizer</h2>
+  <img class="manual-shot" src="images/grbl-machining-editor.png" alt="Built-in G-code editor"><span class="shot-caption">G-code editor with search, syntax highlighting and save.</span>
+  <p>The editor's line numbers match “Run from line”. The OpenGL visualizer supports drag, pinch zoom, reset and fit-to-view. During streaming, completed toolpath segments are dimmed.</p>
+  <img class="manual-shot" src="images/grbl-machining-visualizer.png" alt="GRBL Machining 3D toolpath visualizer"><span class="shot-caption">The sample toolpath displayed in the visualizer.</span>
+</section>
+
+<section id="console"><h2>Command console</h2>
+  <img class="manual-shot" src="images/grbl-machining-console.png" alt="GRBL Machining command console"><span class="shot-caption">Console for controller responses and manual commands.</span>
+  <p>Type a command in the bottom field and press Send. <strong>Verbose output</strong> shows additional information. Use the console only when you understand the GRBL or FluidNC command being sent.</p>
+</section>
+
+<section id="probing"><h2>Z probing and tool length offset</h2>
+  <img class="manual-shot" src="images/grbl-machining-probing.png" alt="Probing and Tool Length Offset screen"><span class="shot-caption">Probe parameters, automatic Z adjustment and tool-length compensation.</span>
+  <ol class="step-list"><li>Set feed rate, plate thickness and maximum probing distance.</li><li>Connect the probe circuit and test contact before movement.</li><li>Start <strong>Probe</strong> and confirm.</li><li>For a tool change, probe with the first tool, change it without losing the reference, then use <strong>Probe + TLO</strong>.</li></ol><p><strong>G49</strong> cancels tool-length compensation.</p>
+</section>
+
+<section id="leveling"><h2>Three-point auto-leveling</h2>
+  <ol class="step-list"><li>Load the G-code in File Sender.</li><li>Move to the first point, probe it and press <strong>Get point</strong>.</li><li>Repeat at two more non-collinear points.</li><li>Long-press <strong>Leveling</strong>.</li><li>Load the new <code>_leveled</code> file and inspect it in the visualizer.</li></ol>
+  <div class="warning">The three points must describe the stock plane and must not be collinear. To restart, long-press Get point and confirm deletion.</div>
+</section>
+
+<section id="cam"><h2>On-the-fly CAM</h2>
+  <img class="manual-shot" src="images/grbl-machining-cam.png" alt="GRBL Machining on-the-fly CAM"><span class="shot-caption">Quick geometric toolpath generation inside the app.</span>
+  <p>The CAM tab generates lines, circles and rectangles with multiple Z passes. Set Point 1, Point 2, job type, feed, total depth, depth per pass, clearance height and any tool/step-over values. “Write job file” saves <code>job.nc</code> and loads it in File Sender.</p>
+  <div class="tip">Always inspect the generated file and perform the first test above the stock.</div>
+</section>
+
+<section id="web"><h2>File transfer and browser control</h2>
+  <img class="manual-shot" style="max-width:780px" src="images/grbl-machining-web-interface.png" alt="GRBL Machining browser interface"><span class="shot-caption">Browser interface reconstructed from the app server: job status, pause/stop, overrides, upload and G-code file management.</span>
+  <ol class="step-list"><li>Open Settings → File HTTP server.</li><li>Set a password of at least four characters and enable the server.</li><li>Connect the PC and Android device to the same trusted Wi-Fi network.</li><li>Open the address shown in the notification; username: <code>grbl</code>.</li></ol>
+  <p>The page can upload/download G-code, show job state and progress, pause or stop a job, change overrides and make the host device ring.</p>
+  <div class="warning">The server is intended for a trusted local network. Use a strong password and disable it when it is not needed.</div>
+</section>
+
+<section id="settings"><h2>Important settings</h2>
+  <img class="manual-shot" src="images/grbl-machining-settings-top.png" alt="GRBL Machining main settings screen"><span class="shot-caption">Main settings: general behavior, custom buttons, HTTP server and Z-plunge detection.</span>
+  <ul class="step-list"><li>Default connection and status update interval.</li><li>Maximum jogging speed and custom buttons.</li><li>Work-zero check before streaming.</li><li>Z-plunge detection thresholds.</li><li>Restore work coordinates after reconnecting.</li><li>HTTP server port and password.</li><li>App and browser-interface color scheme.</li></ul>
+</section>
+</article></div></main>
+
+<footer class="footer"><div class="container"><p>GRBL Machining is a fork of <a href="https://github.com/zeevy/grblcontroller" target="_blank" rel="noopener">Grbl Controller by zeevy</a>. <a href="about-us.html">Credits and licences</a>.</p></div></footer>
+<script src="js/jquery.js"></script><script src="js/bootstrap.js"></script><script>$(function(){ $('#siteNavigation').load('navigation.html'); });</script>
+</body></html>

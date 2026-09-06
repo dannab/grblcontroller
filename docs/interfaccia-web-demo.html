@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GRBL Machining — interfaccia web dimostrativa</title>
+<style>
+:root{--primary:#37474f;--primary-dark:#263238;--accent:#ffa000;--on-primary:#fff;--on-accent:#212121}
+*{box-sizing:border-box}body{margin:0;background:#f3f4f5;color:#263238;font:16px Arial,sans-serif}
+header{background:var(--primary);color:var(--on-primary);padding:18px 20px;box-shadow:0 2px 4px #0003}
+header .row{display:flex;align-items:center;gap:14px;max-width:780px;margin:auto;flex-wrap:wrap}
+.logo{width:42px;height:42px;background:#ffffff26;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px}.hinfo{flex:1}.hinfo h1{margin:0;font-size:1.15em;font-weight:500}.sub{opacity:.85;font-size:.85em;margin-top:2px}.ring{display:flex;gap:8px;align-items:center}
+main{max-width:780px;margin:18px auto;padding:0 16px}.card{background:#fff;border-radius:8px;box-shadow:0 1px 3px #0002;margin-bottom:16px;overflow:hidden}.card-head{padding:14px 18px;border-bottom:1px solid #eee;font-weight:500;color:#424242}.card-body{padding:18px}
+button{background:var(--accent);color:var(--on-accent);border:0;border-radius:4px;padding:10px 22px;font-size:14px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;box-shadow:0 1px 2px #0003}.stop,.del{background:#c62828;color:#fff}.pause{background:#ef6c00;color:#fff}.ctrl{display:flex;align-items:stretch;gap:20px;flex-wrap:wrap}.cmain{display:flex;align-items:center;justify-content:center;gap:10px;padding-right:20px;border-right:1px solid #eee}.covr{flex:1;min-width:240px;display:flex;flex-direction:column;justify-content:center;gap:12px}.ovr{display:flex;align-items:center;gap:10px}.lbl{min-width:104px;color:#616161;font-size:.9em}.ovr b{min-width:50px;text-align:center}.ob{background:#eceff1;color:#263238;padding:8px 14px;box-shadow:none}.rst{font-size:12px}.chint{flex-basis:100%;color:#757575;font-size:.82em;margin:6px 0 0}
+.status{display:flex;gap:18px;align-items:center;margin-top:4px}.pill{background:#2e7d32;border-radius:12px;padding:3px 10px;font-size:.78em}.job{opacity:.9}.track{height:7px;background:#ffffff35;border-radius:5px;overflow:hidden;max-width:260px;margin-top:7px}.track span{display:block;width:42%;height:100%;background:var(--accent)}
+.hint{color:#757575;font-size:.85em;margin:0 0 10px}.picker{display:block;width:100%;padding:12px;border:1px dashed #bdbdbd;border-radius:6px;background:#fafafa;margin-bottom:12px;color:#616161}
+table{width:100%;border-collapse:collapse}th{text-align:left;padding:10px 18px;background:#fafafa;font-weight:500;font-size:.8em;text-transform:uppercase;letter-spacing:.5px;color:#757575;border-bottom:1px solid #eee}td{padding:12px 18px;border-bottom:1px solid #f0f0f0}td a{color:var(--primary);font-weight:500}.size,.act{text-align:right;white-space:nowrap}.del{padding:6px 14px;font-size:12px}
+footer{max-width:780px;margin:8px auto 20px;padding:0 18px;color:#757575;font-size:.82em;display:flex;justify-content:space-between}.stats{display:flex;gap:18px}.demo-note{text-align:center;color:#78909c;font-size:12px;margin:12px}
+@media(max-width:650px){.ctrl{display:block}.cmain{border:0;padding:0 0 18px}.covr{min-width:0}.ring{width:100%}}
+</style>
+</head>
+<body>
+<header><div class="row"><div class="logo">⌁</div><div class="hinfo"><h1>Fresa laboratorio</h1><div class="sub"><span class="pill">Idle</span> <span class="job">grbl_machining_demo.nc — riga 7 di 17</span><div class="track"><span></span></div></div></div><div class="ring"><button>Fai squillare</button><button class="stop">Ferma suono</button></div></div></header>
+<main>
+<div class="card"><div class="card-head">Controllo macchina</div><div class="card-body ctrl"><div class="cmain"><button class="pause">Pausa</button><button class="stop">Arresto</button></div><div class="covr"><div class="ovr"><span class="lbl">Avanzamento</span><button class="ob">−</button><b>100%</b><button class="ob">+</button><button class="ob rst">Reset</button></div><div class="ovr"><span class="lbl">Mandrino</span><button class="ob">−</button><b>100%</b><button class="ob">+</button><button class="ob rst">Reset</button></div></div><p class="chint">La pausa ferma il movimento ma <b>non il mandrino</b>. Per riprendere usa il telefono alla macchina.</p></div></div>
+<div class="card"><div class="card-head">Carica file dal PC</div><div class="card-body"><p class="hint">Se un file con lo stesso nome esiste, viene rinominato con un suffisso. Estensioni accettate: .nc .gcode .gco .tap .cnc .ngc .txt</p><div class="picker">Scegli uno o più file G-code…</div><button>Carica</button></div></div>
+<div class="card"><div class="card-head">File G-code disponibili (3)</div><table><thead><tr><th>Nome</th><th class="size">Dimensione</th><th class="act">Azioni</th></tr></thead><tbody><tr><td><a>grbl_machining_demo.nc</a></td><td class="size">312 B</td><td class="act"><button class="del">Elimina</button></td></tr><tr><td><a>incisione_logo.nc</a></td><td class="size">84,2 KB</td><td class="act"><button class="del">Elimina</button></td></tr><tr><td><a>spianatura.gcode</a></td><td class="size">18,7 KB</td><td class="act"><button class="del">Elimina</button></td></tr></tbody></table></div>
+</main><footer><div class="stats"><span><b>3</b> file</span><span><b>103,2 KB</b> totali</span><span>ultimo aggiornamento: <b>ora</b></span></div><div>GRBL Machining</div></footer><div class="demo-note">Anteprima dimostrativa: i controlli sono disattivati.</div>
+</body></html>

@@ -1,0 +1,25 @@
+:root { --ink:#17212b; --muted:#5f6b76; --accent:#d14d2b; --soft:#f6f3ef; --line:#ded8d0; }
+body { color:var(--ink); background:#fff; }
+.manual-hero { margin-top:70px; padding:48px 0 34px; background:linear-gradient(135deg,#202a34,#384653); color:#fff; }
+.manual-hero h1 { font-size:42px; margin-bottom:10px; }
+.manual-hero p { max-width:760px; font-size:18px; color:#e4e9ed; }
+.manual-wrap { padding-top:30px; padding-bottom:70px; }
+.manual-toc { position:sticky; top:75px; padding:20px; background:var(--soft); border:1px solid var(--line); border-radius:8px; }
+.manual-toc h3 { margin-top:0; }
+.manual-toc a { display:block; padding:6px 0; color:#34495e; }
+.manual-content section { scroll-margin-top:80px; margin-bottom:48px; }
+.manual-content h2 { padding-bottom:8px; border-bottom:2px solid var(--accent); }
+.manual-content h3 { margin-top:28px; }
+.action-table th { background:#303c47; color:white; }
+.action-table td:first-child { font-weight:600; white-space:nowrap; }
+.tip,.warning,.danger { padding:14px 16px; margin:18px 0; border-left:5px solid; border-radius:4px; }
+.tip { background:#edf7f2; border-color:#27845b; }
+.warning { background:#fff7e5; border-color:#d58b00; }
+.danger { background:#fff0ed; border-color:#c43d2b; }
+.badge-long { display:inline-block; padding:2px 7px; border-radius:10px; background:var(--accent); color:white; font-size:12px; }
+.continuous-icon { display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:30px; margin:0 3px; border-radius:50%; background:#303c47; color:#f0a33a; font-size:17px; vertical-align:middle; box-shadow:0 2px 5px rgba(23,33,43,.18); }
+.manual-shot { display:block; max-width:430px; width:100%; height:auto; margin:22px auto 8px; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(23,33,43,.14); }
+.shot-caption { display:block; max-width:600px; margin:0 auto 22px; color:var(--muted); text-align:center; font-size:13px; }
+.step-list li { margin-bottom:9px; }
+code { color:#9d2d18; background:#f5f1ed; }
+@media(max-width:991px){ .manual-toc{position:static;margin-bottom:30px}.manual-hero h1{font-size:32px}.action-table td:first-child{white-space:normal} }

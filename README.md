@@ -1,6 +1,8 @@
 # GRBL Machining
 ### Android controller for GRBL CNC machines — Machining Edition
 
+📖 **User guides:** [English manual](docs/manual.html) · [Manuale italiano](docs/manuale.html). The `docs` folder can be published directly with GitHub Pages.
+
 Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/grblcontroller) (now archived), continued by a CNC user with improvements driven by real-world machining. License: GPL-3.0.
 
 > A Play Store release under the name **GRBL Machining** is in preparation.
@@ -54,3 +56,10 @@ Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/
 - Ace editor https://ace.c9.io/ and NanoHTTPD https://github.com/NanoHttpd/nanohttpd
 
 See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full third-party license details.
+
+#### Debug-only demo mode
+The debug variant includes a hardware-free controller simulator for UI tests and documentation screenshots. It is intentionally absent from release builds. Launch it on a connected emulator/device with:
+
+```text
+adb shell am start -a io.github.dannab.grblmachining.action.DEMO -c android.intent.category.DEFAULT
+```
