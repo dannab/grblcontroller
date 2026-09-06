@@ -1,7 +1,7 @@
 # GRBL Machining
 ### Android controller for GRBL CNC machines — Machining Edition
 
-📖 **User guides:** [English manual](docs/manual.html) · [Manuale italiano](docs/manuale.html). The `docs` folder can be published directly with GitHub Pages.
+📖 **User guides:** [English manual](https://dannab.github.io/grblcontroller/manual.html) · [Manuale italiano](https://dannab.github.io/grblcontroller/manuale.html).
 
 Actively maintained fork of [Grbl Controller by zeevy](https://github.com/zeevy/grblcontroller) (now archived), continued by a CNC user with improvements driven by real-world machining. License: GPL-3.0.
 
