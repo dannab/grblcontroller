@@ -21,19 +21,41 @@
 
 package in.co.gorest.grblcontroller.events;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 public class JogCommandEvent {
+
+    private static final AtomicLong NEXT_GESTURE_TOKEN = new AtomicLong();
 
     private String command;
     private String status;
+    private boolean accepted;
+    private final long gestureToken;
 
     public JogCommandEvent(String command){
-        this.command = command;
+        this(command, newGestureToken());
     }
+
+    public JogCommandEvent(String command, long gestureToken){
+        this.command = command;
+        this.gestureToken = gestureToken;
+    }
+
+    /** Un token identifica l'intera pressione, incluse tutte le ripetizioni. */
+    public static long newGestureToken(){ return NEXT_GESTURE_TOKEN.incrementAndGet(); }
+
+    /** Usato dal service per invalidare atomicamente ogni gesto gia' iniziato. */
+    public static long currentGestureToken(){ return NEXT_GESTURE_TOKEN.get(); }
 
     public String getCommand(){ return this.command; }
     public void setCommand(String command){ this.command = command; }
 
     public String getStatus(){ return this.status; }
     public void setStatus(String status){ this.status = status; }
+
+    public long getGestureToken(){ return gestureToken; }
+
+    public boolean isAccepted(){ return accepted; }
+    public void markAccepted(){ accepted = true; }
 
 }

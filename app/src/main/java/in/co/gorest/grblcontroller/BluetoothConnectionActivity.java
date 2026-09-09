@@ -156,14 +156,17 @@ public class BluetoothConnectionActivity extends GrblActivity {
     @Override
     public void onDestroy(){
         super.onDestroy();
-        onGcodeCommandReceived("$10=1");
         if(mBound){
+            // Lo stop/disconnect resta nel service finche' FluidNC non ha
+            // confermato uno stato terminale.
+            if (isFinishing() && !isChangingConfigurations()) {
+                grblBluetoothSerialService.disconnectService();
+            }
             grblBluetoothSerialService.setMessageHandler(null);
             unbindService(serviceConnection);
             mBound = false;
         }
 
-        stopService(new Intent(this, GrblBluetoothSerialService.class));
         EventBus.getDefault().unregister(this);
     }
 
@@ -230,7 +233,6 @@ public class BluetoothConnectionActivity extends GrblActivity {
                                     .setTitle(R.string.text_disconnect)
                                     .setMessage(getString(R.string.text_disconnect_confirm))
                                     .setPositiveButton(getString(R.string.text_yes_confirm), (dialog, which) -> {
-                                        onGcodeCommandReceived("$10=1");
                                         if(grblBluetoothSerialService != null) grblBluetoothSerialService.disconnectService();
                                     })
                                     .setNegativeButton(getString(R.string.text_cancel), null)
@@ -353,8 +355,15 @@ public class BluetoothConnectionActivity extends GrblActivity {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onJogCommandEvent(JogCommandEvent event){
+        // Fail-closed: i retry di uno stop precedente non devono colpire un
+        // nuovo jog. Serve una nuova pressione dopo la chiusura della finestra.
+        if (grblBluetoothSerialService == null
+                || grblBluetoothSerialService.isJogCancelPending()) return;
         if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE) || machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)){
-            if(machineStatus.getPlannerBuffer() > 5) onGcodeCommandReceived(event.getCommand());
+            if(machineStatus.getPlannerBuffer() > 5
+                    && grblBluetoothSerialService.serialWriteJogCommand(event)) {
+                event.markAccepted();
+            }
         }
     }
 

@@ -110,8 +110,21 @@ public class SerialCommunicationHandler extends Handler {
 
     private void onSerialRead(String message, final GrblSerialService grblSerialService){
 
+        boolean commandResponse = GrblUtils.isGrblOkMessage(message)
+                || GrblUtils.isGrblErrorMessage(message);
+        boolean statusReport = GrblUtils.isGrblStatusString(message);
         boolean isVersionString = onSerialRead(message);
+
+        // Manteniamo queste notifiche nello stesso executor FIFO che analizza
+        // la seriale: cosi' l'ok/error puo' essere associato al comando inviato
+        // e uno stato Jog tardivo rinnova immediatamente il cancel.
+        if (commandResponse) grblSerialService.onCommandResponseReceived();
+        if (statusReport) grblSerialService.onMachineStateObserved(machineStatus.getState());
+
         if(isVersionString){
+            // Il banner e' anche l'unica conferma affidabile che un eventuale
+            // soft-reset precedente abbia realmente raggiunto il controller.
+            grblSerialService.onControllerResetObserved();
             grblSerialService.setGrblFound(true);
 
             Handler handler = new Handler(Looper.getMainLooper());

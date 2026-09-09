@@ -70,8 +70,8 @@ public class GrblBluetoothSerialService extends GrblSerialService{
     private AcceptThread mSecureAcceptThread;
     private AcceptThread mInsecureAcceptThread;
     private ConnectThread mConnectThread;
-    private ConnectedThread mConnectedThread;
-    private int mState;
+    private volatile ConnectedThread mConnectedThread;
+    private volatile int mState;
     private int mNewState;
 
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -129,37 +129,44 @@ public class GrblBluetoothSerialService extends GrblSerialService{
                 }catch(IllegalArgumentException e){
                     EventBus.getDefault().post(new UiToastEvent(e.getMessage(), true, true));
                     disconnectService();
-                    stopSelf();
                 }
             }
         }else{
             EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_unknown_error), true, true));
             disconnectService();
-            stopSelf();
         }
 
         return Service.START_NOT_STICKY;
     }
 
     public void disconnectService(){
-        serialCommunicationHandler.stopGrblStatusUpdateService();
+        if (getState() != STATE_CONNECTED) {
+            closeBluetoothTransport(true);
+            return;
+        }
+        requestSafeTransportShutdown(() -> closeBluetoothTransport(true));
+    }
+
+    private void closeBluetoothTransport(boolean stopServiceAfterClose) {
+        if (serialCommunicationHandler != null) {
+            serialCommunicationHandler.stopGrblStatusUpdateService();
+        }
         this.stop();
-        setGrblFound(false);
+        onTransportDisconnected();
+        if (stopServiceAfterClose) stopSelf();
     }
 
     @Override
     public void onDestroy(){
-        super.onDestroy();
-
-        disconnectService();
-        serialCommunicationHandler.shutdown();
+        closeBluetoothTransport(false);
+        if (serialCommunicationHandler != null) serialCommunicationHandler.shutdown();
         mState = STATE_NONE;
-        this.stop();
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
             stopForeground(true);
         }
         updateUserInterfaceTitle();
         EventBus.getDefault().unregister(this);
+        super.onDestroy();
     }
 
     private synchronized void updateUserInterfaceTitle() {
@@ -249,6 +256,7 @@ public class GrblBluetoothSerialService extends GrblSerialService{
 
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket, socketType);
+        onTransportConnected();
         mConnectedThread.start();
 
         // Send the name of the connected device back to the UI Activity
@@ -307,12 +315,23 @@ public class GrblBluetoothSerialService extends GrblSerialService{
         }
 
         mState = STATE_NONE;
+        onTransportDisconnected();
         updateUserInterfaceTitle();
 
         this.start();
     }
 
-    private void connectionLost() {
+    private void connectionLost(ConnectedThread failedThread) {
+        synchronized (this) {
+            // Un reader della connessione precedente puo' terminare dopo che
+            // una nuova e' gia' attiva: non deve abbattere la nuova sessione.
+            if (failedThread == null
+                    || failedThread != mConnectedThread
+                    || mState != STATE_CONNECTED) return;
+            mState = STATE_NONE;
+            mConnectedThread = null;
+        }
+
         // Send a failure message back to the Activity
         if(mHandler != null){
             Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
@@ -322,11 +341,19 @@ public class GrblBluetoothSerialService extends GrblSerialService{
             mHandler.sendMessage(msg);
         }
 
-        mState = STATE_NONE;
+        if (serialCommunicationHandler != null) {
+            serialCommunicationHandler.stopGrblStatusUpdateService();
+        }
+        onTransportDisconnected();
         // Update UI title
         updateUserInterfaceTitle();
 
         this.start();
+    }
+
+    @Override
+    protected void onTransportWriteFailure() {
+        connectionLost(mConnectedThread);
     }
 
     private class AcceptThread extends Thread {
@@ -514,17 +541,19 @@ public class GrblBluetoothSerialService extends GrblSerialService{
                     }
                 } catch(IOException | NullPointerException e) {
                     Log.e(TAG, "disconnected", e);
-                    connectionLost();
+                    connectionLost(this);
                     break;
                 }
             }
         }
 
-        public void write(byte[] buffer) {
+        public boolean write(byte[] buffer) {
             try {
                 mmOutStream.write(buffer);
+                return true;
             } catch (IOException | NullPointerException e) {
                 Log.e(TAG, "Exception during write", e);
+                return false;
             }
         }
 
@@ -538,13 +567,14 @@ public class GrblBluetoothSerialService extends GrblSerialService{
     }
 
     @Override
-    protected void serialWriteBytes(byte[] b) {
-        ConnectedThread r;
-        synchronized (this) {
-            if (mState != STATE_CONNECTED) return;
-            r = mConnectedThread;
-        }
-        r.write(b);
+    protected boolean serialWriteBytes(byte[] b) {
+        // Snapshot volatile: non prendere il monitor del service mentre il
+        // writer comune possiede transportWriteLock. Evita inversioni di lock
+        // proprio tra un retry 0x85 e una transizione di connessione BT.
+        ConnectedThread writer = mConnectedThread;
+        return mState == STATE_CONNECTED
+                && writer != null
+                && writer.write(b);
     }
 
 }

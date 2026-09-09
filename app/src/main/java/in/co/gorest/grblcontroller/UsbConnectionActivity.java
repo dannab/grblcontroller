@@ -85,13 +85,16 @@ public class UsbConnectionActivity extends GrblActivity{
     @Override
     public void onDestroy() {
         super.onDestroy();
-        onGcodeCommandReceived("$10=1");
         unregisterReceiver(mUsbReceiver);
         if(mBound){
+            // Il service conserva la porta abbastanza a lungo da ottenere da
+            // FluidNC la conferma di arresto; non va fermato brutalmente qui.
+            if (isFinishing() && !isChangingConfigurations()) {
+                grblUsbSerialService.disconnectService();
+            }
             unbindService(usbConnection);
             mBound = false;
         }
-        stopService(new Intent(this, GrblUsbSerialService.class));
         EventBus.getDefault().unregister(this);
     }
 
@@ -235,8 +238,15 @@ public class UsbConnectionActivity extends GrblActivity{
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onJogCommandEvent(JogCommandEvent event){
+        // Fail-closed: i retry di uno stop precedente non devono colpire un
+        // nuovo jog. Serve una nuova pressione dopo la chiusura della finestra.
+        if (grblUsbSerialService == null
+                || grblUsbSerialService.isJogCancelPending()) return;
         if(machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE) || machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)){
-            if(machineStatus.getPlannerBuffer() > 5) onGcodeCommandReceived(event.getCommand());
+            if(machineStatus.getPlannerBuffer() > 5
+                    && grblUsbSerialService.serialWriteJogCommand(event)) {
+                event.markAccepted();
+            }
         }
     }
 

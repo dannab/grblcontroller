@@ -39,6 +39,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
@@ -68,6 +69,7 @@ import com.joanzapata.iconify.fonts.FontAwesomeModule;
 import com.joanzapata.iconify.widget.IconTextView;
 
 import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.ThreadMode;
 
 import es.dmoral.toasty.Toasty;
@@ -76,6 +78,7 @@ import in.co.gorest.grblcontroller.databinding.ActivityMainBinding;
 import in.co.gorest.grblcontroller.events.ConsoleMessageEvent;
 import in.co.gorest.grblcontroller.events.GrblAlarmEvent;
 import in.co.gorest.grblcontroller.events.GrblErrorEvent;
+import in.co.gorest.grblcontroller.events.JogStopRequestedEvent;
 import in.co.gorest.grblcontroller.events.StreamingCompleteEvent;
 import in.co.gorest.grblcontroller.events.OpenGcodeEditorEvent;
 import in.co.gorest.grblcontroller.events.StreamingStartedEvent;
@@ -593,18 +596,61 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public boolean onKeyDown(int keyCode, KeyEvent event){
 
         if(keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE){
+            // I tasti volume sono sempre uno STOP jog prioritario. FluidNC
+            // ignorabbe 0x85 prima dello stato Jog, quindi il service copre
+            // anche la transizione Idle -> Jog con retry e conferma di stato.
+            requestPriorityJogStop();
+
             if(machineStatus.getState().equals(Constants.MACHINE_STATUS_RUN)){
                 onGrblRealTimeCommandReceived(GrblUtils.GRBL_PAUSE_COMMAND);
                 return true;
             }
 
-            if(machineStatus.getState().equals(Constants.MACHINE_STATUS_HOLD)){
-                onGrblRealTimeCommandReceived(GrblUtils.GRBL_RESUME_COMMAND);
-                return true;
-            }
+            // Uno STOP fisico non deve mai diventare "resume" se lo stato
+            // osservato e' Hold. Il riavvio resta un'azione UI separata.
+            return true;
         }
 
         return false;
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_POINTER_DOWN
+                || action == MotionEvent.ACTION_OUTSIDE) {
+            // Un secondo dito in qualunque punto della finestra rende ambiguo
+            // l'uomo-presente: disarma la UI e arresta il jog.
+            requestPriorityJogStop();
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    private void requestPriorityJogStop() {
+        // Prima impedisce a un Runnable STEP ancora attivo di inviare nuovi
+        // $J; subito dopo affida al service il cancel realtime prioritario.
+        EventBus.getDefault().post(new JogStopRequestedEvent());
+        onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (!hasFocus) {
+            // Dialog, pannello di sistema o perdita focus durante una pressione:
+            // richiesta idempotente; il service decide se c'e' un jog noto.
+            requestPriorityJogStop();
+        }
     }
 
     // ----------------------------------------------------------------------

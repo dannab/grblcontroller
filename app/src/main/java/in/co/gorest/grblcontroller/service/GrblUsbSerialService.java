@@ -72,10 +72,10 @@ public class GrblUsbSerialService extends GrblSerialService {
 
     private UsbManager usbManager;
     private UsbDevice device;
-    private UsbDeviceConnection connection;
-    private UsbSerialDevice serialPort;
+    private volatile UsbDeviceConnection connection;
+    private volatile UsbSerialDevice serialPort;
 
-    private boolean serialPortConnected;
+    private volatile boolean serialPortConnected;
 
     /*
      * onCreate will be executed when service is started. It configures an IntentFilter to listen for
@@ -112,22 +112,60 @@ public class GrblUsbSerialService extends GrblSerialService {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
-
+        closeUsbTransport(false);
         unregisterReceiver(usbReceiver);
-        serialCommunicationHandler.shutdown();
-        setGrblFound(false);
+        if (serialCommunicationHandler != null) serialCommunicationHandler.shutdown();
 
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1){
             stopForeground(true);
         }
 
         EventBus.getDefault().unregister(this);
+        super.onDestroy();
+    }
+
+    /** Disconnessione volontaria: chiude la porta solo dopo lo stop confermato. */
+    public void disconnectService() {
+        if (!serialPortConnected) {
+            closeUsbTransport(true);
+            return;
+        }
+        requestSafeTransportShutdown(() -> closeUsbTransport(true));
+    }
+
+    private void closeUsbTransport(boolean stopServiceAfterClose) {
+        if (serialCommunicationHandler != null) {
+            serialCommunicationHandler.stopGrblStatusUpdateService();
+        }
+
+        serialPortConnected = false;
+        UsbSerialDevice port = serialPort;
+        serialPort = null;
+        if (port != null) {
+            try {
+                port.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
+
+        UsbDeviceConnection usbConnection = connection;
+        connection = null;
+        if (usbConnection != null) usbConnection.close();
+
+        onTransportDisconnected();
+        if (stopServiceAfterClose) stopSelf();
     }
 
     @Override
-    protected void serialWriteBytes(byte[] data) {
-        if (serialPort != null) serialPort.write(data);
+    protected boolean serialWriteBytes(byte[] data) {
+        UsbSerialDevice port = serialPort;
+        if (!serialPortConnected || port == null) return false;
+        try {
+            port.write(data);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     /*
@@ -178,14 +216,18 @@ public class GrblUsbSerialService extends GrblSerialService {
                 if(!serialPortConnected) findSerialPortDevice();
             } else if (Objects.equals(arg1.getAction(), ACTION_USB_DETACHED)) {
                 sendInternalBroadcast(ACTION_USB_DISCONNECTED);
-                serialCommunicationHandler.stopGrblStatusUpdateService();
-                if(serialPortConnected){
-                    serialPort.close();
-                }
-                serialPortConnected = false;
+                closeUsbTransport(false);
             }
         }
     };
+
+    @Override
+    protected void onTransportWriteFailure() {
+        if (serialPortConnected) {
+            sendInternalBroadcast(ACTION_USB_DISCONNECTED);
+            closeUsbTransport(false);
+        }
+    }
 
     private void findSerialPortDevice() {
         // This snippet will try to open the first encountered usb device connected, excluding usb root hubs
@@ -276,6 +318,7 @@ public class GrblUsbSerialService extends GrblSerialService {
             if (serialPort != null) {
                 if (serialPort.open()) {
                     serialPortConnected = true;
+                    onTransportConnected();
                     serialPort.setBaudRate(MachineStatusListener.getInstance().getUsbBaudRate());
                     serialPort.setDataBits(UsbSerialInterface.DATA_BITS_8);
                     serialPort.setStopBits(UsbSerialInterface.STOP_BITS_1);

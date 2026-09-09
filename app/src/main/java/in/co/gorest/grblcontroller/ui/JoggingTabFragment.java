@@ -29,6 +29,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.SeekBar;
@@ -55,9 +56,9 @@ import in.co.gorest.grblcontroller.R;
 import in.co.gorest.grblcontroller.databinding.FragmentJoggingTabBinding;
 import in.co.gorest.grblcontroller.events.GrblOkEvent;
 import in.co.gorest.grblcontroller.events.JogCommandEvent;
+import in.co.gorest.grblcontroller.events.JogStopRequestedEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
-import in.co.gorest.grblcontroller.helpers.RepeatListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.util.GcodeLeveling;
@@ -130,8 +131,18 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      */
     private static final long STEP_REPEAT_INTERVAL_MS = 100;
 
-    /** true se è attivo un jog continuo — serve per mandare cancel al rilascio */
+    /** true se il tocco proprietario ha armato un jog continuo. */
     private boolean jogContinuousActive = false;
+
+    /**
+     * Un solo pulsante e un solo pointer possono possedere il jog. Questo evita
+     * che un secondo dito azzeri lo stato del primo e faccia perdere il cancel.
+     */
+    private IconButton activeJogButton;
+    private int activeJogPointerId = MotionEvent.INVALID_POINTER_ID;
+    private Runnable activeStepRepeat;
+    private boolean activeStepRepeatStarted;
+    private long activeJogGestureToken;
 
     /**
      * Modalità continuous indipendenti per i due gruppi di assi:
@@ -217,12 +228,23 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     @Override
     public void onPause() {
+        // Prima del lifecycle Android: lo stop dipende dal comando locale
+        // armato, non da uno status Jog che potrebbe arrivare in ritardo.
+        boolean jogMayBeMoving = activeJogButton != null
+                || jogContinuousActive
+                || Constants.MACHINE_STATUS_JOG.equals(machineStatus.getState());
+        finishActiveJogTouch(jogMayBeMoving);
         super.onPause();
-        if (isAdded() && fragmentInteractionListener != null
-                && machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
-            fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
-        }
-        jogContinuousActive = false;
+    }
+
+    @Override
+    public void onDestroyView() {
+        // Seconda barriera idempotente contro detach/configuration change.
+        boolean jogMayBeMoving = activeJogButton != null
+                || jogContinuousActive
+                || Constants.MACHINE_STATUS_JOG.equals(machineStatus.getState());
+        finishActiveJogTouch(jogMayBeMoving);
+        super.onDestroyView();
     }
 
     @Override
@@ -232,12 +254,20 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
     }
 
     private void sendJogCancelRobust() {
-        fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
-        requireView().postDelayed(() -> {
-            if (isAdded() && machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
-                fragmentInteractionListener.onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
-            }
-        }, 60);
+        if (fragmentInteractionListener != null) {
+            // Il service invia subito 0x85 e gestisce retry, risposta $J tardiva
+            // e stato Jog osservato dopo il rilascio.
+            fragmentInteractionListener.onGrblRealTimeCommandReceived(
+                    GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onJogStopRequestedEvent(JogStopRequestedEvent event) {
+        // Il chiamante invia 0x85 subito dopo questo evento. Qui si disarma
+        // prima la UI, inclusa l'esatta callback STEP eventualmente pendente,
+        // così nessun jog può ripartire al termine della finestra di stop.
+        clearActiveJogTouch();
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -260,62 +290,10 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
             final IconButton iconButton = view.findViewById(resourceId);
 
-            // Comportamento:
-            //  - Modalità STEP (default): tap = 1 step singolo, hold = ripetizione
-            //    automatica dello stesso step finché il tasto resta premuto.
-            //    Niente più soglia temporale: lo step parte sempre al DOWN,
-            //    poi si ripete da solo dopo STEP_REPEAT_INITIAL_DELAY_MS e
-            //    successivamente ogni STEP_REPEAT_INTERVAL_MS.
-            //  - Modalità CONTINUO: press = jog continuo, release = jog cancel.
-            iconButton.setOnTouchListener((v, event) -> {
-                if (!isAdded()) return false;
-
-                switch (event.getAction()) {
-
-                    case android.view.MotionEvent.ACTION_DOWN:
-                        iconButton.removeCallbacks(null);
-                        jogContinuousActive = false;
-
-                        // Modalità continuous è per gruppo: il pulsante in colonna Z
-                        // controlla continuousModeZ, tutti gli altri (XY diagonali, A)
-                        // continuousModeXYA. Il discriminante è la lettera dell'asse nel tag.
-                        boolean useContinuous = isZAxisTag(iconButton.getTag().toString())
-                                ? continuousModeZ
-                                : continuousModeXYA;
-
-                        if (useContinuous) {
-                            // Modalità continuo: jog immediato senza attesa
-                            sendJogContinuous(iconButton.getTag().toString());
-                            jogContinuousActive = true;
-                        } else {
-                            // Modalità step: invia subito uno step, poi avvia
-                            // la ripetizione automatica finché il tasto è premuto.
-                            final String tag = iconButton.getTag().toString();
-                            sendJogCommand(tag);
-
-                            iconButton.postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (iconButton.isPressed() && isAdded()) {
-                                        sendJogCommand(tag);
-                                        iconButton.postDelayed(this, STEP_REPEAT_INTERVAL_MS);
-                                    }
-                                }
-                            }, STEP_REPEAT_INITIAL_DELAY_MS);
-                        }
-                        return false;
-
-                    case android.view.MotionEvent.ACTION_UP:
-                    case android.view.MotionEvent.ACTION_CANCEL:
-                        iconButton.removeCallbacks(null);
-                        if (jogContinuousActive) {
-                            sendJogCancelRobust();
-                            jogContinuousActive = false;
-                        }
-                        return false;
-                }
-                return false;
-            });
+            // Gestore unico del gesto: conserva pulsante e dito proprietari e
+            // chiude il jog anche su multi-touch, swipe fuori area o CANCEL.
+            iconButton.setOnTouchListener((v, event) ->
+                    handleJogButtonTouch(iconButton, event));
         }
 
         // Pulsanti registrati esplicitamente per ID — ognuno con il proprio
@@ -360,8 +338,12 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         //   click       → cicla 1 → 0.1 → 0.01
         //   long-click  → toggla modalità STEP ↔ CONTINUOUS (per XY+A)
         btnStepCycle = view.findViewById(R.id.btn_step_cycle);
-        btnStepCycle.setOnClickListener(v -> cycleStepXYA());
+        btnStepCycle.setOnClickListener(v -> {
+            finishActiveJogTouch(activeJogButton != null);
+            cycleStepXYA();
+        });
         btnStepCycle.setOnLongClickListener(v -> {
+            finishActiveJogTouch(activeJogButton != null);
             continuousModeXYA = !continuousModeXYA;
             updateStepCycleButton();
             return true;
@@ -374,8 +356,12 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         // NOTA: l'ID resta "jog_cancel" per non rompere il layout, ma la funzione
         //       di toggle-globale-continuous che aveva prima è stata sostituita.
         btnStepCycleZ = view.findViewById(R.id.jog_cancel);
-        btnStepCycleZ.setOnClickListener(v -> cycleStepZ());
+        btnStepCycleZ.setOnClickListener(v -> {
+            finishActiveJogTouch(activeJogButton != null);
+            cycleStepZ();
+        });
         btnStepCycleZ.setOnLongClickListener(v -> {
+            finishActiveJogTouch(activeJogButton != null);
             continuousModeZ = !continuousModeZ;
             updateStepCycleZButton();
             return true;
@@ -437,6 +423,144 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         });
 
         return view;
+    }
+
+    /**
+     * Gestione "uomo presente" comune a tutti i pulsanti di jog.
+     * Un solo pulsante e un solo pointer possono possedere il movimento.
+     */
+    private boolean handleJogButtonTouch(IconButton button, android.view.MotionEvent event) {
+        if (!isAdded()) return true;
+
+        final int action = event.getActionMasked();
+        switch (action) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                // Un secondo DOWN non deve mai azzerare lo stato del primo jog.
+                // Chiude il movimento esistente e richiede una nuova pressione.
+                if (activeJogButton != null) {
+                    finishActiveJogTouch(true);
+                    return true;
+                }
+
+                activeJogButton = button;
+                activeJogPointerId = event.getPointerId(0);
+                activeJogGestureToken = JogCommandEvent.newGestureToken();
+                activeStepRepeatStarted = false;
+                button.setPressed(true);
+                if (button.getParent() != null) {
+                    button.getParent().requestDisallowInterceptTouchEvent(true);
+                }
+
+                String tag = String.valueOf(button.getTag());
+                boolean useContinuous = isZAxisTag(tag)
+                        ? continuousModeZ
+                        : continuousModeXYA;
+
+                // Armiamo lo stato locale PRIMA di inviare $J: il rilascio
+                // resta così tracciato anche se lo status GRBL è ancora Idle.
+                jogContinuousActive = useContinuous;
+                if (useContinuous) {
+                    if (!sendJogContinuous(tag)) {
+                        finishActiveJogTouch(false);
+                    }
+                } else {
+                    if (!sendJogCommand(tag)) {
+                        finishActiveJogTouch(false);
+                        return true;
+                    }
+                    activeStepRepeat = new Runnable() {
+                        @Override
+                        public void run() {
+                            if (activeJogButton == button
+                                    && !jogContinuousActive
+                                    && button.isPressed()
+                                    && isAdded()) {
+                                if (sendJogCommand(tag)) {
+                                    // Da questo momento il planner puo' avere
+                                    // piu' step gia' accodati: il rilascio e'
+                                    // quindi uomo-presente e invia 0x85.
+                                    activeStepRepeatStarted = true;
+                                    button.postDelayed(this, STEP_REPEAT_INTERVAL_MS);
+                                } else {
+                                    finishActiveJogTouch(true);
+                                }
+                            }
+                        }
+                    };
+                    button.postDelayed(activeStepRepeat, STEP_REPEAT_INITIAL_DELAY_MS);
+                }
+                return true;
+
+            case android.view.MotionEvent.ACTION_POINTER_DOWN:
+                // Multi-touch = situazione ambigua: fermata fail-closed.
+                if (activeJogButton == button) finishActiveJogTouch(true);
+                return true;
+
+            case android.view.MotionEvent.ACTION_MOVE:
+                if (activeJogButton != button) return true;
+                int pointerIndex = event.findPointerIndex(activeJogPointerId);
+                if (pointerIndex < 0
+                        || event.getX(pointerIndex) < 0
+                        || event.getY(pointerIndex) < 0
+                        || event.getX(pointerIndex) >= button.getWidth()
+                        || event.getY(pointerIndex) >= button.getHeight()) {
+                    finishActiveJogTouch(true);
+                }
+                return true;
+
+            case android.view.MotionEvent.ACTION_POINTER_UP:
+                if (activeJogButton == button
+                        && event.getPointerId(event.getActionIndex()) == activeJogPointerId) {
+                    finishActiveJogTouch(true);
+                }
+                return true;
+
+            case android.view.MotionEvent.ACTION_UP:
+                if (activeJogButton == button) finishActiveJogTouch(false);
+                return true;
+
+            case android.view.MotionEvent.ACTION_CANCEL:
+                if (activeJogButton == button) finishActiveJogTouch(true);
+                return true;
+
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * Chiude atomicamente il gesto locale prima di inviare il cancel. In tal
+     * modo eventuali callback/reingressi non possono riutilizzare il vecchio
+     * proprietario.
+     */
+    private void finishActiveJogTouch(boolean forceCancel) {
+        boolean mustCancel = forceCancel
+                || jogContinuousActive
+                || activeStepRepeatStarted;
+
+        clearActiveJogTouch();
+
+        if (mustCancel) sendJogCancelRobust();
+    }
+
+    private void clearActiveJogTouch() {
+        IconButton button = activeJogButton;
+        Runnable stepRepeat = activeStepRepeat;
+
+        activeJogButton = null;
+        activeJogPointerId = android.view.MotionEvent.INVALID_POINTER_ID;
+        activeStepRepeat = null;
+        activeStepRepeatStarted = false;
+        activeJogGestureToken = 0L;
+        jogContinuousActive = false;
+
+        if (button != null) {
+            if (stepRepeat != null) button.removeCallbacks(stepRepeat);
+            button.setPressed(false);
+            if (button.getParent() != null) {
+                button.getParent().requestDisallowInterceptTouchEvent(false);
+            }
+        }
     }
 
     private void SetCustomButtons(View view) {
@@ -1118,7 +1242,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .show();
     }
 
-    private void sendJogCommand(String tag) {
+    private boolean sendJogCommand(String tag) {
         if (machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
                 || machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
 
@@ -1141,26 +1265,29 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             }
 
             String jog = String.format(tag, units, stepSize, jogFeed);
-            EventBus.getDefault().post(new JogCommandEvent(jog));
+            JogCommandEvent event = new JogCommandEvent(jog, activeJogGestureToken);
+            EventBus.getDefault().post(event);
+            return event.isAccepted();
         } else {
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_machine_not_idle), true, true));
+            return false;
         }
     }
 
     /**
      * Invia un comando di jog continuo verso la direzione indicata dal tag.
-     * Usa una distanza molto grande (9999mm) — GRBL si muove indefinitamente
+     * Usa una distanza molto grande (9999 mm): FluidNC esegue un unico moto
      * fino a quando non riceve il jog cancel (0x85).
-     * Il movimento è completamente fluido perché GRBL gestisce
+     * Il movimento resta fluido perché il firmware gestisce
      * internamente accelerazione e decelerazione.
      *
      * @param tag formato del comando jog (es. "$J=%sG91X%sF%s")
      */
-    private void sendJogContinuous(String tag) {
+    private boolean sendJogContinuous(String tag) {
         if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)
                 && !machineStatus.getState().equals(Constants.MACHINE_STATUS_JOG)) {
-            return;
+            return false;
         }
 
         String units = "G21";
@@ -1174,7 +1301,9 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         // Per il jog continuo usiamo sempre la distanza massima
         // Il segno (+ o -) è nel tag, la distanza è sempre positiva e grande
         String jog = String.format(tag, units, JOG_CONTINUOUS_DISTANCE, jogFeed);
-        EventBus.getDefault().post(new JogCommandEvent(jog));
+        JogCommandEvent event = new JogCommandEvent(jog, activeJogGestureToken);
+        EventBus.getDefault().post(event);
+        return event.isAccepted();
     }
 
     private void sendCommandIfIdle(String command) {
