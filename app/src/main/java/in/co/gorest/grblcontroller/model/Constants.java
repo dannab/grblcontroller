@@ -70,10 +70,12 @@ public interface Constants {
 
     String SERIAL_CONNECTION_TYPE_BLUETOOTH         = "bluetooth";
     String SERIAL_CONNECTION_TYPE_USB_OTG           = "usbotg";
+    String SERIAL_CONNECTION_TYPE_TELNET            = "telnet";
 
     int BLUETOOTH_SERVICE_NOTIFICATION_ID           = 100;
     int FILE_STREAMING_NOTIFICATION_ID              = 101;
     int USB_OTG_SERVICE_NOTIFICATION_ID             = 102;
+    int TELNET_SERVICE_NOTIFICATION_ID               = 103;
 
     String TEXT_CATEGORY_UPDATE                     = "update";
     String TEXT_CATEGORY_LINK                       = "link";

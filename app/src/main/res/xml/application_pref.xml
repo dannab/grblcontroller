@@ -24,6 +24,23 @@
             android:summary="%s"
             android:defaultValue="bluetooth" />
 
+        <EditTextPreference
+            android:key="@string/preference_telnet_host"
+            android:icon="@drawable/ic_device_hub_black_24dp"
+            android:title="@string/text_telnet_host"
+            android:summary="@string/text_telnet_host_desc"
+            android:singleLine="true"
+            android:inputType="textUri" />
+
+        <EditTextPreference
+            android:key="@string/preference_telnet_port"
+            android:icon="@drawable/ic_settings_input_hdmi_black_24dp"
+            android:title="@string/text_telnet_port"
+            android:summary="@string/text_telnet_port_desc"
+            android:defaultValue="23"
+            android:singleLine="true"
+            android:inputType="number" />
+
         <ListPreference
             android:key="@string/usb_serial_baud_rate"
             android:icon="@drawable/ic_usb_black_24dp"

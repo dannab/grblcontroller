@@ -61,14 +61,34 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onResume() {
             super.onResume();
-            String defaultConnectionType = getPreferenceManager().getSharedPreferences().getString(getString(R.string.preference_default_serial_connection_type), Constants.SERIAL_CONNECTION_TYPE_BLUETOOTH);
-            if(defaultConnectionType.equals(Constants.SERIAL_CONNECTION_TYPE_USB_OTG)){
-                getPreferenceScreen().findPreference(getString(R.string.preference_auto_connect)).setEnabled(false);
-            }
+            updateConnectionPreferences();
 
             getPreferenceScreen().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
             updateHttpServerInfo();
             updateZDropInfo();
+        }
+
+        private void updateConnectionPreferences() {
+            SharedPreferences preferences = getPreferenceManager().getSharedPreferences();
+            String type = preferences.getString(
+                    getString(R.string.preference_default_serial_connection_type),
+                    Constants.SERIAL_CONNECTION_TYPE_BLUETOOTH);
+            boolean usb = Constants.SERIAL_CONNECTION_TYPE_USB_OTG.equals(type);
+            boolean telnet = Constants.SERIAL_CONNECTION_TYPE_TELNET.equals(type);
+
+            android.preference.Preference autoConnect = getPreferenceScreen()
+                    .findPreference(getString(R.string.preference_auto_connect));
+            android.preference.Preference usbBaud = getPreferenceScreen()
+                    .findPreference(getString(R.string.usb_serial_baud_rate));
+            android.preference.Preference telnetHost = getPreferenceScreen()
+                    .findPreference(getString(R.string.preference_telnet_host));
+            android.preference.Preference telnetPort = getPreferenceScreen()
+                    .findPreference(getString(R.string.preference_telnet_port));
+
+            if (autoConnect != null) autoConnect.setEnabled(!usb);
+            if (usbBaud != null) usbBaud.setEnabled(usb);
+            if (telnetHost != null) telnetHost.setEnabled(telnet);
+            if (telnetPort != null) telnetPort.setEnabled(telnet);
         }
 
         /**
@@ -130,6 +150,16 @@ public class SettingsActivity extends AppCompatActivity {
                     || key.equals(getString(R.string.preference_update_pool_interval))
                     || key.equals(getString(R.string.preference_start_up_string))){
                 EventBus.getDefault().post(new UiToastEvent(getString(R.string.text_restart_required), true, true));
+            }
+
+            if (key.equals(getString(R.string.preference_default_serial_connection_type))) {
+                updateConnectionPreferences();
+            }
+
+            if (key.equals(getString(R.string.preference_telnet_host))
+                    || key.equals(getString(R.string.preference_telnet_port))) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        getString(R.string.text_restart_required), true, true));
             }
 
             if(key.equals(getString(R.string.preference_http_server_enabled))

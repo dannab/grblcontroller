@@ -602,9 +602,24 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
                 onGrblRealTimeCommandReceived(GrblUtils.GRBL_RESUME_COMMAND);
                 return true;
             }
+
+            // Fuori da una lavorazione non cerchiamo di dedurre se un jog sia
+            // realmente attivo: il tasto fisico invia subito il cancel 0x85.
+            onGrblRealTimeCommandReceived(GrblUtils.GRBL_JOG_CANCEL_COMMAND);
+            return true;
         }
 
-        return false;
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                || keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     // ----------------------------------------------------------------------

@@ -19,6 +19,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Normal permission required by Android 14 for a connectedDevice
+         foreground service that talks to FluidNC over the local network. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Used by the "find the phone" button on the HTTP server page -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -85,6 +88,14 @@
             tools:targetApi="n"
             tools:ignore="LockedOrientationActivity,NonResizeableActivity" />
         <activity
+            android:name=".TelnetConnectionActivity"
+            android:resizeableActivity="false"
+            android:screenOrientation="portrait"
+            android:supportsPictureInPicture="false"
+            android:theme="@style/AppTheme.NoActionBar"
+            tools:targetApi="n"
+            tools:ignore="LockedOrientationActivity,NonResizeableActivity" />
+        <activity
             android:name=".DeviceListActivity"
             android:configChanges="orientation|keyboardHidden"
             android:label="Select Paired Device"
@@ -115,6 +126,11 @@
             android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".service.GrblBluetoothSerialService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <service
+            android:name=".service.GrblTelnetService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />

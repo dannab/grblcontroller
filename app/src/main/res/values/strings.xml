@@ -69,6 +69,8 @@
     <string translatable="false" name="preference_ignore_error_20">preference_ignore_error_20</string>
     <string translatable="false" name="preference_update_pool_interval">preference_update_pool_interval</string>
     <string name="usb_serial_baud_rate" translatable="false">usb_serial_baud_rate</string>
+    <string name="preference_telnet_host" translatable="false">telnet_host</string>
+    <string name="preference_telnet_port" translatable="false">telnet_port</string>
     <string name="preference_remember_last_file_location" translatable="false">remember_last_file_location</string>
     <string name="most_recent_selected_file" translatable="false">most_recent_selected_file</string>
     <string name="preference_single_step_mode" translatable="false">preference_single_step_mode</string>
@@ -131,6 +133,13 @@
     <string name="text_disconnect_confirm">do you really want to disconnect?</string>
     <string name="text_bt_service_not_running">Bluetooth service not running!</string>
     <string name="text_bt_not_enabled">Bluetooth is not enabled!</string>
+    <string name="text_telnet_service_not_running">Telnet service is not running!</string>
+    <string name="text_telnet_host_required">Configure the FluidNC host name or IP address in Settings.</string>
+    <string name="text_telnet_invalid_port">The Telnet port must be between 1 and 65535.</string>
+    <string name="text_telnet_connection_failed">Unable to connect to FluidNC at %1$s:%2$d</string>
+    <string name="text_telnet_connection_lost">Telnet connection to FluidNC was lost</string>
+    <string name="text_telnet_service">FluidNC Telnet service</string>
+    <string name="text_telnet_service_foreground_message">This handles communication with FluidNC over the network.</string>
     <string name="text_grbl_soft_reset">Grbl soft reset!</string>
     <string name="text_grbl_soft_reset_desc">do you want to soft reset the machine?</string>
     <string name="text_unknown">Unknown</string>
@@ -141,7 +150,11 @@
     <string name="text_custom_action">Custom action</string>
     <string name="text_send_custom_command">send custom commands for the action</string>
     <string name="text_auto_connect">Auto connect</string>
-    <string name="text_auto_connect_desc">connect to last used bluetooth device on application start</string>
+    <string name="text_auto_connect_desc">connect to the last Bluetooth device or configured FluidNC host on application start</string>
+    <string name="text_telnet_host">FluidNC host / IP</string>
+    <string name="text_telnet_host_desc">Local network address of FluidNC, for example fluidnc.local or 192.168.1.50</string>
+    <string name="text_telnet_port">FluidNC Telnet port</string>
+    <string name="text_telnet_port_desc">Default port: 23</string>
     <string name="text_color_scheme">Color scheme</string>
     <string name="text_color_scheme_desc">Accent colours for the app and the web interface</string>
     <string name="text_color_scheme_changed">Color scheme applied</string>
@@ -196,11 +209,13 @@
     <string-array name="preference_entries_default_connection">
         <item>Bluetooth</item>
         <item>USB OTG (115200 baud)</item>
+        <item>FluidNC Telnet (Wi-Fi)</item>
     </string-array>
 
     <string-array name="preference_values_default_connection">
         <item>bluetooth</item>
         <item>usbotg</item>
+        <item>telnet</item>
     </string-array>
 
     <string-array name="preference_entries_color_scheme">

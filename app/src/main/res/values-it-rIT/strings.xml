@@ -28,6 +28,13 @@
     <string name="text_disconnect_confirm">vuoi davvero disconnetterti?</string>
     <string name="text_bt_service_not_running">Il servizio Bluetooth non è in esecuzione!</string>
     <string name="text_bt_not_enabled">Il Bluetooth non è abilitato!</string>
+    <string name="text_telnet_service_not_running">Il servizio Telnet non è in esecuzione!</string>
+    <string name="text_telnet_host_required">Configura il nome host o l’indirizzo IP di FluidNC nelle Impostazioni.</string>
+    <string name="text_telnet_invalid_port">La porta Telnet deve essere compresa tra 1 e 65535.</string>
+    <string name="text_telnet_connection_failed">Impossibile connettersi a FluidNC su %1$s:%2$d</string>
+    <string name="text_telnet_connection_lost">Connessione Telnet a FluidNC persa</string>
+    <string name="text_telnet_service">Servizio Telnet FluidNC</string>
+    <string name="text_telnet_service_foreground_message">Gestisce la comunicazione di rete con FluidNC.</string>
     <string name="text_grbl_soft_reset">Reset software Grbl!</string>
     <string name="text_grbl_soft_reset_desc">vuoi effettuare un reset software della macchina?</string>
     <string name="text_unknown">Sconosciuto</string>
@@ -37,7 +44,11 @@
     <string name="text_custom_action">Azione personalizzata</string>
     <string name="text_send_custom_command">invia comandi personalizzati per l\'azione</string>
     <string name="text_auto_connect">Connessione automatica</string>
-    <string name="text_auto_connect_desc">connetti all\'ultimo dispositivo Bluetooth utilizzato all\'avvio dell\'applicazione</string>
+    <string name="text_auto_connect_desc">connetti all’ultimo dispositivo Bluetooth o all’host FluidNC configurato all’avvio</string>
+    <string name="text_telnet_host">Host / IP FluidNC</string>
+    <string name="text_telnet_host_desc">Indirizzo di FluidNC nella rete locale, ad esempio fluidnc.local o 192.168.1.50</string>
+    <string name="text_telnet_port">Porta Telnet FluidNC</string>
+    <string name="text_telnet_port_desc">Porta predefinita: 23</string>
     <string name="text_restore_wpos_on_connect">Ripristina coordinate di lavoro alla connessione</string>
     <string name="text_restore_wpos_on_connect_desc">Alla connessione, se nelle caselle X/Y/Z/A sono rimasti dei valori, chiede se reimpostarli sulla macchina con G10 L20 P0</string>
     <string name="text_restore_wpos_title">Ripristinare le coordinate di lavoro?</string>
@@ -77,11 +88,13 @@
     <string-array name="preference_entries_default_connection">
         <item>Bluetooth</item>
         <item>USB OTG (115200 baud)</item>
+        <item>FluidNC Telnet (Wi-Fi)</item>
     </string-array>
 
     <string-array name="preference_values_default_connection">
         <item>bluetooth</item>
         <item>usbotg</item>
+        <item>telnet</item>
     </string-array>
 
     <string-array name="preference_entries_stop_button_behaviour">
