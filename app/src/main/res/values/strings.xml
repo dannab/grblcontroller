@@ -525,12 +525,25 @@
     <string name="text_torch_error">Unable to control the torch</string>
 
     <!-- Autolevel errors -->
-    <string name="text_leveling_no_points_file">points.txt not found! Probe the 3 points first.</string>
+    <string name="text_leveling_no_points_file">points.txt not found! Save the 3 points first.</string>
     <string name="text_leveling_no_source">No valid source G-Code file selected.</string>
     <string name="text_leveling_points_read_error">Error reading points.txt: %1$s</string>
     <string name="text_leveling_wrong_point_count">points.txt contains %1$d points. Exactly 3 are required.</string>
-    <string name="text_leveling_collinear">Geometry error: the 3 probed points are collinear!</string>
+    <string name="text_leveling_collinear">Geometry error: the 3 saved points are collinear!</string>
     <string name="text_leveling_processing_error">Error while processing the file: %1$s</string>
+    <string name="text_leveling_warning_title">3-point leveling</string>
+    <string name="text_leveling_warning_desc">Only G-Code already linearized by the CAM is accepted: G0/G1 movements only, while G2/G3 arcs are rejected. Use millimetres, the same work coordinate system as the three points, and output XY before the first absolute Z movement.</string>
+    <string name="text_leveling_points_require_mm">3-point leveling works in millimetres. Set the controller to G21, then save the points again.</string>
+    <string name="text_leveling_points_wcs_unsupported">Work coordinate system %1$s is not available here. Select G54, G55, G56 or G57 first.</string>
+    <string name="text_leveling_point_context_missing">These points do not contain unit and coordinate-system information. Delete them and save the three points again.</string>
+    <string name="text_leveling_point_context_invalid">points.txt is not valid. Delete it and save the three points again.</string>
+    <string name="text_leveling_points_context_changed">The saved points use %1$s, but the controller now uses %2$s. Delete the points or restore the original coordinate system.</string>
+    <string name="text_leveling_points_complete">Three points are already saved. Long-press getPoint to delete them before starting again.</string>
+    <string name="text_leveling_units_unsupported">Line %1$d uses %2$s. Export the file from the CAM in millimetres (G21).</string>
+    <string name="text_leveling_wcs_mismatch">Line %1$d selects %2$s, which differs from the coordinate system used for the points.</string>
+    <string name="text_leveling_coordinate_offset_unsupported">Line %1$d uses %2$s, which changes the coordinate offsets. Remove it from the CAM output before leveling.</string>
+    <string name="text_leveling_arc_unsupported">Line %1$d contains a G2/G3 arc. Configure the CAM to linearize arcs into G1 segments.</string>
+    <string name="text_leveling_initial_xy_unknown">At line %1$d an absolute Z appears before both X and Y are known. Configure the CAM to output the initial XY position before the first Z movement.</string>
 
     <!-- Settings items formerly hardcoded in application_pref.xml -->
     <string name="text_startup_string">Grbl start-up string</string>

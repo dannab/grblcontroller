@@ -49,6 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 import in.co.gorest.grblcontroller.R;
@@ -565,8 +566,8 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 return true;
 
             case R.id.do_leveling:
-               generaFileLivellato();
-                break;
+                showLevelingWarning();
+                return true;
 
             case R.id.custom_button_1:
             case R.id.custom_button_2:
@@ -588,21 +589,66 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
      * Formato riga CSV: "10.000,25.500,-2.000\n"
      */
     private void saveCurrentPoint() {
+        if (!machineStatus.getState().equals(Constants.MACHINE_STATUS_IDLE)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_machine_not_idle), true, true));
+            return;
+        }
+
+        MachineStatusListener.ParserState parserState = machineStatus.getParserState();
+        String coordinateSystem = parserState.coordinateSystem;
+        String units = parserState.unitSelection;
+
+        if (!"G21".equals(units)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_require_mm), true, true));
+            return;
+        }
+        if (!isValidWpos(coordinateSystem)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_wcs_unsupported, coordinateSystem),
+                    true, true));
+            return;
+        }
+
+        GcodeLeveling.PointsFileStatus pointsStatus =
+                GcodeLeveling.inspectPointsText(pointsCoords);
+        if (pointsStatus.getPointCount() > 0 && !pointsStatus.hasContext()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_point_context_missing), true, true));
+            return;
+        }
+        if (pointsStatus.hasContext()
+                && (!coordinateSystem.equals(pointsStatus.getCoordinateSystem())
+                || !units.equals(pointsStatus.getUnits()))) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_context_changed,
+                            pointsStatus.getCoordinateSystem(), coordinateSystem), true, true));
+            return;
+        }
+        if (pointsStatus.getPointCount() >= 3) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_complete), true, true));
+            return;
+        }
+
         double x = machineStatus.getWorkPosition().getCordX();
         double y = machineStatus.getWorkPosition().getCordY();
         double z = machineStatus.getWorkPosition().getCordZ();
 
-        // Formato CSV: X,Y,Z — compatibile con software CAD/CAM
-        String newPoint = String.valueOf(x) + ',' + String.valueOf(y) + ',' + String.valueOf(z) + "\n";
-
-        pointsCoords += newPoint;
+        // Coordinate acquisite a mano; il contesto WCS/G21 è salvato nell'intestazione.
+        String newPoint = String.format(Locale.US, "%.3f,%.3f,%.3f%n", x, y, z);
+        String updatedPoints = pointsStatus.getPointCount() == 0
+                ? GcodeLeveling.createPointsContextHeader(coordinateSystem, units) + "\n" + newPoint
+                : pointsCoords + newPoint;
 
         File pointsFile = getPointsFile();
         if (pointsFile == null) return;
 
         try (FileOutputStream fos = new FileOutputStream(pointsFile)) {
-            fos.write(pointsCoords.getBytes());
+            fos.write(updatedPoints.getBytes(StandardCharsets.UTF_8));
             fos.flush();
+            pointsCoords = updatedPoints;
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_point_saved, newPoint.trim()), true, false));
         } catch (IOException e) {
@@ -610,6 +656,16 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_point_save_error), true, true));
         }
+    }
+
+    private void showLevelingWarning() {
+        new AlertDialog.Builder(getActivity())
+                .setTitle(getString(R.string.text_leveling_warning_title))
+                .setMessage(getString(R.string.text_leveling_warning_desc))
+                .setPositiveButton(getString(R.string.text_yes_confirm),
+                        (dialog, which) -> generaFileLivellato())
+                .setNegativeButton(getString(R.string.text_no_confirm), null)
+                .show();
     }
 
     /**

@@ -406,12 +406,25 @@
     <string name="text_torch_error">Impossibile controllare la torcia</string>
 
     <!-- Autolivellamento -->
-    <string name="text_leveling_no_points_file">File points.txt non trovato! Esegui prima il probing dei 3 punti.</string>
+    <string name="text_leveling_no_points_file">File points.txt non trovato! Salva prima i 3 punti.</string>
     <string name="text_leveling_no_source">Nessun file G-Code di origine valido selezionato.</string>
     <string name="text_leveling_points_read_error">Errore lettura points.txt: %1$s</string>
     <string name="text_leveling_wrong_point_count">Il file points.txt contiene %1$d punti. Ne servono esattamente 3.</string>
-    <string name="text_leveling_collinear">Errore geometrico: i 3 punti di probing sono allineati!</string>
+    <string name="text_leveling_collinear">Errore geometrico: i 3 punti salvati sono allineati!</string>
     <string name="text_leveling_processing_error">Errore durante l\'elaborazione del file: %1$s</string>
+    <string name="text_leveling_warning_title">Livellamento a 3 punti</string>
+    <string name="text_leveling_warning_desc">Sono accettati solo G-Code già linearizzati dal CAM: movimenti G0/G1, mentre gli archi G2/G3 vengono rifiutati. Usa millimetri, lo stesso sistema di coordinate dei tre punti e fai emettere al CAM XY prima del primo movimento Z assoluto.</string>
+    <string name="text_leveling_points_require_mm">Il livellamento a 3 punti lavora in millimetri. Imposta il controller su G21 e salva nuovamente i punti.</string>
+    <string name="text_leveling_points_wcs_unsupported">Il sistema di coordinate %1$s non è disponibile qui. Seleziona prima G54, G55, G56 o G57.</string>
+    <string name="text_leveling_point_context_missing">Questi punti non contengono le informazioni su unità e sistema di coordinate. Cancellali e salva nuovamente i tre punti.</string>
+    <string name="text_leveling_point_context_invalid">Il file points.txt non è valido. Cancellalo e salva nuovamente i tre punti.</string>
+    <string name="text_leveling_points_context_changed">I punti salvati usano %1$s, ma il controller ora usa %2$s. Cancella i punti oppure ripristina il sistema di coordinate originale.</string>
+    <string name="text_leveling_points_complete">Sono già stati salvati tre punti. Tieni premuto getPoint per cancellarli prima di ricominciare.</string>
+    <string name="text_leveling_units_unsupported">La riga %1$d usa %2$s. Esporta il file dal CAM in millimetri (G21).</string>
+    <string name="text_leveling_wcs_mismatch">La riga %1$d seleziona %2$s, diverso dal sistema di coordinate usato per i punti.</string>
+    <string name="text_leveling_coordinate_offset_unsupported">La riga %1$d usa %2$s, che modifica gli offset delle coordinate. Rimuovilo dall\'output del CAM prima del livellamento.</string>
+    <string name="text_leveling_arc_unsupported">La riga %1$d contiene un arco G2/G3. Configura il CAM per trasformare gli archi in segmenti G1.</string>
+    <string name="text_leveling_initial_xy_unknown">Alla riga %1$d compare una Z assoluta prima che siano note sia X sia Y. Configura il CAM per emettere la posizione XY iniziale prima del primo movimento Z.</string>
 
     <!-- Voci impostazioni -->
     <string name="text_startup_string">Stringa di avvio Grbl</string>
