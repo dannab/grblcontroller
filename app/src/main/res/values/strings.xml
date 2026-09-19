@@ -22,6 +22,8 @@
   -->
 
 <resources>
+    <string name="text_show_coordinates">Show coordinates</string>
+    <string name="text_hide_coordinates">Hide coordinates</string>
 
     <string name="app_name" translatable="false">GRBL Machining</string>
     <string name="shared_preference_key" translatable="false">io.github.dannab.grblmachining.f635f2e523d7c64f5b4ad9179b689433</string>

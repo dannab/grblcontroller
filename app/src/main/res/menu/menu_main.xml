@@ -18,6 +18,12 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/action_toggle_coordinates"
+        android:orderInCategory="12"
+        android:title="@string/text_hide_coordinates"
+        app:showAsAction="never" />
+
+    <item
         android:icon="@drawable/ic_settings_black_20dp"
         android:title="@string/text_settings"
         android:orderInCategory="13"

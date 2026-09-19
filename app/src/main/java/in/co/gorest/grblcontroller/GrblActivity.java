@@ -114,6 +114,8 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     public static boolean isAppRunning;
 
     private Toast lastToast;
+    private static final String STATE_COORDINATES_HIDDEN = "coordinates_hidden";
+    private boolean coordinatesHidden;
     private ViewPager tabViewPager = null;
     private CharSequence lastBaseSubtitle = null;
     private TextView toolbarTitleView = null;
@@ -270,14 +272,18 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         binding.setMachineStatus(machineStatus);
 
         CardView viewLastToast = findViewById(R.id.view_last_toast);
-        viewLastToast.setOnLongClickListener(view -> {
-            if(lastToast != null) lastToast.show();
+        setCoordinatesHidden(savedInstanceState != null
+                && savedInstanceState.getBoolean(STATE_COORDINATES_HIDDEN, false));
+        View.OnLongClickListener hideCoordinates = view -> {
+            setCoordinatesHidden(true);
             return true;
-        });
+        };
+        viewLastToast.setOnLongClickListener(hideCoordinates);
 
         for(int resourceId: new Integer[]{R.id.wpos_edit_x, R.id.wpos_edit_y, R.id.wpos_edit_z, R.id.wpos_edit_a}){
             IconTextView positionTextView = findViewById(resourceId);
             positionTextView.setOnClickListener(v -> setWorkPosition(v.getTag().toString()));
+            positionTextView.setOnLongClickListener(hideCoordinates);
         }
 
         Iconify.with(new FontAwesomeModule());
@@ -295,6 +301,28 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
 
 
 
+    }
+
+    private void setCoordinatesHidden(boolean hidden) {
+        coordinatesHidden = hidden;
+        findViewById(R.id.view_last_toast).setVisibility(hidden ? View.GONE : View.VISIBLE);
+        invalidateOptionsMenu();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(STATE_COORDINATES_HIDDEN, coordinatesHidden);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem coordinatesItem = menu.findItem(R.id.action_toggle_coordinates);
+        if (coordinatesItem != null) {
+            coordinatesItem.setTitle(coordinatesHidden
+                    ? R.string.text_show_coordinates : R.string.text_hide_coordinates);
+        }
+        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
@@ -348,6 +376,10 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         int id = item.getItemId();
 
         switch (id){
+            case R.id.action_toggle_coordinates:
+                setCoordinatesHidden(!coordinatesHidden);
+                return true;
+
             case R.id.app_settings:
                 startActivity(new Intent(getApplicationContext(), SettingsActivity.class));
                 return true;

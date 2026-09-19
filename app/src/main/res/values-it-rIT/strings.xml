@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="text_show_coordinates">Mostra coordinate</string>
+    <string name="text_hide_coordinates">Nascondi coordinate</string>
     <string name="text_yes_confirm">Sì</string>
     <string name="text_no_confirm">No</string>
     <string name="text_cancel">Annulla</string>
