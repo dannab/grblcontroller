@@ -44,6 +44,7 @@ import in.co.gorest.grblcontroller.events.GrblErrorEvent;
 import in.co.gorest.grblcontroller.events.GrblOkEvent;
 import in.co.gorest.grblcontroller.events.GrblProbeEvent;
 import in.co.gorest.grblcontroller.events.GrblSettingMessageEvent;
+import in.co.gorest.grblcontroller.events.MachineNameEvent;
 import in.co.gorest.grblcontroller.events.UiToastEvent;
 import in.co.gorest.grblcontroller.model.Constants;
 import in.co.gorest.grblcontroller.model.Position;
@@ -153,6 +154,7 @@ public class SerialCommunicationHandler extends Handler {
 
     protected boolean onSerialRead(String message){
         boolean isVersionString = false;
+        String fluidNcMachineName = GrblUtils.getFluidNcMachineName(message);
         if(GrblUtils.isGrblOkMessage(message)){
             EventBus.getDefault().post(new GrblOkEvent(message));
 
@@ -165,6 +167,10 @@ public class SerialCommunicationHandler extends Handler {
             machineStatus.setState(MachineStatusListener.STATE_ALARM);
             EventBus.getDefault().post(alarmEvent);
             EventBus.getDefault().post(new UiToastEvent(alarmEvent.getAlarmDescription()));
+
+        }else if(fluidNcMachineName != null){
+            EventBus.getDefault().post(new MachineNameEvent(fluidNcMachineName));
+            EventBus.getDefault().post(new ConsoleMessageEvent(message));
 
         }else if(GrblUtils.isGrblFeedbackMessage(message)){
             EventBus.getDefault().post(new ConsoleMessageEvent(message));

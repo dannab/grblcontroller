@@ -135,6 +135,27 @@ public class GrblUtils {
         return FEEDBACK_PATTERN.matcher(response).find();
     }
 
+    // $I on FluidNC reports the configured top-level YAML `name` as
+    // [MSG:Machine: My machine]. Recent versions also print the same value in
+    // their startup diagnostics as [MSG:INFO: Machine My machine].
+    private static final Pattern FLUIDNC_MACHINE_NAME_PATTERN = Pattern.compile(
+            "^\\[MSG:Machine:\\s*(.+?)]$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FLUIDNC_STARTUP_MACHINE_NAME_PATTERN = Pattern.compile(
+            "^\\[MSG:INFO:\\s*Machine\\s+(.+?)]$", Pattern.CASE_INSENSITIVE);
+
+    public static String getFluidNcMachineName(final String response) {
+        if (response == null) return null;
+
+        Matcher matcher = FLUIDNC_MACHINE_NAME_PATTERN.matcher(response.trim());
+        if (!matcher.matches()) {
+            matcher = FLUIDNC_STARTUP_MACHINE_NAME_PATTERN.matcher(response.trim());
+        }
+        if (!matcher.matches()) return null;
+
+        String name = matcher.group(1).trim();
+        return name.isEmpty() ? null : name;
+    }
+
     private static final String BUILD_OPTIONS_REGEX = "^\\[OPT:(.*)]$";
     private static final Pattern BUILD_OPTIONS_PATTERN = Pattern.compile(BUILD_OPTIONS_REGEX);
     public static boolean isBuildOptionsMessage(final String response) {

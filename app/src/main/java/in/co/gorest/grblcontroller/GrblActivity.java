@@ -76,6 +76,7 @@ import in.co.gorest.grblcontroller.databinding.ActivityMainBinding;
 import in.co.gorest.grblcontroller.events.ConsoleMessageEvent;
 import in.co.gorest.grblcontroller.events.GrblAlarmEvent;
 import in.co.gorest.grblcontroller.events.GrblErrorEvent;
+import in.co.gorest.grblcontroller.events.MachineNameEvent;
 import in.co.gorest.grblcontroller.events.StreamingCompleteEvent;
 import in.co.gorest.grblcontroller.events.OpenGcodeEditorEvent;
 import in.co.gorest.grblcontroller.events.StreamingStartedEvent;
@@ -233,6 +234,23 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         toolbarTitleView.setText(base == null ? "" : base);
         String url = HttpServerManager.getInstance().getDisplayUrl();
         toolbarSubtitleView.setText(url == null ? getString(R.string.text_http_server_off) : url);
+    }
+
+    /**
+     * Shows the transport label only until FluidNC has reported its configured
+     * machine name. This also preserves that name when the activity resumes
+     * and receives the current connection state again.
+     */
+    protected void applyConnectedSubtitle(CharSequence transportLabel) {
+        String knownMachineName = HttpServerManager.getMachineName();
+        if (knownMachineName != null && !knownMachineName.trim().isEmpty()) {
+            applySubtitle(knownMachineName);
+            return;
+        }
+
+        applySubtitle(transportLabel);
+        HttpServerManager.getInstance().setMachineName(
+                transportLabel == null ? null : transportLabel.toString());
     }
 
     /** Re-applies the last subtitle, picking up server state changes. */
@@ -585,6 +603,15 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onConsoleMessageEvent(ConsoleMessageEvent event){
         consoleLogger.offerMessage(event.getMessage());
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMachineNameEvent(MachineNameEvent event){
+        String machineName = event.getMachineName();
+        if (machineName == null || machineName.trim().isEmpty()) return;
+
+        applySubtitle(machineName);
+        HttpServerManager.getInstance().setMachineName(machineName);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

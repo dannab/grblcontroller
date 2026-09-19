@@ -174,8 +174,7 @@ public class UsbConnectionActivity extends GrblActivity{
 
             switch (intentAction) {
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_GRANTED: // USB PERMISSION GRANTED
-                    applySubtitle(getString(R.string.text_connected));
-                    in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(getString(R.string.text_connected));
+                    applyConnectedSubtitle(getString(R.string.text_connected));
                     showToastMessage(getString(R.string.text_usb_device_connected));
                     break;
                 case GrblUsbSerialService.ACTION_USB_PERMISSION_NOT_GRANTED: // USB PERMISSION NOT GRANTED

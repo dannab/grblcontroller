@@ -322,8 +322,8 @@ public class BluetoothConnectionActivity extends GrblActivity {
     private void onBluetoothStateChange(int currentState){
         switch (currentState){
             case GrblBluetoothSerialService.STATE_CONNECTED:
-                applySubtitle((mConnectedDeviceName != null) ? mConnectedDeviceName : getString(R.string.text_connected));
-                in.co.gorest.grblcontroller.service.HttpServerManager.getInstance().setMachineName(mConnectedDeviceName);
+                applyConnectedSubtitle((mConnectedDeviceName != null)
+                        ? mConnectedDeviceName : getString(R.string.text_connected));
                 invalidateOptionsMenu();
                 break;
             case GrblBluetoothSerialService.STATE_CONNECTING:

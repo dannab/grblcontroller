@@ -201,10 +201,8 @@ public class TelnetConnectionActivity extends GrblActivity {
     private void onTelnetStateChange(int currentState) {
         switch (currentState) {
             case GrblTelnetService.STATE_CONNECTED:
-                applySubtitle(connectedEndpoint == null
+                applyConnectedSubtitle(connectedEndpoint == null
                         ? getString(R.string.text_connected) : connectedEndpoint);
-                in.co.gorest.grblcontroller.service.HttpServerManager.getInstance()
-                        .setMachineName(connectedEndpoint);
                 break;
             case GrblTelnetService.STATE_CONNECTING:
                 applySubtitle(getString(R.string.text_connecting));
