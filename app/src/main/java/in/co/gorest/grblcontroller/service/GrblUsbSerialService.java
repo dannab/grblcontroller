@@ -301,7 +301,7 @@ public class GrblUsbSerialService extends GrblSerialService {
                     }
 
                     // Everything went as expected. Send an intent to MainActivity
-                    serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
+                    serialWriteByte(GrblUtils.GRBL_STATUS_COMMAND);
                     sendInternalBroadcast(ACTION_USB_READY);
                 } else {
                     // Serial port could not be opened, maybe an I/O error or if CDC driver was chosen, it does not really fit

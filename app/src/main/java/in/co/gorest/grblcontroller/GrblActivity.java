@@ -258,6 +258,14 @@ public abstract class GrblActivity extends AppCompatActivity implements BaseFrag
         if (lastBaseSubtitle != null) applySubtitle(lastBaseSubtitle);
     }
 
+    /** Do not send configuration writes while detaching from an autonomous job. */
+    protected void restoreStatusMaskBeforeDisconnect() {
+        if (machineStatus != null && machineStatus.getSdJob().isEmpty()
+                && Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState())) {
+            onGcodeCommandReceived("$10=1");
+        }
+    }
+
     @SuppressLint("SourceLockedOrientationActivity")
     @Override
     protected void onCreate(Bundle savedInstanceState) {

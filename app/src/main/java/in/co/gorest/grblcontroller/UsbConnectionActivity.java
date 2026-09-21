@@ -85,7 +85,7 @@ public class UsbConnectionActivity extends GrblActivity{
     @Override
     public void onDestroy() {
         super.onDestroy();
-        onGcodeCommandReceived("$10=1");
+        restoreStatusMaskBeforeDisconnect();
         unregisterReceiver(mUsbReceiver);
         if(mBound){
             unbindService(usbConnection);

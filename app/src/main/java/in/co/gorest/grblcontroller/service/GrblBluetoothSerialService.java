@@ -261,15 +261,15 @@ public class GrblBluetoothSerialService extends GrblSerialService{
         }
         updateUserInterfaceTitle();
 
-        // Piccola pausa per lasciare assestare la connessione prima del soft
-        // reset. Era Object.wait(250), che funzionava solo perché il metodo è
+        // Piccola pausa per lasciare assestare la connessione prima della richiesta
+        // di stato. Era Object.wait(250), che funzionava solo perché il metodo è
         // synchronized: Thread.sleep è l'intento reale.
         try {
             Thread.sleep(250);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        if(!isGrblFound()) serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
+        if(!isGrblFound()) serialWriteByte(GrblUtils.GRBL_STATUS_COMMAND);
     }
 
     synchronized void stop() {

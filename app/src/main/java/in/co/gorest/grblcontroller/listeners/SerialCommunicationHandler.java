@@ -71,6 +71,7 @@ public class SerialCommunicationHandler extends Handler {
 
     private final ExecutorService singleThreadExecutor;
     private ScheduledExecutorService grblStatusUpdater = null;
+    private boolean startupRequested;
 
     private final WeakReference<GrblSerialService> mService;
 
@@ -112,19 +113,37 @@ public class SerialCommunicationHandler extends Handler {
     private void onSerialRead(String message, final GrblSerialService grblSerialService){
 
         boolean isVersionString = onSerialRead(message);
-        if(isVersionString){
+        boolean statusReport = GrblUtils.isGrblStatusString(message);
+        if (isVersionString || statusReport) {
+            if (!grblSerialService.isGrblFound()) {
+                startupRequested = false;
+                startGrblStatusUpdateService(grblSerialService);
+            }
             grblSerialService.setGrblFound(true);
+
+            // A live status reply establishes the connection without resetting
+            // a controller-local job. Configuration queries wait until idle.
+            if (startupRequested || (statusReport &&
+                    (!MachineStatusListener.STATE_IDLE.equals(machineStatus.getState())
+                            || !machineStatus.getSdJob().isEmpty()))) return;
+            startupRequested = true;
 
             Handler handler = new Handler(Looper.getMainLooper());
 
             long delayMillis = grblSerialService.getStatusUpdatePoolInterval();
             for(final String startUpCommand: this.getStartUpCommands()){
-                handler.postDelayed(() -> grblSerialService.serialWriteString(startUpCommand), delayMillis);
+                handler.postDelayed(() -> {
+                    if (grblSerialService.isGrblFound()
+                            && (MachineStatusListener.STATE_IDLE.equals(machineStatus.getState())
+                            || MachineStatusListener.STATE_ALARM.equals(machineStatus.getState()))
+                            && machineStatus.getSdJob().isEmpty()) {
+                        grblSerialService.serialWriteString(startUpCommand);
+                    }
+                }, delayMillis);
 
                 delayMillis = delayMillis + grblSerialService.getStatusUpdatePoolInterval();
             }
 
-            startGrblStatusUpdateService(grblSerialService);
         }
 
     }
@@ -191,6 +210,19 @@ public class SerialCommunicationHandler extends Handler {
             GrblSettingMessageEvent settingMessageEvent = new GrblSettingMessageEvent(GrblSettings, message);
             EventBus.getDefault().post(settingMessageEvent);
             EventBus.getDefault().post(new ConsoleMessageEvent(settingMessageEvent.toString()));
+
+        }else if(message.startsWith("[VER:") && message.endsWith("]")) {
+            // Build info can be the first identification after a non-resetting attach.
+            if (message.contains("FluidNC")) {
+                machineStatus.setBuildInfo(new MachineStatusListener.BuildInfo(1.1, 'f'));
+            } else {
+                double version = GrblUtils.getVersionDouble(message);
+                Character letter = GrblUtils.getVersionLetter(message);
+                if (version >= Constants.MIN_SUPPORTED_VERSION)
+                    machineStatus.setBuildInfo(new MachineStatusListener.BuildInfo(version,
+                            letter == null ? ' ' : letter));
+            }
+            EventBus.getDefault().post(new ConsoleMessageEvent(message));
 
         }else if(GrblUtils.isBuildOptionsMessage(message)) {
             String buildOptions = GrblUtils.getBuildOptionString(message);
@@ -260,6 +292,7 @@ public class SerialCommunicationHandler extends Handler {
         boolean hasOverrides = false;
         boolean enabledPinsChanged = false;
         boolean accessoryStatesChanged = false;
+        String sdJob = "";
 
         for (String part : statusMessage.substring(0, statusMessage.length()-1).split("\\|")) {
 
@@ -300,6 +333,10 @@ public class SerialCommunicationHandler extends Handler {
                 machineStatus.setFeedRate(Double.parseDouble(parts[0]));
                 machineStatus.setSpindleSpeed(Double.parseDouble(parts[1]));
 
+            }else if (part.startsWith("SD:")) {
+                sdJob = part.substring(3).replaceFirst(",", "% · ");
+                if (!sdJob.contains("%")) sdJob += "%";
+
             }else if (part.startsWith("Pn:")) {
                 String value = part.substring(part.indexOf(':')+1);
                 machineStatus.setEnabledPins(value);
@@ -311,6 +348,8 @@ public class SerialCommunicationHandler extends Handler {
                 accessoryStatesChanged = true;
             }
         }
+
+        machineStatus.setSdJob(sdJob);
 
         if(WCO == null){
             if(machineStatus.getWorkCoordsOffset() != null){

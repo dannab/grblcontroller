@@ -95,10 +95,28 @@ public class GcodeHttpServer extends NanoHTTPD {
     private final byte[] expectedAuthBytes;
     private final RingHandler ringHandler;
     private final Palette palette;
+    private final BatteryStatusProvider batteryStatusProvider;
+
+    interface BatteryStatusProvider {
+        PhoneBatteryStatus getBatteryStatus();
+    }
+
+    private PhoneBatteryStatus batterySnapshot() {
+        PhoneBatteryStatus status = batteryStatusProvider != null
+                ? batteryStatusProvider.getBatteryStatus() : null;
+        return status != null ? status : PhoneBatteryStatus.UNKNOWN;
+    }
 
     public GcodeHttpServer(int port, File rootDir, String password,
                            RingHandler ringHandler, Palette palette) {
+        this(port, rootDir, password, ringHandler, palette, null);
+    }
+
+    GcodeHttpServer(int port, File rootDir, String password,
+                    RingHandler ringHandler, Palette palette,
+                    BatteryStatusProvider batteryStatusProvider) {
         super(port);
+        this.batteryStatusProvider = batteryStatusProvider;
         this.rootDir = rootDir;
         this.ringHandler = ringHandler;
         this.palette = (palette != null) ? palette : Palette.DEFAULT;
@@ -884,6 +902,7 @@ public class GcodeHttpServer extends NanoHTTPD {
         String comment = (hasFile && fs.getLastComment() != null) ? fs.getLastComment() : "";
         String mname = (machineName != null && !machineName.isEmpty())
                 ? machineName : "Nessuna macchina connessa";
+        PhoneBatteryStatus battery = batterySnapshot();
         html.append("<header><div class=\"row\">")
                 .append("<div class=\"logo\">⚙</div>")
                 .append("<div class=\"hinfo\">")
@@ -899,6 +918,13 @@ public class GcodeHttpServer extends NanoHTTPD {
                 .append("</b> / <b id=\"jTotal\">").append(total).append("</b> (<b id=\"jPerc\">").append(perc)
                 .append("%</b>) &middot; Tempo <b id=\"jElapsed\">").append(escapeHtml(elapsed))
                 .append("</b> &middot; Stima <b id=\"jEta\">—</b></div>")
+                .append("<div class=\"jline\" id=\"sdJob\">")
+                .append(escapeHtml(MachineStatusListener.getInstance().getSdJob().isEmpty() ? "" :
+                        "SD FluidNC: " + MachineStatusListener.getInstance().getSdJob()))
+                .append("</div>")
+                .append("<div class=\"jline\"><span id=\"phoneBattery\" class=\"battery")
+                .append(battery.isLow() ? " battery-low" : "")
+                .append("\">").append(escapeHtml(battery.displayText())).append("</span></div>")
                 .append("</div>");
         if (withRing) {
             html.append("<div class=\"ring\">")
@@ -915,7 +941,9 @@ public class GcodeHttpServer extends NanoHTTPD {
         return "header .eyebrow{font-size:12px;opacity:.8;letter-spacing:.3px}"
                 + "header .mname{font-size:21px;font-weight:500;line-height:1.2;margin:1px 0 8px}"
                 + "header .jline{font-size:13.5px;opacity:.95;margin-bottom:3px}"
-                + "header .jline b{font-weight:600}";
+                + "header .jline b{font-weight:600}"
+                + "header .battery{display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.12)}"
+                + "header .battery-low{background:#b71c1c;color:#fff;font-weight:600}";
     }
 
     /** Client logic for the header "find the phone" buttons. */
@@ -955,9 +983,12 @@ public class GcodeHttpServer extends NanoHTTPD {
         int ovrFeed = (ovr != null) ? ovr.feed : 100;
         int ovrSpindle = (ovr != null) ? ovr.spindle : 100;
         String machine = HttpServerManager.getMachineName();
+        PhoneBatteryStatus battery = batterySnapshot();
         String json = "{"
+                + battery.jsonFields() + ","
                 + "\"state\":\"" + jsonEscape(state != null ? state : "") + "\","
                 + "\"machine\":\"" + jsonEscape(machine != null ? machine : "") + "\","
+                + "\"sdJob\":\"" + jsonEscape(ms.getSdJob()) + "\","
                 + "\"status\":\"" + jsonEscape(fs.getStatus() != null ? fs.getStatus() : "") + "\","
                 + "\"connected\":" + connected + ","
                 + "\"hasFile\":" + hasFile + ","
@@ -1026,6 +1057,13 @@ public class GcodeHttpServer extends NanoHTTPD {
                 + "set('machineName',d.connected?(d.machine||'Macchina connessa'):'Nessuna macchina connessa');"
                 + "document.title=d.connected?(d.machine||'Macchina connessa'):'GRBL Machining';"
                 + "set('machineState',d.state||'\\u2014');"
+                + "set('sdJob',d.sdJob?'SD FluidNC: '+d.sdJob:'');"
+                + "var bp=d.batteryPercent;var bt='Batteria telefono: non disponibile';"
+                + "if(typeof bp==='number'){bt='Batteria telefono: '+bp+'%';"
+                + "if(d.batteryCharging)bt+=' · in carica';else if(d.batteryPlugged)bt+=' · alimentazione collegata';}"
+                + "if(typeof bp==='number'&&bp>=0&&bp<=20)bt+=' · ATTENZIONE: batteria scarica';"
+                + "set('phoneBattery',bt);var be=document.getElementById('phoneBattery');"
+                + "if(be)be.classList.toggle('battery-low',typeof bp==='number'&&bp>=0&&bp<=20);"
                 + "set('ovrFeed',(d.ovrFeed!=null?d.ovrFeed:100)+'%');"
                 + "set('ovrSpindle',(d.ovrSpindle!=null?d.ovrSpindle:100)+'%');"
                 + "var dis=!d.connected,cb=document.querySelectorAll('.ctrl [data-cmd]');"

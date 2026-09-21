@@ -90,6 +90,7 @@ public class FileSenderTabFragment extends BaseFragment
     private MachineStatusListener machineStatus;
     private FileSenderListener fileSender;
     private EnhancedSharedPreferences sharedPref;
+    private FluidNcSdBrowser sdBrowser;
 
     // -------------------------------------------------------------------------
     // SAF launcher — usato come fallback per file fuori dalla cartella privata
@@ -132,6 +133,7 @@ public class FileSenderTabFragment extends BaseFragment
 
     @Override
     public void onStop() {
+        if (sdBrowser != null) sdBrowser.close();
         super.onStop();
         EventBus.getDefault().unregister(this);
     }
@@ -165,6 +167,12 @@ public class FileSenderTabFragment extends BaseFragment
         // --- Start streaming ---
         final IconButton startStreaming = view.findViewById(R.id.start_streaming);
         startStreaming.setOnClickListener(v -> {
+            if (!machineStatus.getSdJob().isEmpty()) {
+                fragmentInteractionListener.onGrblRealTimeCommandReceived(
+                        machineStatus.getState().equals(Constants.MACHINE_STATUS_HOLD)
+                                ? GrblUtils.GRBL_RESUME_COMMAND : GrblUtils.GRBL_PAUSE_COMMAND);
+                return;
+            }
             if (fileSender.getGcodeFile() == null) {
                 EventBus.getDefault().post(new UiToastEvent(
                         getString(R.string.text_no_gcode_file_selected), true, true));
@@ -180,13 +188,22 @@ public class FileSenderTabFragment extends BaseFragment
 
         // --- Start streaming da una riga specifica (long click) ---
         startStreaming.setOnLongClickListener(v -> {
+            if (!machineStatus.getSdJob().isEmpty()) return true;
             showRunFromLineInputDialog();
             return true;
         });
 
         // --- Stop streaming ---
         final IconButton stopStreaming = view.findViewById(R.id.stop_streaming);
-        stopStreaming.setOnClickListener(v -> stopFileStreaming());
+        stopStreaming.setOnClickListener(v -> {
+            if (!machineStatus.getSdJob().isEmpty()) {
+                new AlertDialog.Builder(requireContext()).setTitle("Ferma lavoro SD")
+                        .setMessage("Interrompere il lavoro eseguito da FluidNC?")
+                        .setPositiveButton("Ferma", (d, w) -> fragmentInteractionListener
+                                .onGrblRealTimeCommandReceived(GrblUtils.GRBL_RESET_COMMAND))
+                        .setNegativeButton(android.R.string.cancel, null).show();
+            } else stopFileStreaming();
+        });
 
         // --- Override buttons ---
         for (int resourceId : new Integer[]{
@@ -219,14 +236,20 @@ public class FileSenderTabFragment extends BaseFragment
      *    (WhatsApp, email, download, ecc.)
      */
     private void showFilePickerDialog() {
+        if (!machineStatus.getSdJob().isEmpty()) return;
         new AlertDialog.Builder(getActivity())
                 .setTitle(getString(R.string.text_no_gcode_file_selected))
                 .setItems(new String[]{
                         getString(R.string.text_file_source_app_folder),
-                        getString(R.string.text_file_source_other)
+                        getString(R.string.text_file_source_other),
+                        "SD di FluidNC"
                 }, (dialog, which) -> {
                     if (which == 0) {
                         showInternalFileBrowser();
+                    } else if (which == 2) {
+                        if (sdBrowser != null) sdBrowser.close();
+                        sdBrowser = new FluidNcSdBrowser(this);
+                        sdBrowser.show();
                     } else {
                         openSafPicker();
                     }
@@ -862,12 +885,14 @@ public class FileSenderTabFragment extends BaseFragment
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onBluetoothDisconnectEvent(BluetoothDisconnectEvent event) {
-        stopFileStreaming();
+        if (sdBrowser != null) sdBrowser.close();
+        if (FileStreamerIntentService.getIsServiceRunning()) stopFileStreaming();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onGrblErrorEvent(GrblErrorEvent event) {
-        if (!(event.getErrorCode() == 20 && machineStatus.getIgnoreError20())) {
+        if (FileStreamerIntentService.getIsServiceRunning()
+                && !(event.getErrorCode() == 20 && machineStatus.getIgnoreError20())) {
             stopFileStreaming();
         }
     }

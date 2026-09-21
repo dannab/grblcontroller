@@ -45,6 +45,16 @@ public class MachineStatusListener extends BaseObservable {
     public static final String STATE_NOT_CONNECTED  = Constants.MACHINE_STATUS_NOT_CONNECTED;
 
     private String state;
+    private volatile String sdJob = "";
+
+    @Bindable
+    public String getSdJob() { return sdJob; }
+    public void setSdJob(String job) {
+        if (!sdJob.equals(job)) {
+            sdJob = job;
+            notifyPropertyChanged(BR.sdJob);
+        }
+    }
     private Integer plannerBuffer = 0;
     private Integer serialRxBuffer = 0;
     private Double feedRate = 0.0;
@@ -130,6 +140,7 @@ public class MachineStatusListener extends BaseObservable {
     @Bindable
     public String getState(){ return this.state; }
     public void setState(String state){
+        if (STATE_NOT_CONNECTED.equals(state)) setSdJob("");
         if(!this.state.equals(state)){
             this.state = state;
             notifyPropertyChanged(BR.state);

@@ -27,7 +27,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -36,6 +38,7 @@ import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -73,6 +76,41 @@ public class HttpServerService extends Service {
 
     private GcodeHttpServer server;
     private int port = -1;
+
+    private volatile PhoneBatteryStatus batteryStatus = PhoneBatteryStatus.UNKNOWN;
+    private boolean batteryReceiverRegistered;
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (!Intent.ACTION_BATTERY_CHANGED.equals(intent.getAction())) return;
+            int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            batteryStatus = PhoneBatteryStatus.fromValues(
+                    intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
+                    intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
+                    intent.getBooleanExtra(BatteryManager.EXTRA_PRESENT, true),
+                    status == BatteryManager.BATTERY_STATUS_CHARGING,
+                    intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0);
+        }
+    };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // Sticky system broadcast supplies the initial level and later changes.
+        // No polling, wake locks or additional permissions are necessary.
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        try {
+            Intent initial;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                initial = registerReceiver(batteryReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                initial = registerReceiver(batteryReceiver, filter);
+            }
+            batteryReceiverRegistered = true;
+            if (initial != null) batteryReceiver.onReceive(this, initial);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Battery status unavailable", e);
+        }
+    }
 
     // ---- "find the phone" ringing state ----
     private MediaPlayer ringPlayer;
@@ -133,7 +171,7 @@ public class HttpServerService extends Service {
                         @Override public void ring() { ringPhone(); }
                         @Override public void stopRing() { stopRinging(); }
                     },
-                    buildWebPalette());
+                    buildWebPalette(), () -> batteryStatus);
             s.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
             this.server = s;
             this.port = p;
@@ -162,6 +200,10 @@ public class HttpServerService extends Service {
 
     @Override
     public void onDestroy() {
+        if (batteryReceiverRegistered) {
+            unregisterReceiver(batteryReceiver);
+            batteryReceiverRegistered = false;
+        }
         stopRinging();
         if (server != null) {
             try {

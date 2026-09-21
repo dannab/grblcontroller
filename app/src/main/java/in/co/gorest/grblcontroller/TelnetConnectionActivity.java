@@ -75,7 +75,7 @@ public class TelnetConnectionActivity extends GrblActivity {
     public void onDestroy() {
         super.onDestroy();
         if (bound) {
-            onGcodeCommandReceived("$10=1");
+            restoreStatusMaskBeforeDisconnect();
             telnetService.setMessageHandler(null);
             telnetService.disconnectService();
             unbindService(serviceConnection);
@@ -109,7 +109,7 @@ public class TelnetConnectionActivity extends GrblActivity {
                             .setTitle(R.string.text_disconnect)
                             .setMessage(R.string.text_disconnect_confirm)
                             .setPositiveButton(R.string.text_yes_confirm, (dialog, which) -> {
-                                onGcodeCommandReceived("$10=1");
+                                restoreStatusMaskBeforeDisconnect();
                                 if (telnetService != null) telnetService.disconnectService();
                             })
                             .setNegativeButton(R.string.text_cancel, null)

@@ -183,9 +183,8 @@ public class GrblTelnetService extends GrblSerialService {
         }
         notifyDeviceName();
         notifyStateChanged();
-        // Produce un banner certo anche quando la sessione Telnet viene aperta
-        // dopo che FluidNC ha già completato il proprio avvio.
-        serialWriteByte(GrblUtils.GRBL_RESET_COMMAND);
+        // Reattach without resetting a controller-local SD job.
+        serialWriteByte(GrblUtils.GRBL_STATUS_COMMAND);
     }
 
     private void onSessionEnded(TelnetSession session, boolean connectedBeforeFailure) {
