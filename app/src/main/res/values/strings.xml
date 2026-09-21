@@ -514,7 +514,9 @@
     <string name="text_cam_save_error">Save error: %1$s</string>
 
     <!-- Placement points / torch (jogging tab) -->
-    <string name="text_point_saved">Point saved: %1$s</string>
+    <string name="text_point_saved">Point %2$d saved: %1$s</string>
+    <string name="text_point_units_unsupported">Select millimetres (G21) or inches (G20) before saving a point.</string>
+    <string name="text_point_wcs_unsupported">Work coordinate system %1$s is unavailable for point capture.</string>
     <string name="text_point_save_error">Error saving point</string>
     <string name="text_clear_points_title">Delete placement points</string>
     <string name="text_clear_points_desc">Delete all points saved in points.txt?\nThis cannot be undone.</string>
@@ -530,7 +532,7 @@
     <string name="text_leveling_no_points_file">points.txt not found! Save the 3 points first.</string>
     <string name="text_leveling_no_source">No valid source G-Code file selected.</string>
     <string name="text_leveling_points_read_error">Error reading points.txt: %1$s</string>
-    <string name="text_leveling_wrong_point_count">points.txt contains %1$d points. Exactly 3 are required.</string>
+    <string name="text_leveling_wrong_point_count">points.txt contains %1$d points. Leveling requires exactly 3; the saved scan is unchanged.</string>
     <string name="text_leveling_collinear">Geometry error: the 3 saved points are collinear!</string>
     <string name="text_leveling_processing_error">Error while processing the file: %1$s</string>
     <string name="text_leveling_warning_title">3-point leveling</string>

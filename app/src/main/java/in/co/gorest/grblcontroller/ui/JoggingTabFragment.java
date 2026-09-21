@@ -49,6 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
@@ -599,25 +600,23 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         String coordinateSystem = parserState.coordinateSystem;
         String units = parserState.unitSelection;
 
-        if (!"G21".equals(units)) {
+        if (!"G21".equals(units) && !"G20".equals(units)) {
             EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_leveling_points_require_mm), true, true));
+                    getString(R.string.text_point_units_unsupported), true, true));
             return;
         }
-        if (!isValidWpos(coordinateSystem)) {
+        if (coordinateSystem == null
+                || !coordinateSystem.matches("G(?:5[4-9]|59\\.[123])")) {
             EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_leveling_points_wcs_unsupported, coordinateSystem),
+                    getString(R.string.text_point_wcs_unsupported, coordinateSystem),
                     true, true));
             return;
         }
 
         GcodeLeveling.PointsFileStatus pointsStatus =
                 GcodeLeveling.inspectPointsText(pointsCoords);
-        if (pointsStatus.getPointCount() > 0 && !pointsStatus.hasContext()) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_leveling_point_context_missing), true, true));
-            return;
-        }
+        // Legacy point lists remain usable as a scanner. Leveling will still
+        // require a new, contextualized list with exactly three points.
         if (pointsStatus.hasContext()
                 && (!coordinateSystem.equals(pointsStatus.getCoordinateSystem())
                 || !units.equals(pointsStatus.getUnits()))) {
@@ -626,31 +625,36 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                             pointsStatus.getCoordinateSystem(), coordinateSystem), true, true));
             return;
         }
-        if (pointsStatus.getPointCount() >= 3) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_leveling_points_complete), true, true));
-            return;
-        }
-
         double x = machineStatus.getWorkPosition().getCordX();
         double y = machineStatus.getWorkPosition().getCordY();
         double z = machineStatus.getWorkPosition().getCordZ();
 
         // Coordinate acquisite a mano; il contesto WCS/G21 è salvato nell'intestazione.
         String newPoint = String.format(Locale.US, "%.3f,%.3f,%.3f%n", x, y, z);
-        String updatedPoints = pointsStatus.getPointCount() == 0
-                ? GcodeLeveling.createPointsContextHeader(coordinateSystem, units) + "\n" + newPoint
-                : pointsCoords + newPoint;
-
         File pointsFile = getPointsFile();
         if (pointsFile == null) return;
 
-        try (FileOutputStream fos = new FileOutputStream(pointsFile)) {
-            fos.write(updatedPoints.getBytes(StandardCharsets.UTF_8));
-            fos.flush();
-            pointsCoords = updatedPoints;
+        try {
+            boolean empty = !pointsFile.exists() || pointsFile.length() == 0;
+            boolean needsNewline = false;
+            if (!empty) {
+                try (RandomAccessFile reader = new RandomAccessFile(pointsFile, "r")) {
+                    reader.seek(reader.length() - 1);
+                    int last = reader.read();
+                    needsNewline = last != '\n' && last != '\r';
+                }
+            }
+            String addition = empty
+                    ? GcodeLeveling.createPointsContextHeader(coordinateSystem, units) + "\n" + newPoint
+                    : (needsNewline ? "\n" : "") + newPoint;
+            try (FileOutputStream fos = new FileOutputStream(pointsFile, true)) {
+                fos.write(addition.getBytes(StandardCharsets.UTF_8));
+                fos.flush();
+            }
+            pointsCoords += addition;
             EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_point_saved, newPoint.trim()), true, false));
+                    getString(R.string.text_point_saved,
+                            newPoint.trim(), pointsStatus.getPointCount() + 1), true, false));
         } catch (IOException e) {
             Log.e(TAG, "Errore scrittura points.txt: " + e.getMessage());
             EventBus.getDefault().post(new UiToastEvent(

@@ -395,7 +395,9 @@
     <string name="text_cam_save_error">Errore salvataggio: %1$s</string>
 
     <!-- Punti di piazzamento / torcia -->
-    <string name="text_point_saved">Punto salvato: %1$s</string>
+    <string name="text_point_saved">Punto %2$d salvato: %1$s</string>
+    <string name="text_point_units_unsupported">Seleziona millimetri (G21) o pollici (G20) prima di salvare un punto.</string>
+    <string name="text_point_wcs_unsupported">Il sistema di coordinate %1$s non è disponibile per acquisire i punti.</string>
     <string name="text_point_save_error">Errore salvataggio punto</string>
     <string name="text_clear_points_title">Cancella punti di piazzamento</string>
     <string name="text_clear_points_desc">Vuoi cancellare tutti i punti salvati in points.txt?\nL\'operazione è irreversibile.</string>
@@ -411,7 +413,7 @@
     <string name="text_leveling_no_points_file">File points.txt non trovato! Salva prima i 3 punti.</string>
     <string name="text_leveling_no_source">Nessun file G-Code di origine valido selezionato.</string>
     <string name="text_leveling_points_read_error">Errore lettura points.txt: %1$s</string>
-    <string name="text_leveling_wrong_point_count">Il file points.txt contiene %1$d punti. Ne servono esattamente 3.</string>
+    <string name="text_leveling_wrong_point_count">Il file points.txt contiene %1$d punti. Per il livellamento ne servono esattamente 3; la scansione salvata non viene modificata.</string>
     <string name="text_leveling_collinear">Errore geometrico: i 3 punti salvati sono allineati!</string>
     <string name="text_leveling_processing_error">Errore durante l\'elaborazione del file: %1$s</string>
     <string name="text_leveling_warning_title">Livellamento a 3 punti</string>

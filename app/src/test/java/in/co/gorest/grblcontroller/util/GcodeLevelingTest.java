@@ -93,6 +93,20 @@ public class GcodeLevelingTest {
         }
     }
 
+    @Test
+    public void collectedScanCanHaveMoreThanThreePointsWithoutEnteringLeveling() throws Exception {
+        List<String> scan = Arrays.asList(
+                ";GRBLCONTROLLER_LEVELING_V2 WCS=G54 UNITS=G21",
+                "0,0,0", "10,0,0", "0,10,0", "10,10,0", "20,10,0");
+        assertEquals(5, GcodeLeveling.inspectPointsText(String.join("\n", scan)).getPointCount());
+        try {
+            GcodeLeveling.transform(scan, Arrays.asList("G21 G90 G54", "G0 X0 Y0"));
+            fail("Leveling must require an explicit three-point set");
+        } catch (GcodeLeveling.LevelingException error) {
+            assertEquals(GcodeLeveling.ErrorCode.WRONG_POINT_COUNT, error.code);
+        }
+    }
+
     private static void assertError(GcodeLeveling.ErrorCode expectedCode,
                                     int expectedLine, List<String> gcode) throws Exception {
         try {
