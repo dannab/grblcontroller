@@ -46,7 +46,7 @@
     <section id="sicurezza">
       <h2>Prima di iniziare</h2>
       <div class="danger"><strong>La CNC può muoversi senza preavviso.</strong> Tieni sempre accessibile l'arresto di emergenza, prova le nuove procedure lontano dal pezzo e non lasciare la macchina incustodita.</div>
-      <p>L'app comunica con controller GRBL 1.1 e FluidNC tramite Bluetooth o USB OTG. Prima del primo lavoro verifica direzione degli assi, unità di misura, homing, limiti e origine pezzo.</p>
+      <p>L'app comunica con controller GRBL 1.1 e FluidNC tramite Bluetooth, USB OTG oppure Telnet su rete Wi-Fi. Prima del primo lavoro verifica direzione degli assi, unità di misura, homing, limiti e origine pezzo.</p>
     </section>
 
     <section id="connessione">
@@ -54,10 +54,11 @@
       <ol class="step-list">
         <li>Accendi il controller CNC.</li>
         <li>Tocca l'icona di connessione nella barra superiore.</li>
-        <li>Scegli <strong>Bluetooth</strong> oppure <strong>USB OTG</strong> e seleziona il dispositivo.</li>
+        <li>Scegli <strong>Bluetooth</strong>, <strong>USB OTG</strong> oppure <strong>FluidNC Telnet</strong>. Per Telnet inserisci indirizzo IP/hostname e porta configurati nelle impostazioni (normalmente 23).</li>
         <li>Attendi che lo stato macchina e le coordinate inizino ad aggiornarsi.</li>
       </ol>
       <div class="tip"><strong>Bluetooth seriale:</strong> per GRBL 1.1 il modulo HC-05/HC-06 deve normalmente essere configurato a 115200 baud, 8 bit, nessuna parità, 1 bit di stop.</div>
+      <div class="tip"><strong>FluidNC:</strong> Telnet e WebUI possono convivere sulla stessa rete. Il controller deve essere collegato al Wi-Fi e raggiungibile dal telefono; non serve disabilitare la WebUI.</div>
       <p>Se l'opzione di ripristino coordinate è attiva, dopo una riconnessione l'app può proporre di riapplicare la posizione di lavoro con <code>G10 L20 P0</code>. Accetta soltanto se utensile e macchina non si sono mossi.</p>
     </section>
 
@@ -71,6 +72,7 @@
         <li><strong>Console:</strong> invio manuale di comandi e lettura delle risposte GRBL.</li>
         <li><strong>CAM:</strong> crea lavorazioni geometriche semplici direttamente sul dispositivo.</li>
       </ul>
+      <p>Quando FluidNC comunica il nome macchina, l'app lo usa nell'intestazione al posto del nome Bluetooth. Sui display piccoli il pannello delle coordinate può essere nascosto dalle impostazioni.</p>
     </section>
 
     <section id="nascoste">
@@ -84,8 +86,9 @@
           <tr><td>Step Z</td><td>Cicla 1 → 0,1 → 0,01 mm</td><td>Alterna passo/continuo per Z</td></tr>
           <tr><td>X/Y/Z/A zero</td><td>Imposta a zero l'asse nel sistema attivo, dopo conferma</td><td>Porta quell'asse allo zero con movimento rapido</td></tr>
           <tr><td>G54–G57</td><td>Sceglie il sistema di coordinate</td><td>Salva la posizione di lavoro corrente nel sistema attivo</td></tr>
-          <tr><td>Get point</td><td>Memorizza X/Y/Z correnti in <code>points.txt</code></td><td>Cancella, dopo conferma, tutti i punti salvati</td></tr>
-          <tr><td>Leveling</td><td>Nessuna azione</td><td>Genera la copia autolivellata del file caricato</td></tr>
+          <tr><td>Get point</td><td>Aggiunge X/Y/Z correnti a <code>points.txt</code>, senza limite di righe</td><td>Cancella, dopo conferma, tutti i punti salvati</td></tr>
+          <tr><td>Leveling</td><td>Avvia o prosegue la presa guidata dei tre punti; al terzo crea il file livellato</td><td>Cancella <code>levelingpoints.txt</code> dopo conferma</td></tr>
+          <tr><td>Mandrino nel File Sender</td><td>In Idle usa <code>M3 S…</code>/<code>M5</code>; in Hold arresta o ripristina il mandrino</td><td>Modifica il valore S manuale senza avviare il mandrino</td></tr>
           <tr><td>Override feed ±</td><td>Aumenta o diminuisce il feed</td><td>Riporta il feed al 100%</td></tr>
           <tr><td>Override spindle ±</td><td>Aumenta o diminuisce i giri mandrino</td><td>Riporta lo spindle al 100%</td></tr>
           <tr><td>Pulsanti personalizzati</td><td>Esegue i comandi “tocco breve”</td><td>Esegue i comandi “tocco lungo” configurati</td></tr>
@@ -101,7 +104,10 @@
       <p>In modalità <strong>passo</strong> ogni tocco muove della distanza indicata. In modalità <strong>continua</strong>, identificata dalle icone <span class="continuous-icon" title="Movimento continuo X/Y/A"><i class="fa fa-arrows" aria-hidden="true"></i></span> per X/Y/A e <span class="continuous-icon" title="Movimento continuo Z"><i class="fa fa-arrows-v" aria-hidden="true"></i></span> per Z, tieni premuta una freccia per muovere e rilasciala per inviare l'arresto del jog. Feed e passo di X/Y/A sono separati da quelli di Z.</p>
       <div class="danger"><strong>Attenzione — funzione in via di miglioramento:</strong> usa il movimento continuo con molta cautela. In alcune condizioni il comando potrebbe non arrestarsi come previsto e la macchina potrebbe incastrarsi o raggiungere un fine corsa. Provalo inizialmente a bassa velocità, mantieni il percorso libero e tieniti pronto a usare l'arresto di emergenza.</div>
       <div class="warning">Prima di usare “vai a zero” controlla che il percorso sia libero: il comando usa un movimento rapido. Se devi spostare anche Z, porta prima l'utensile a una quota sicura.</div>
+      <p><strong>Tasti volume:</strong> durante una lavorazione in Run mettono in pausa; in Hold riprendono. In tutte le altre situazioni inviano immediatamente il comando di annullamento jog, senza verificare se un jog sia attivo.</p>
+      <div class="danger">Il comando dai tasti volume passa comunque dal telefono e dalla connessione. È una protezione pratica, ma non sostituisce un pulsante di emergenza fisico che tolga energia alla macchina.</div>
       <p>Il pulsante campana sblocca l'allarme (<code>$X</code>), la casa avvia l'homing con conferma e la lampadina controlla la torcia del telefono. I quattro pulsanti personalizzati si abilitano e si configurano nelle impostazioni; ogni pulsante può inviare più righe e avere due azioni diverse.</p>
+      <p><strong>Get point</strong> salva ogni lettura come semplice riga X/Y/Z in <code>points.txt</code>, senza intestazione e senza limite di tre punti. Puoi quindi usarlo anche come rilevatore manuale o come sorgente per la polilinea CAM.</p>
     </section>
 
     <section id="file">
@@ -109,12 +115,16 @@
       <img class="manual-shot" src="images/grbl-machining-file-sender.png" alt="Schermata File Sender di GRBL Machining">
       <span class="shot-caption">File Sender in modalità Demo con G-code caricato, comandi di avvio/arresto e override abilitati.</span>
       <ol class="step-list">
-        <li>Tocca il nome/selettore file e scegli la cartella dell'app oppure il selettore file Android.</li>
+        <li>Tocca il nome/selettore file e scegli la cartella dell'app, il selettore file Android oppure, se disponibile, la scheda SD di FluidNC.</li>
         <li>Controlla origine, quota Z, utensile, fissaggio e stato <strong>Idle</strong>.</li>
         <li>Se disponibile, apri il visualizzatore e verifica il percorso.</li>
         <li>Premi Play, leggi il riepilogo di sicurezza e conferma.</li>
         <li>Durante il lavoro usa pausa/riprendi; usa Stop per interrompere definitivamente.</li>
       </ol>
+      <h3>File sulla SD di FluidNC</h3>
+      <p>Con una connessione FluidNC puoi sfogliare i file presenti sulla SD del controller e avviarli con <code>$SD/Run</code>. La lavorazione viene letta direttamente da FluidNC e non dipende dallo streaming del telefono; l'app resta collegata per stato e comandi. Verifica comunque il percorso e mantieni stabile la rete per poter controllare il lavoro.</p>
+      <h3>Comando mandrino</h3>
+      <p>In stato <strong>Idle</strong> il pulsante avvia il mandrino con <code>M3</code> e il valore <code>S</code> manuale configurato, necessario anche con un'uscita FluidNC 0–10 V, e lo spegne con <code>M5</code>. Una pressione prolungata cambia S senza avviare. Durante <strong>Hold</strong> usa il comando realtime per arrestare e ripristinare il mandrino; durante <strong>Run</strong> metti prima in pausa.</p>
       <h3>Partire da una riga</h3>
       <p>Tieni premuto Play, inserisci il numero mostrato nell'editor e segui la procedura. L'app ricostruisce lo stato modale precedente (unità, piano, coordinate, modalità, feed, mandrino e refrigerante), quindi propone il riposizionamento automatico a Z sicura oppure quello manuale.</p>
       <div class="danger"><strong>Ripresa da riga:</strong> verifica sempre posizione fisica, origine pezzo e utensile. Se mandrino o refrigerante risultavano attivi, l'app avvisa prima di riaccenderli.</div>
@@ -154,12 +164,13 @@
       <h2>Autolivellamento a 3 punti</h2>
       <ol class="step-list">
         <li>Carica il G-code da correggere nel File Sender.</li>
-        <li>Raggiungi il primo punto, esegui il probing e salva il punto con <strong>Get point</strong>.</li>
-        <li>Ripeti su altri due punti non allineati.</li>
-        <li>Tieni premuto <strong>Leveling</strong>.</li>
-        <li>Carica dal File Sender il nuovo file con suffisso <code>_leveled</code> e verificalo nel visualizzatore.</li>
+        <li>Porta l'utensile sul primo punto con probing automatico oppure manualmente, poi premi brevemente <strong>Leveling</strong>. L'app crea <code>levelingpoints.txt</code> e fissa quel punto.</li>
+        <li>Segui i messaggi e premi di nuovo Leveling sul secondo e sul terzo punto, che devono essere distinti e non allineati.</li>
+        <li>Dopo il terzo punto controlla la scheda riepilogativa con file, unità, sistema di coordinate e coordinate rilevate.</li>
+        <li>Conferma la generazione, quindi verifica nel visualizzatore il nuovo file con suffisso <code>_leveled</code>.</li>
       </ol>
-      <div class="warning">I tre punti devono descrivere il piano del pezzo e non essere allineati. Per ricominciare, tieni premuto Get point e conferma la cancellazione.</div>
+      <p>Se <code>levelingpoints.txt</code> contiene già tre punti, l'app chiede se riusarli o cancellarli e ricominciare. Una pressione prolungata su Leveling elimina il file dopo conferma. <code>points.txt</code> resta indipendente e non viene modificato.</p>
+      <div class="warning">Il livellamento richiede millimetri (<code>G21</code>), lo stesso sistema di coordinate e tre punti non allineati. I movimenti ad arco <code>G2</code>/<code>G3</code> vengono rifiutati: configura il CAM per convertirli in segmenti <code>G1</code>. Il file deve inoltre stabilire XY prima del primo Z assoluto.</div>
     </section>
 
     <section id="cam">
@@ -167,6 +178,9 @@
       <img class="manual-shot" src="images/grbl-machining-cam.png" alt="Schermata CAM al volo di GRBL Machining">
       <span class="shot-caption">Generazione rapida di lavorazioni geometriche direttamente nell'app.</span>
       <p>La scheda CAM genera lavori semplici come linea, cerchio e rettangolo con più passate Z. Imposta Punto 1, Punto 2, tipo di lavoro, feed, profondità totale, profondità per passata, quota di attraversamento e gli eventuali parametri utensile/step-over. “Crea percorso utensile” salva <code>job.nc</code> e lo carica nel File Sender.</p>
+      <h3>Incisione polilinea da points.txt</h3>
+      <p>Questa modalità collega nell'ordine tutti i punti salvati con Get point. Servono almeno due righe valide: del primo punto usa X, Y e Z come riferimento; dei punti successivi usa soltanto X e Y e ignora la loro Z. Imposta feed, profondità totale, discesa per passata e quota sicura come per le altre lavorazioni. Le passate alternate percorrono la linea avanti e indietro per evitare spostamenti inutili.</p>
+      <p>Prima di generare, il riepilogo mostra numero dei punti, Z iniziale, Z sicura, Z finale, numero delle passate e passo effettivo. Le coordinate sono interpretate in millimetri e devono appartenere allo stesso sistema di lavoro. Una riga malformata viene indicata con il suo numero.</p>
       <div class="tip">Controlla sempre il file generato nel visualizzatore e fai la prima prova a vuoto sopra il pezzo.</div>
     </section>
 
@@ -180,7 +194,7 @@
         <li>Collega PC e dispositivo alla stessa rete Wi‑Fi.</li>
         <li>Apri nel browser l'indirizzo mostrato nella notifica; utente: <code>grbl</code>.</li>
       </ol>
-      <p>La pagina permette di caricare/scaricare G-code, leggere stato e avanzamento, mettere in pausa o fermare il lavoro, regolare gli override e far squillare il dispositivo per ritrovarlo.</p>
+      <p>La pagina permette di caricare/scaricare G-code, leggere stato e avanzamento, mettere in pausa o fermare il lavoro, regolare gli override e far squillare il dispositivo per ritrovarlo. Nell'intestazione mostra il nome macchina ricevuto da FluidNC e la carica della batteria del telefono, con un avviso quando è troppo bassa.</p>
       <div class="warning">Il server è pensato per una rete locale fidata. Usa una password non banale e disattivalo quando non serve.</div>
     </section>
 
@@ -189,12 +203,13 @@
       <img class="manual-shot" src="images/grbl-machining-settings-top.png" alt="Schermata principale delle impostazioni di GRBL Machining">
       <span class="shot-caption">Pagina principale con accesso a impostazioni generali, pulsanti personalizzati, server HTTP e controllo affondi Z.</span>
       <ul class="step-list">
-        <li>Connessione predefinita e intervallo di aggiornamento stato.</li>
+        <li>Connessione predefinita, host/porta FluidNC Telnet e intervallo di aggiornamento stato.</li>
         <li>Velocità massima jogging e configurazione pulsanti personalizzati.</li>
         <li>Controllo posizione zero prima dello streaming.</li>
         <li>Controllo affondi Z e relative soglie.</li>
         <li>Ripristino coordinate di lavoro dopo la riconnessione.</li>
         <li>Server HTTP, porta e password.</li>
+        <li>Valore S per l'avvio manuale del mandrino e visibilità del pannello coordinate.</li>
         <li>Schema colori dell'app e dell'interfaccia web.</li>
       </ul>
       <p>Questo manuale segue il codice della versione Machining Edition. Le vecchie pagine inglesi restano raggiungibili dal menu e saranno aggiornate progressivamente.</p>
