@@ -520,6 +520,12 @@
     <string name="text_cam_invalid_value">Invalid value in CAM parameters: %1$s</string>
     <string name="text_cam_job_saved">job.nc saved and loaded into the File Sender</string>
     <string name="text_cam_save_error">Save error: %1$s</string>
+    <string name="text_cam_points_file_missing">points.txt was not found. Save at least two points with getPoint first.</string>
+    <string name="text_cam_points_need_two">points.txt contains %1$d valid points. At least two are required.</string>
+    <string name="text_cam_points_invalid_line">Invalid coordinate at line %1$d of points.txt: %2$s</string>
+    <string name="text_cam_points_read_error">Error reading points.txt: %1$s</string>
+    <string name="text_cam_points_summary_title">Polyline engraving summary</string>
+    <string name="text_cam_points_summary_desc">Points: %1$d\nFirst point and reference Z: %2$s\nSafe Z: %3$.3f\nFinal Z: %4$.3f\nDepth passes: %5$d\nEffective Z step: %6$.3f\n\nThe points will be joined in file order. Only the first point’s Z is used; all later Z values are ignored. Coordinates are interpreted as millimetres and must use the same work coordinate system when the job is run.</string>
 
     <!-- Placement points / torch (jogging tab) -->
     <string name="text_point_saved">Point %2$d saved: %1$s</string>
@@ -600,6 +606,7 @@
         <item>circle engraving</item>
         <item>rectangle profile with cornering</item>
         <item>cut on line</item>
+        <item>polyline engraving from points.txt</item>
     </string-array>
 
 

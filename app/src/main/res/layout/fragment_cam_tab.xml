@@ -245,6 +245,7 @@
             </RelativeLayout>
 
             <TableLayout
+                android:id="@+id/cam_from_to_table"
                 android:layout_centerHorizontal="true"
                 android:stretchColumns="*"
                 android:layout_width="match_parent"

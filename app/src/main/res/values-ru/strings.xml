@@ -309,6 +309,7 @@
         <item>circle engraving</item>
         <item>rectangle profile with cornering</item>
         <item>cut on line</item>
+        <item>polyline engraving from points.txt</item>
     </string-array>
 
     <!-- HTTP-сервер -->

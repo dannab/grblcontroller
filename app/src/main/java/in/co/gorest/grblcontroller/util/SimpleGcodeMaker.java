@@ -21,11 +21,21 @@
  */
 package in.co.gorest.grblcontroller.util;
 
-import android.util.Pair;
+import java.util.List;
 import java.util.Locale;
 import in.co.gorest.grblcontroller.model.Constants;
 
 public class SimpleGcodeMaker {
+
+    private static final class DepthPass {
+        final int count;
+        final double step;
+
+        DepthPass(int count, double step) {
+            this.count = count;
+            this.step = step;
+        }
+    }
 
     private double xf, yf, xt, yt;
     private double xcenter, ycenter, xcirc, ycirc;
@@ -89,12 +99,12 @@ public class SimpleGcodeMaker {
      * FIX: se step <= 0 restituisce 1 passata con step = tot_len
      * per evitare divisione per zero (es. circleCut con offset=0).
      */
-    private Pair<Integer, Double> pass(double tot_len, double step, boolean aprox_pass) {
+    private DepthPass pass(double tot_len, double step, boolean aprox_pass) {
         tot_len = Math.abs(tot_len);
 
         // FIX punto 3: offset=0 → una sola passata al raggio pieno
         if (step <= 0) {
-            return new Pair<>(1, tot_len);
+            return new DepthPass(1, tot_len);
         }
 
         int npass = (int) Math.ceil(tot_len / step);
@@ -104,12 +114,12 @@ public class SimpleGcodeMaker {
             step = tot_len / npass;
         }
 
-        return new Pair<>(npass, step);
+        return new DepthPass(npass, step);
     }
 
     private String ZLoop(String cutPath, double startX, double startY, boolean retractEachPass) {
 
-        Pair<Integer, Double> pass = this.pass(this.zdeep, this.zstep, this.Zaprox_pass);
+        DepthPass pass = this.pass(this.zdeep, this.zstep, this.Zaprox_pass);
 
         StringBuilder sb = new StringBuilder();
         double safeZ = this.zfrom + this.ztraversal;
@@ -117,8 +127,8 @@ public class SimpleGcodeMaker {
         sb.append(Constants.CAM_GCODE_HEAD);
         sb.append("G00 Z").append(f(safeZ)).append("\n");
 
-        for (int i = 1; i <= pass.first; i++) {
-            double targetZ = this.zfrom - (pass.second * i);
+        for (int i = 1; i <= pass.count; i++) {
+            double targetZ = this.zfrom - (pass.step * i);
 
             sb.append("G00 X").append(f(startX))
                     .append(" Y").append(f(startY)).append("\n");
@@ -160,13 +170,13 @@ public class SimpleGcodeMaker {
 
         if (offset <= 0 || minSide <= 0) return "";
 
-        Pair<Integer, Double> p = pass(minSide, offset, aprox_pass);
+        DepthPass p = pass(minSide, offset, aprox_pass);
 
         StringBuilder path = new StringBuilder();
 
-        for (int i = 0; i < p.first; i++) {
-            int index = invert_direction ? (p.first - 1 - i) : i;
-            double o = p.second * index;
+        for (int i = 0; i < p.count; i++) {
+            int index = invert_direction ? (p.count - 1 - i) : i;
+            double o = p.step * index;
             if (o >= minSide - minOffset) continue;
 
             double x1 = this.xf + o;
@@ -181,7 +191,7 @@ public class SimpleGcodeMaker {
         }
 
         double startOffset = !invert_direction ? 0 :
-                Math.min(p.second * (p.first - 1), minSide - minOffset);
+                Math.min(p.step * (p.count - 1), minSide - minOffset);
 
         return ZLoop(path.toString(),
                 this.xf + startOffset,
@@ -194,12 +204,12 @@ public class SimpleGcodeMaker {
      * alla coordinata Y finale per completare la copertura dell'area.
      */
     public String snakeX(double dist, boolean aprox_pass) {
-        Pair<Integer, Double> p = pass(this.height, dist, aprox_pass);
+        DepthPass p = pass(this.height, dist, aprox_pass);
         StringBuilder path = new StringBuilder();
         boolean sw = true;
 
-        for (int i = 1; i <= p.first; i++) {
-            double stepY = this.yf - (p.second * i);
+        for (int i = 1; i <= p.count; i++) {
+            double stepY = this.yf - (p.step * i);
             // Clamp: non andare oltre yt
             if (stepY < this.yt) stepY = this.yt;
 
@@ -219,12 +229,12 @@ public class SimpleGcodeMaker {
      * alla coordinata X finale per completare la copertura dell'area.
      */
     public String snakeY(double dist, boolean aprox_pass) {
-        Pair<Integer, Double> p = pass(this.width, dist, aprox_pass);
+        DepthPass p = pass(this.width, dist, aprox_pass);
         StringBuilder path = new StringBuilder();
         boolean sw = true;
 
-        for (int i = 1; i <= p.first; i++) {
-            double stepX = this.xf + (p.second * i);
+        for (int i = 1; i <= p.count; i++) {
+            double stepX = this.xf + (p.step * i);
             // Clamp: non andare oltre xt
             if (stepX > this.xt) stepX = this.xt;
 
@@ -260,13 +270,13 @@ public class SimpleGcodeMaker {
      * senza divisione per zero.
      */
     public String circleCut(double offset, boolean aprox_pass, boolean invert_direction) {
-        Pair<Integer, Double> p = pass(this.ray, offset, aprox_pass);
+        DepthPass p = pass(this.ray, offset, aprox_pass);
         StringBuilder path = new StringBuilder();
         double minRadius = 0.0001;
 
-        for (int i = 0; i < p.first; i++) {
-            int index = invert_direction ? (p.first - 1 - i) : i;
-            double o = p.second * index;
+        for (int i = 0; i < p.count; i++) {
+            int index = invert_direction ? (p.count - 1 - i) : i;
+            double o = p.step * index;
             if (o > this.ray) o = this.ray;
 
             double currentR = this.ray - o;
@@ -287,10 +297,10 @@ public class SimpleGcodeMaker {
         if (!invert_direction) {
             startRadius = this.ray;
         } else {
-            double lastOffset = p.second * (p.first - 1);
+            double lastOffset = p.step * (p.count - 1);
             if (lastOffset > this.ray) lastOffset = this.ray;
             startRadius = this.ray - lastOffset;
-            if (startRadius <= minRadius) startRadius = p.second;
+            if (startRadius <= minRadius) startRadius = p.step;
         }
 
         return ZLoop(path.toString(), this.xcenter + startRadius, this.ycenter, false);
@@ -359,7 +369,7 @@ public class SimpleGcodeMaker {
     }
 
     public String lineCut() {
-        Pair<Integer, Double> p = pass(this.zdeep, this.zstep, this.Zaprox_pass);
+        DepthPass p = pass(this.zdeep, this.zstep, this.Zaprox_pass);
         StringBuilder sb = new StringBuilder();
         boolean sw = true;
 
@@ -370,8 +380,8 @@ public class SimpleGcodeMaker {
         sb.append("G00 X").append(f(this.xcenter))
                 .append(" Y").append(f(this.ycenter)).append("\n");
 
-        for (int i = 1; i <= p.first; i++) {
-            double targetZ = this.zfrom - (p.second * i);
+        for (int i = 1; i <= p.count; i++) {
+            double targetZ = this.zfrom - (p.step * i);
 
             sb.append("G01 Z").append(f(targetZ))
                     .append(" F").append(f(plungeFeedrate)).append("\n");
@@ -391,5 +401,60 @@ public class SimpleGcodeMaker {
         sb.append(Constants.CAM_GCODE_END);
 
         return sb.toString();
+    }
+
+    /**
+     * Incide la polilinea nell'ordine di points.txt. La Z dei punti successivi
+     * al primo è intenzionalmente ignorata; zfrom è già la Z del primo punto.
+     * Le passate alternano il verso per non effettuare rapidi alla quota di taglio.
+     */
+    public String polylineCut(List<PlacementPoints.Point> points) {
+        if (points == null || points.size() < 2) return "";
+
+        DepthPass p = pass(this.zdeep, this.zstep, this.Zaprox_pass);
+        StringBuilder sb = new StringBuilder();
+        double safeZ = this.zfrom + this.ztraversal;
+
+        sb.append(Constants.CAM_GCODE_HEAD);
+        sb.append("G00 Z").append(f(safeZ)).append("\n");
+        PlacementPoints.Point first = points.get(0);
+        sb.append("G00 X").append(f(first.x))
+                .append(" Y").append(f(first.y)).append("\n");
+
+        boolean forward = true;
+        for (int passIndex = 1; passIndex <= p.count; passIndex++) {
+            double targetZ = this.zfrom - (p.step * passIndex);
+            sb.append("G01 Z").append(f(targetZ))
+                    .append(" F").append(f(plungeFeedrate)).append("\n");
+            sb.append("F").append(f(cutFeedrate)).append("\n");
+
+            if (forward) {
+                for (int pointIndex = 1; pointIndex < points.size(); pointIndex++) {
+                    appendPolylinePoint(sb, points.get(pointIndex));
+                }
+            } else {
+                for (int pointIndex = points.size() - 2; pointIndex >= 0; pointIndex--) {
+                    appendPolylinePoint(sb, points.get(pointIndex));
+                }
+            }
+            forward = !forward;
+        }
+
+        sb.append("G00 Z").append(f(safeZ)).append("\n");
+        sb.append(Constants.CAM_GCODE_END);
+        return sb.toString();
+    }
+
+    private void appendPolylinePoint(StringBuilder target, PlacementPoints.Point point) {
+        target.append("G01 X").append(f(point.x))
+                .append(" Y").append(f(point.y)).append("\n");
+    }
+
+    public int getDepthPassCount() {
+        return pass(this.zdeep, this.zstep, this.Zaprox_pass).count;
+    }
+
+    public double getEffectiveDepthStep() {
+        return pass(this.zdeep, this.zstep, this.Zaprox_pass).step;
     }
 }

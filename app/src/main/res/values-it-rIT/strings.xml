@@ -399,6 +399,12 @@
     <string name="text_cam_invalid_value">Valore non valido nei parametri CAM: %1$s</string>
     <string name="text_cam_job_saved">job.nc salvato e caricato in File Sender</string>
     <string name="text_cam_save_error">Errore salvataggio: %1$s</string>
+    <string name="text_cam_points_file_missing">points.txt non è stato trovato. Salva prima almeno due punti con getPoint.</string>
+    <string name="text_cam_points_need_two">points.txt contiene %1$d punti validi. Ne servono almeno due.</string>
+    <string name="text_cam_points_invalid_line">Coordinata non valida alla riga %1$d di points.txt: %2$s</string>
+    <string name="text_cam_points_read_error">Errore durante la lettura di points.txt: %1$s</string>
+    <string name="text_cam_points_summary_title">Riepilogo incisione polilinea</string>
+    <string name="text_cam_points_summary_desc">Punti: %1$d\nPrimo punto e Z di riferimento: %2$s\nZ di sicurezza: %3$.3f\nZ finale: %4$.3f\nPassate in profondità: %5$d\nPasso Z effettivo: %6$.3f\n\nI punti saranno uniti nell’ordine del file. Viene usata soltanto la Z del primo punto; tutte le Z successive vengono ignorate. Le coordinate sono interpretate in millimetri e durante la lavorazione deve essere usato lo stesso sistema di coordinate.</string>
 
     <!-- Punti di piazzamento / torcia -->
     <string name="text_point_saved">Punto %2$d salvato: %1$s</string>
@@ -479,6 +485,7 @@
         <item>incisione circolare</item>
         <item>profilatura rettangolare con smussatura</item>
         <item>taglio su linea</item>
+        <item>incisione polilinea da points.txt</item>
     </string-array>
 </resources>
 

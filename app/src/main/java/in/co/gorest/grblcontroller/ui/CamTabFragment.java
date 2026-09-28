@@ -45,6 +45,7 @@ import org.greenrobot.eventbus.EventBus;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 
 import in.co.gorest.grblcontroller.BR;
@@ -55,9 +56,12 @@ import in.co.gorest.grblcontroller.helpers.EnhancedSharedPreferences;
 import in.co.gorest.grblcontroller.listeners.FileSenderListener;
 import in.co.gorest.grblcontroller.listeners.MachineStatusListener;
 import in.co.gorest.grblcontroller.model.Constants;
+import in.co.gorest.grblcontroller.util.PlacementPoints;
 import in.co.gorest.grblcontroller.util.SimpleGcodeMaker;
 
 public class CamTabFragment extends BaseFragment {
+
+    private static final int JOB_TYPE_POINTS_POLYLINE = 10;
 
     private MachineStatusListener machineStatus;
     private EnhancedSharedPreferences sharedPref;
@@ -70,6 +74,9 @@ public class CamTabFragment extends BaseFragment {
     private TextView camFromText;
     private TextView camToText;
     private TextView camToolDia;
+    private View camStepOverView;
+    private View camToolDiaView;
+    private View camFromToTable;
     private String editIcon;
 
     private Double Xto   = 0.0, Yto   = 0.0, Zto   = 0.0;
@@ -137,6 +144,9 @@ public class CamTabFragment extends BaseFragment {
         camZDeep      = view.findViewById(R.id.cam_z_deep);
         camZStep      = view.findViewById(R.id.cam_z_step);
         camToolDia    = view.findViewById(R.id.cam_tool_dia);
+        camStepOverView = view.findViewById(R.id.cam_step_over_view);
+        camToolDiaView = view.findViewById(R.id.cam_tool_dia_view);
+        camFromToTable = view.findViewById(R.id.cam_from_to_table);
 
         // --- Valori iniziali da SharedPreferences ---
         camFeedRate.setText(sharedPref.getString(getString(R.string.preference_cam_feed_rate),
@@ -166,21 +176,30 @@ public class CamTabFragment extends BaseFragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
                 jobType = position;
+                updateJobTypeUi();
             }
             @Override
-            public void onNothingSelected(AdapterView<?> parent) { jobType = 0; }
+            public void onNothingSelected(AdapterView<?> parent) {
+                jobType = 0;
+                updateJobTypeUi();
+            }
         });
 
         // --- Pulsante calcola ---
         IconButton startCamCalc = view.findViewById(R.id.start_cam_calc);
-        startCamCalc.setOnClickListener(v ->
-                new AlertDialog.Builder(getActivity())
-                        .setTitle(getString(R.string.text_start_cam_calc))
-                        .setMessage(getString(R.string.text_start_cam_calc_desc))
-                        .setPositiveButton(getString(R.string.text_yes_confirm),
-                                (d, w) -> doCamCalculation())
-                        .setNegativeButton(getString(R.string.text_cancel), null)
-                        .show());
+        startCamCalc.setOnClickListener(v -> {
+            if (jobType == JOB_TYPE_POINTS_POLYLINE) {
+                showPointsPolylineSummary();
+                return;
+            }
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(getString(R.string.text_start_cam_calc))
+                    .setMessage(getString(R.string.text_start_cam_calc_desc))
+                    .setPositiveButton(getString(R.string.text_yes_confirm),
+                            (d, w) -> doCamCalculation())
+                    .setNegativeButton(getString(R.string.text_cancel), null)
+                    .show();
+        });
 
         // --- Pulsante From ---
         IconButton camFrom = view.findViewById(R.id.cam_from);
@@ -300,6 +319,91 @@ public class CamTabFragment extends BaseFragment {
         } catch (NumberFormatException e) {
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_cam_invalid_value, e.getMessage()), true, true));
+        }
+    }
+
+    private void updateJobTypeUi() {
+        boolean pointsPolyline = jobType == JOB_TYPE_POINTS_POLYLINE;
+        int geometryVisibility = pointsPolyline ? View.GONE : View.VISIBLE;
+        if (camStepOverView != null) camStepOverView.setVisibility(geometryVisibility);
+        if (camToolDiaView != null) camToolDiaView.setVisibility(geometryVisibility);
+        if (camFromToTable != null) camFromToTable.setVisibility(geometryVisibility);
+    }
+
+    private void showPointsPolylineSummary() {
+        File appDir = getAppMediaDir();
+        if (appDir == null) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_app_folder_unavailable), true, true));
+            return;
+        }
+        File pointsFile = new File(appDir, "points.txt");
+        if (!pointsFile.exists()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_cam_points_file_missing), true, true));
+            return;
+        }
+
+        try {
+            List<PlacementPoints.Point> points = PlacementPoints.read(pointsFile);
+            if (points.size() < 2) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        getString(R.string.text_cam_points_need_two, points.size()), true, true));
+                return;
+            }
+
+            double zTraversal = parseSignedDouble(camZTraversal);
+            double zStep = parseSignedDouble(camZStep);
+            double zDeep = parseSignedDouble(camZDeep);
+            double feedRate = parseSignedDouble(camFeedRate);
+            if (Math.abs(zStep) > Math.abs(zDeep)) {
+                EventBus.getDefault().post(new UiToastEvent(
+                        getString(R.string.error_z_step_greater_than_z_deep), true, true));
+                return;
+            }
+
+            PlacementPoints.Point first = points.get(0);
+            PlacementPoints.Point second = points.get(1);
+            SimpleGcodeMaker maker = new SimpleGcodeMaker(
+                    first.x, first.y, second.x, second.y, first.z,
+                    zStep, zDeep, zTraversal, feedRate / 2.0, feedRate, true);
+
+            int passCount = maker.getDepthPassCount();
+            double effectiveStep = maker.getEffectiveDepthStep();
+            double safeZ = first.z + Math.abs(zTraversal);
+            double finalZ = first.z - Math.abs(zDeep);
+            String firstPoint = String.format(Locale.US, "X%.3f Y%.3f Z%.3f",
+                    first.x, first.y, first.z);
+
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.text_cam_points_summary_title)
+                    .setMessage(getString(R.string.text_cam_points_summary_desc,
+                            points.size(), firstPoint, safeZ, finalZ,
+                            passCount, effectiveStep))
+                    .setPositiveButton(R.string.text_start_cam_calc,
+                            (dialog, which) -> {
+                                String gcode = maker.polylineCut(points);
+                                if (gcode.isEmpty()) {
+                                    EventBus.getDefault().post(new UiToastEvent(
+                                            getString(R.string.text_cam_no_gcode_generated),
+                                            true, true));
+                                } else {
+                                    saveGcodeToAppFolder(gcode);
+                                }
+                            })
+                    .setNegativeButton(R.string.text_cancel, null)
+                    .show();
+        } catch (PlacementPoints.ParseException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_cam_points_invalid_line,
+                            error.lineNumber, error.lineText), true, true));
+        } catch (IOException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_cam_points_read_error, error.getMessage()),
+                    true, true));
+        } catch (NumberFormatException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_cam_invalid_value, error.getMessage()), true, true));
         }
     }
 
