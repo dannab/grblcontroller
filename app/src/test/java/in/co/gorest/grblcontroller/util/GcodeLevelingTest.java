@@ -107,6 +107,23 @@ public class GcodeLevelingTest {
         }
     }
 
+    @Test
+    public void acceptsDedicatedLevelingFileWithSourceMetadata() throws Exception {
+        List<String> levelingPoints = Arrays.asList(
+                ";GRBLCONTROLLER_LEVELING_V2 WCS=G54 UNITS=G21",
+                ";SOURCE_FILE=roughing.nc",
+                "0,0,0",
+                "100,0,1",
+                "0,100,2");
+
+        List<String> output = GcodeLeveling.transform(levelingPoints, Arrays.asList(
+                "G21 G90 G54",
+                "G0 X0 Y0",
+                "G1 Z-1"));
+
+        assertTrue(output.contains("G1 Z-1.000"));
+    }
+
     private static void assertError(GcodeLeveling.ErrorCode expectedCode,
                                     int expectedLine, List<String> gcode) throws Exception {
         try {

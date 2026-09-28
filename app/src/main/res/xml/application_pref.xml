@@ -41,6 +41,15 @@
             android:singleLine="true"
             android:inputType="number" />
 
+        <EditTextPreference
+            android:key="@string/preference_manual_spindle_speed"
+            android:icon="@drawable/ic_settings_input_hdmi_black_24dp"
+            android:title="@string/text_manual_spindle_speed"
+            android:summary="@string/text_manual_spindle_speed_desc"
+            android:defaultValue="0"
+            android:singleLine="true"
+            android:inputType="numberDecimal" />
+
         <ListPreference
             android:key="@string/usb_serial_baud_rate"
             android:icon="@drawable/ic_usb_black_24dp"
@@ -350,7 +359,7 @@
             android:title="@string/text_http_server_port"
             android:summary="@string/text_http_server_port_desc"
             android:inputType="number"
-            android:defaultValue="8888" />
+            android:defaultValue="@string/default_http_server_port" />
 
         <EditTextPreference
             android:icon="@drawable/ic_font_download_black_24dp"

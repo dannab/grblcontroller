@@ -162,7 +162,8 @@ public class GcodeLeveling {
 
     /**
      * Legge il file G-Code originale, calcola la compensazione basata sui 3 punti
-     * salvati in points.txt e scrive un nuovo file con suffisso "_leveled".
+     * salvati nel file dedicato levelingpoints.txt e scrive un nuovo file
+     * con suffisso "_leveled".
      *
      * Il formato supportato è volutamente ristretto e deterministico: millimetri,
      * stesso WCS dei punti e traiettorie G0/G1. G91 viene compensato usando la

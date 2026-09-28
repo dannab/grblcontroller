@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name_debug">GRBL Machining DEBUG</string>
+    <string name="default_http_server_port" translatable="false">8889</string>
+    <string name="text_http_server_port_desc">Default 8889. Valid values 1024-65535.</string>
+</resources>

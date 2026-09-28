@@ -249,6 +249,12 @@
     <string name="text_check_mode_off">Controllo {fa-toggle-off 16dp}</string>
     <string name="text_spindle_on">Mandrino {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_spindle_off">Mandrino {fa-toggle-off 18dp}</string>
+    <string name="text_manual_spindle_speed">Velocità manuale mandrino (S)</string>
+    <string name="text_manual_spindle_speed_desc">Valore S usato dal pulsante mandrino del File Sender. Impostalo in base alla speed_map di FluidNC. Tieni premuto il pulsante mandrino per modificarlo senza avviare.</string>
+    <string name="text_manual_spindle_speed_invalid">Inserisci un valore S maggiore di zero</string>
+    <string name="text_manual_spindle_start">Avvia mandrino</string>
+    <string name="text_manual_spindle_needs_idle">Il mandrino può essere avviato manualmente solo a macchina inattiva</string>
+    <string name="text_manual_spindle_idle_or_hold">Metti prima in pausa il lavoro. I comandi manuali M3/M5 sono disponibili in Idle; l’override mandrino è disponibile in Hold.</string>
     <string name="text_flood_on">Refrigerante {fa-toggle-on 16dp @color/colorAccent}</string>
     <string name="text_flood_off">Refrigerante {fa-toggle-off 16dp}</string>
     <string name="text_mist_on">Nebbia {fa-toggle-on 16dp @color/colorAccent}</string>
@@ -410,10 +416,10 @@
     <string name="text_torch_error">Impossibile controllare la torcia</string>
 
     <!-- Autolivellamento -->
-    <string name="text_leveling_no_points_file">File points.txt non trovato! Salva prima i 3 punti.</string>
+    <string name="text_leveling_no_points_file">File levelingpoints.txt non trovato. Avvia l’acquisizione dei tre punti dal pulsante Level.</string>
     <string name="text_leveling_no_source">Nessun file G-Code di origine valido selezionato.</string>
-    <string name="text_leveling_points_read_error">Errore lettura points.txt: %1$s</string>
-    <string name="text_leveling_wrong_point_count">Il file points.txt contiene %1$d punti. Per il livellamento ne servono esattamente 3; la scansione salvata non viene modificata.</string>
+    <string name="text_leveling_points_read_error">Errore lettura levelingpoints.txt: %1$s</string>
+    <string name="text_leveling_wrong_point_count">Il file levelingpoints.txt contiene %1$d punti. Per il livellamento ne servono esattamente 3.</string>
     <string name="text_leveling_collinear">Errore geometrico: i 3 punti salvati sono allineati!</string>
     <string name="text_leveling_processing_error">Errore durante l\'elaborazione del file: %1$s</string>
     <string name="text_leveling_warning_title">Livellamento a 3 punti</string>
@@ -421,7 +427,7 @@
     <string name="text_leveling_points_require_mm">Il livellamento a 3 punti lavora in millimetri. Imposta il controller su G21 e salva nuovamente i punti.</string>
     <string name="text_leveling_points_wcs_unsupported">Il sistema di coordinate %1$s non è disponibile qui. Seleziona prima G54, G55, G56 o G57.</string>
     <string name="text_leveling_point_context_missing">Questi punti non contengono le informazioni su unità e sistema di coordinate. Cancellali e salva nuovamente i tre punti.</string>
-    <string name="text_leveling_point_context_invalid">Il file points.txt non è valido. Cancellalo e salva nuovamente i tre punti.</string>
+    <string name="text_leveling_point_context_invalid">Il file levelingpoints.txt non è valido. Cancellalo e acquisisci nuovamente i tre punti.</string>
     <string name="text_leveling_points_context_changed">I punti salvati usano %1$s, ma il controller ora usa %2$s. Cancella i punti oppure ripristina il sistema di coordinate originale.</string>
     <string name="text_leveling_points_complete">Sono già stati salvati tre punti. Tieni premuto getPoint per cancellarli prima di ricominciare.</string>
     <string name="text_leveling_units_unsupported">La riga %1$d usa %2$s. Esporta il file dal CAM in millimetri (G21).</string>
@@ -429,6 +435,22 @@
     <string name="text_leveling_coordinate_offset_unsupported">La riga %1$d usa %2$s, che modifica gli offset delle coordinate. Rimuovilo dall\'output del CAM prima del livellamento.</string>
     <string name="text_leveling_arc_unsupported">La riga %1$d contiene un arco G2/G3. Configura il CAM per trasformare gli archi in segmenti G1.</string>
     <string name="text_leveling_initial_xy_unknown">Alla riga %1$d compare una Z assoluta prima che siano note sia X sia Y. Configura il CAM per emettere la posizione XY iniziale prima del primo movimento Z.</string>
+    <string name="text_leveling_point_saved_title">Punto di livellamento %1$d salvato</string>
+    <string name="text_leveling_next_point_desc">Coordinate salvate: %2$s\n\nSpostati sul punto %1$d e premi nuovamente Level.</string>
+    <string name="text_leveling_existing_points_title">Tre punti di livellamento già disponibili</string>
+    <string name="text_leveling_existing_points_desc">Vuoi riusare i tre punti salvati per %1$s oppure cancellarli e iniziare una nuova acquisizione dalla posizione corrente?</string>
+    <string name="text_leveling_reuse_points">Usa i punti salvati</string>
+    <string name="text_leveling_delete_restart">Cancella e ricomincia</string>
+    <string name="text_leveling_invalid_points_title">Punti di livellamento non validi</string>
+    <string name="text_leveling_invalid_points_desc">levelingpoints.txt è incompleto o non valido. Cancellalo e ricomincia l’acquisizione guidata.</string>
+    <string name="text_leveling_summary_title">Riepilogo livellamento</string>
+    <string name="text_leveling_summary_desc">G-Code: %1$s\nSistema di coordinate: %2$s\nUnità: %3$s\n\nPunti:\n%4$s\n\nGli archi G2/G3 vengono rifiutati. Continua solo con un file CAM già convertito in movimenti G0/G1.</string>
+    <string name="text_leveling_apply">Crea file livellato</string>
+    <string name="text_leveling_capture_context_changed">I punti salvati usano %1$s / %2$s, mentre il controller ora usa %3$s / %4$s. Ripristina il contesto originale oppure tieni premuto Level per cancellarli.</string>
+    <string name="text_clear_leveling_points_title">Cancella punti di livellamento</string>
+    <string name="text_clear_leveling_points_desc">Cancellare levelingpoints.txt e l’acquisizione dei tre punti?</string>
+    <string name="text_leveling_points_file_deleted">levelingpoints.txt cancellato.</string>
+    <string name="text_no_leveling_points_file">Nessun file levelingpoints.txt da cancellare.</string>
 
     <!-- Voci impostazioni -->
     <string name="text_startup_string">Stringa di avvio Grbl</string>

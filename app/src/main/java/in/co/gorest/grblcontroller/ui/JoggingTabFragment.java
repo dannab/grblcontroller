@@ -51,6 +51,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import in.co.gorest.grblcontroller.R;
@@ -72,6 +74,8 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
 
     /** Nome del file dove vengono salvate le coordinate dei punti di piazzamento */
     private static final String POINTS_FILE_NAME = "points.txt";
+    /** File separato, completo di contesto, riservato al livellamento a tre punti. */
+    private static final String LEVELING_POINTS_FILE_NAME = "levelingpoints.txt";
 
     private MachineStatusListener machineStatus;
     private EnhancedSharedPreferences sharedPref;
@@ -496,6 +500,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 break;
 
             case R.id.do_leveling:
+                handleLevelingButton();
                 break;
             case R.id.get_point:
                 /**
@@ -567,7 +572,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 return true;
 
             case R.id.do_leveling:
-                showLevelingWarning();
+                deleteLevelingPointsFile();
                 return true;
 
             case R.id.custom_button_1:
@@ -596,40 +601,11 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             return;
         }
 
-        MachineStatusListener.ParserState parserState = machineStatus.getParserState();
-        String coordinateSystem = parserState.coordinateSystem;
-        String units = parserState.unitSelection;
-
-        if (!"G21".equals(units) && !"G20".equals(units)) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_point_units_unsupported), true, true));
-            return;
-        }
-        if (coordinateSystem == null
-                || !coordinateSystem.matches("G(?:5[4-9]|59\\.[123])")) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_point_wcs_unsupported, coordinateSystem),
-                    true, true));
-            return;
-        }
-
-        GcodeLeveling.PointsFileStatus pointsStatus =
-                GcodeLeveling.inspectPointsText(pointsCoords);
-        // Legacy point lists remain usable as a scanner. Leveling will still
-        // require a new, contextualized list with exactly three points.
-        if (pointsStatus.hasContext()
-                && (!coordinateSystem.equals(pointsStatus.getCoordinateSystem())
-                || !units.equals(pointsStatus.getUnits()))) {
-            EventBus.getDefault().post(new UiToastEvent(
-                    getString(R.string.text_leveling_points_context_changed,
-                            pointsStatus.getCoordinateSystem(), coordinateSystem), true, true));
-            return;
-        }
         double x = machineStatus.getWorkPosition().getCordX();
         double y = machineStatus.getWorkPosition().getCordY();
         double z = machineStatus.getWorkPosition().getCordZ();
 
-        // Coordinate acquisite a mano; il contesto WCS/G21 è salvato nell'intestazione.
+        // points.txt resta volutamente un semplice elenco CSV senza intestazione e senza limiti.
         String newPoint = String.format(Locale.US, "%.3f,%.3f,%.3f%n", x, y, z);
         File pointsFile = getPointsFile();
         if (pointsFile == null) return;
@@ -644,9 +620,7 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                     needsNewline = last != '\n' && last != '\r';
                 }
             }
-            String addition = empty
-                    ? GcodeLeveling.createPointsContextHeader(coordinateSystem, units) + "\n" + newPoint
-                    : (needsNewline ? "\n" : "") + newPoint;
+            String addition = (needsNewline ? "\n" : "") + newPoint;
             try (FileOutputStream fos = new FileOutputStream(pointsFile, true)) {
                 fos.write(addition.getBytes(StandardCharsets.UTF_8));
                 fos.flush();
@@ -654,22 +628,12 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
             pointsCoords += addition;
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_point_saved,
-                            newPoint.trim(), pointsStatus.getPointCount() + 1), true, false));
+                            newPoint.trim(), countCoordinateLines(pointsCoords)), true, false));
         } catch (IOException e) {
             Log.e(TAG, "Errore scrittura points.txt: " + e.getMessage());
             EventBus.getDefault().post(new UiToastEvent(
                     getString(R.string.text_point_save_error), true, true));
         }
-    }
-
-    private void showLevelingWarning() {
-        new AlertDialog.Builder(getActivity())
-                .setTitle(getString(R.string.text_leveling_warning_title))
-                .setMessage(getString(R.string.text_leveling_warning_desc))
-                .setPositiveButton(getString(R.string.text_yes_confirm),
-                        (dialog, which) -> generaFileLivellato())
-                .setNegativeButton(getString(R.string.text_no_confirm), null)
-                .show();
     }
 
     /**
@@ -700,21 +664,220 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
                 .setNegativeButton(getString(R.string.text_no_confirm), null)
                 .show();
     }
-    private void generaFileLivellato() {
-        File appDir = getAppMediaDir();
-        File pointsFile = new File(appDir, "points.txt");
-
-        // Recupera il file attualmente attivo (senza modificarne lo stato nell'app)
-        File currentGcodeFile = in.co.gorest.grblcontroller.listeners.FileSenderListener.getInstance().getGcodeFile();
-
-        if (currentGcodeFile == null) {
-            org.greenrobot.eventbus.EventBus.getDefault().post(
-                    new in.co.gorest.grblcontroller.events.UiToastEvent(getString(R.string.text_no_file_in_sender), true, true));
+    private void handleLevelingButton() {
+        File currentGcodeFile = getCurrentGcodeFile();
+        if (currentGcodeFile == null) return;
+        if (!Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState())) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_machine_not_idle), true, true));
             return;
         }
 
-        // Chiamata all'utility di calcolo
-        in.co.gorest.grblcontroller.util.GcodeLeveling.applyAutolevel(pointsFile, currentGcodeFile, new in.co.gorest.grblcontroller.util.GcodeLeveling.LevelingCallback() {
+        File levelingPointsFile = getLevelingPointsFile();
+        if (levelingPointsFile == null) return;
+        if (!levelingPointsFile.exists() || levelingPointsFile.length() == 0) {
+            captureLevelingPoint(levelingPointsFile, currentGcodeFile, true);
+            return;
+        }
+
+        try {
+            String contents = readTextFile(levelingPointsFile);
+            GcodeLeveling.PointsFileStatus status = GcodeLeveling.inspectPointsText(contents);
+            if (!status.hasContext() || status.getPointCount() > 3) {
+                showInvalidLevelingPointsDialog(currentGcodeFile);
+            } else if (status.getPointCount() == 3) {
+                showExistingLevelingPointsDialog(levelingPointsFile, currentGcodeFile);
+            } else {
+                captureLevelingPoint(levelingPointsFile, currentGcodeFile, false);
+            }
+        } catch (IOException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_read_error, error.getMessage()),
+                    true, true));
+        }
+    }
+
+    private File getCurrentGcodeFile() {
+        File current = in.co.gorest.grblcontroller.listeners.FileSenderListener
+                .getInstance().getGcodeFile();
+        if (current == null || !current.exists()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_no_source), true, true));
+            return null;
+        }
+        return current;
+    }
+
+    private boolean validateLevelingContext(GcodeLeveling.PointsFileStatus existing) {
+        MachineStatusListener.ParserState parserState = machineStatus.getParserState();
+        String coordinateSystem = parserState.coordinateSystem;
+        String units = parserState.unitSelection;
+        if (!"G21".equals(units)) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_require_mm), true, true));
+            return false;
+        }
+        if (coordinateSystem == null
+                || !coordinateSystem.matches("G(?:5[4-9]|59\\.[123])")) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_wcs_unsupported, coordinateSystem),
+                    true, true));
+            return false;
+        }
+        if (existing != null && existing.hasContext()
+                && (!coordinateSystem.equals(existing.getCoordinateSystem())
+                || !units.equals(existing.getUnits()))) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_capture_context_changed,
+                            existing.getCoordinateSystem(), existing.getUnits(),
+                            coordinateSystem, units), true, true));
+            return false;
+        }
+        return true;
+    }
+
+    private void captureLevelingPoint(File levelingPointsFile, File gcodeFile,
+                                      boolean createFile) {
+        GcodeLeveling.PointsFileStatus existing = null;
+        try {
+            if (!createFile && levelingPointsFile.exists()) {
+                existing = GcodeLeveling.inspectPointsText(readTextFile(levelingPointsFile));
+            }
+            if (!validateLevelingContext(existing)) return;
+
+            MachineStatusListener.ParserState parserState = machineStatus.getParserState();
+            double x = machineStatus.getWorkPosition().getCordX();
+            double y = machineStatus.getWorkPosition().getCordY();
+            double z = machineStatus.getWorkPosition().getCordZ();
+            String point = String.format(Locale.US, "%.3f,%.3f,%.3f", x, y, z);
+
+            String addition;
+            if (createFile) {
+                String safeSourceName = gcodeFile.getName().replace('\n', '_').replace('\r', '_');
+                addition = GcodeLeveling.createPointsContextHeader(
+                        parserState.coordinateSystem, parserState.unitSelection)
+                        + "\n;SOURCE_FILE=" + safeSourceName + "\n" + point + "\n";
+            } else {
+                addition = point + "\n";
+            }
+            try (FileOutputStream output = new FileOutputStream(
+                    levelingPointsFile, !createFile)) {
+                output.write(addition.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+            }
+
+            String contents = readTextFile(levelingPointsFile);
+            GcodeLeveling.PointsFileStatus updated = GcodeLeveling.inspectPointsText(contents);
+            if (updated.getPointCount() >= 3) {
+                showLevelingSummary(levelingPointsFile, gcodeFile);
+            } else {
+                new AlertDialog.Builder(getActivity())
+                        .setTitle(getString(R.string.text_leveling_point_saved_title,
+                                updated.getPointCount()))
+                        .setMessage(getString(R.string.text_leveling_next_point_desc,
+                                updated.getPointCount() + 1, point))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+            }
+        } catch (IOException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_read_error, error.getMessage()),
+                    true, true));
+        }
+    }
+
+    private void showExistingLevelingPointsDialog(File levelingPointsFile, File gcodeFile) {
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.text_leveling_existing_points_title)
+                .setMessage(getString(R.string.text_leveling_existing_points_desc,
+                        gcodeFile.getName()))
+                .setPositiveButton(R.string.text_leveling_reuse_points,
+                        (dialog, which) -> showLevelingSummary(levelingPointsFile, gcodeFile))
+                .setNegativeButton(R.string.text_leveling_delete_restart,
+                        (dialog, which) -> {
+                            if (deleteLevelingPointsFileNow()) {
+                                captureLevelingPoint(levelingPointsFile, gcodeFile, true);
+                            }
+                        })
+                .setNeutralButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showInvalidLevelingPointsDialog(File gcodeFile) {
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.text_leveling_invalid_points_title)
+                .setMessage(R.string.text_leveling_invalid_points_desc)
+                .setPositiveButton(R.string.text_leveling_delete_restart,
+                        (dialog, which) -> {
+                            File file = getLevelingPointsFile();
+                            if (file != null && deleteLevelingPointsFileNow()) {
+                                captureLevelingPoint(file, gcodeFile, true);
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showLevelingSummary(File levelingPointsFile, File gcodeFile) {
+        try {
+            String contents = readTextFile(levelingPointsFile);
+            GcodeLeveling.PointsFileStatus status = GcodeLeveling.inspectPointsText(contents);
+            List<String> coordinates = coordinateLines(contents);
+            if (!status.hasContext() || coordinates.size() != 3) {
+                showInvalidLevelingPointsDialog(gcodeFile);
+                return;
+            }
+            String pointsSummary = "1. " + coordinates.get(0)
+                    + "\n2. " + coordinates.get(1)
+                    + "\n3. " + coordinates.get(2);
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.text_leveling_summary_title)
+                    .setMessage(getString(R.string.text_leveling_summary_desc,
+                            gcodeFile.getName(), status.getCoordinateSystem(),
+                            status.getUnits(), pointsSummary))
+                    .setPositiveButton(R.string.text_leveling_apply,
+                            (dialog, which) -> generaFileLivellato(
+                                    levelingPointsFile, gcodeFile))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        } catch (IOException error) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_read_error, error.getMessage()),
+                    true, true));
+        }
+    }
+
+    private void deleteLevelingPointsFile() {
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.text_clear_leveling_points_title)
+                .setMessage(R.string.text_clear_leveling_points_desc)
+                .setPositiveButton(getString(R.string.text_yes_confirm),
+                        (dialog, which) -> deleteLevelingPointsFileNow())
+                .setNegativeButton(getString(R.string.text_no_confirm), null)
+                .show();
+    }
+
+    private boolean deleteLevelingPointsFileNow() {
+        File file = getLevelingPointsFile();
+        if (file == null) return false;
+        if (!file.exists()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_no_leveling_points_file), true, false));
+            return true;
+        }
+        if (file.delete()) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_leveling_points_file_deleted), true, false));
+            return true;
+        }
+        EventBus.getDefault().post(new UiToastEvent(
+                getString(R.string.text_points_delete_error), true, true));
+        return false;
+    }
+
+    private void generaFileLivellato(File pointsFile, File currentGcodeFile) {
+        GcodeLeveling.applyAutolevel(pointsFile, currentGcodeFile,
+                new GcodeLeveling.LevelingCallback() {
             @Override
             public void onSuccess(File leveledFile) {
                 if (getActivity() != null) {
@@ -752,15 +915,31 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         }
 
         StringBuilder sb = new StringBuilder();
+        boolean removedLegacyHeader = false;
         try (BufferedReader reader = new BufferedReader(new FileReader(pointsFile))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) continue;
+                if (trimmed.startsWith(";") || trimmed.startsWith("#")
+                        || trimmed.startsWith("(")) {
+                    removedLegacyHeader = true;
+                    continue;
+                }
+                sb.append(trimmed).append("\n");
             }
             pointsCoords = sb.toString();
         } catch (IOException e) {
             Log.e(TAG, "Errore lettura points.txt: " + e.getMessage());
             pointsCoords = "";
+            return;
+        }
+        if (removedLegacyHeader) {
+            try (FileOutputStream output = new FileOutputStream(pointsFile, false)) {
+                output.write(pointsCoords.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                Log.e(TAG, "Errore rimozione intestazione points.txt: " + e.getMessage());
+            }
         }
     }
 
@@ -780,6 +959,37 @@ public class JoggingTabFragment extends BaseFragment implements View.OnClickList
         File dir = getAppMediaDir();
         if (dir == null) return null;
         return new File(dir, POINTS_FILE_NAME);
+    }
+
+    private File getLevelingPointsFile() {
+        File dir = getAppMediaDir();
+        if (dir == null) return null;
+        return new File(dir, LEVELING_POINTS_FILE_NAME);
+    }
+
+    private static String readTextFile(File file) throws IOException {
+        StringBuilder text = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) text.append(line).append('\n');
+        }
+        return text.toString();
+    }
+
+    private static List<String> coordinateLines(String text) {
+        List<String> lines = new ArrayList<>();
+        if (text == null) return lines;
+        for (String line : text.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith(";")
+                    || trimmed.startsWith("#") || trimmed.startsWith("(")) continue;
+            lines.add(trimmed);
+        }
+        return lines;
+    }
+
+    private static int countCoordinateLines(String text) {
+        return coordinateLines(text).size();
     }
 
     // -------------------------------------------------------------------------

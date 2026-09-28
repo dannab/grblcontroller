@@ -1,0 +1,3 @@
+<resources>
+    <string name="text_http_server_port_desc">Default 8889. Valori validi 1024-65535.</string>
+</resources>

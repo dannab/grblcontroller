@@ -59,6 +59,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -761,6 +762,9 @@ public class FileSenderTabFragment extends BaseFragment
             case R.id.spindle_override_fine_plus:
                 sendRealTimeCommand(Overrides.CMD_SPINDLE_OVR_RESET);
                 return true;
+            case R.id.toggle_spindle:
+                showManualSpindleSpeedDialog(false);
+                return true;
         }
         return false;
     }
@@ -779,7 +783,7 @@ public class FileSenderTabFragment extends BaseFragment
         else if (id == R.id.rapid_override_low)             sendRealTimeCommand(Overrides.CMD_RAPID_OVR_LOW);
         else if (id == R.id.rapid_override_medium)          sendRealTimeCommand(Overrides.CMD_RAPID_OVR_MEDIUM);
         else if (id == R.id.rapid_overrides_reset)          sendRealTimeCommand(Overrides.CMD_RAPID_OVR_RESET);
-        else if (id == R.id.toggle_spindle)                 sendRealTimeCommand(Overrides.CMD_TOGGLE_SPINDLE);
+        else if (id == R.id.toggle_spindle)                 toggleManualSpindle();
         else if (id == R.id.toggle_flood_coolant) {
             sendRealTimeCommand(Overrides.CMD_TOGGLE_FLOOD_COOLANT);
             optimisticToggleCoolant(!machineStatus.getAccessoryStates().flood,
@@ -795,6 +799,111 @@ public class FileSenderTabFragment extends BaseFragment
                         getString(R.string.text_mist_disabled), true, true));
             }
         }
+    }
+
+    /**
+     * The Grbl 0x9E command is only a spindle-stop override: it cannot select
+     * M3 nor establish an S value.  A 0-10 V FluidNC spindle needs both, so
+     * the File Sender button uses ordinary G-code for start/stop.
+     */
+    private void toggleManualSpindle() {
+        MachineStatusListener.AccessoryStates accessories = machineStatus.getAccessoryStates();
+        boolean spindleActive = accessories.spindleCW || accessories.spindleCCW;
+
+        // Durante una pausa il comando corretto è l'override realtime 0x9E:
+        // ferma/ripristina lo spindle senza cambiare lo stato modale M3/M5 del lavoro.
+        if (Constants.MACHINE_STATUS_HOLD.equals(machineStatus.getState())) {
+            sendRealTimeCommand(Overrides.CMD_TOGGLE_SPINDLE);
+            optimisticSetSpindle(!spindleActive);
+            return;
+        }
+
+        // M3/M5 sono riservati al comando manuale in Idle. Durante Run un M5
+        // normale potrebbe entrare nella coda G-code del lavoro.
+        if (!Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState())) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_manual_spindle_idle_or_hold), true, true));
+            return;
+        }
+
+        if (spindleActive) {
+            fragmentInteractionListener.onGcodeCommandReceived("M5");
+            optimisticSetSpindle(false);
+            return;
+        }
+
+        String speed = getConfiguredManualSpindleSpeed();
+        if (speed == null) {
+            showManualSpindleSpeedDialog(true);
+            return;
+        }
+        startManualSpindle(speed);
+    }
+
+    private String getConfiguredManualSpindleSpeed() {
+        return normalizePositiveSpindleSpeed(sharedPref.getString(
+                getString(R.string.preference_manual_spindle_speed), "0"));
+    }
+
+    private String normalizePositiveSpindleSpeed(String rawValue) {
+        if (rawValue == null) return null;
+        try {
+            BigDecimal value = new BigDecimal(rawValue.trim().replace(',', '.'));
+            if (value.compareTo(BigDecimal.ZERO) <= 0) return null;
+            return value.stripTrailingZeros().toPlainString();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private void showManualSpindleSpeedDialog(boolean startAfterSave) {
+        final EditText input = new EditText(requireContext());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        String saved = sharedPref.getString(
+                getString(R.string.preference_manual_spindle_speed), "0");
+        input.setText(saved);
+        input.selectAll();
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.text_manual_spindle_speed)
+                .setMessage(R.string.text_manual_spindle_speed_desc)
+                .setView(input)
+                .setPositiveButton(startAfterSave
+                        ? R.string.text_manual_spindle_start
+                        : android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    String speed = normalizePositiveSpindleSpeed(input.getText().toString());
+                    if (speed == null) {
+                        input.setError(getString(R.string.text_manual_spindle_speed_invalid));
+                        return;
+                    }
+                    sharedPref.edit().putString(
+                            getString(R.string.preference_manual_spindle_speed), speed).apply();
+                    dialog.dismiss();
+                    if (startAfterSave) startManualSpindle(speed);
+                }));
+        dialog.show();
+    }
+
+    private void startManualSpindle(String speed) {
+        if (!Constants.MACHINE_STATUS_IDLE.equals(machineStatus.getState())) {
+            EventBus.getDefault().post(new UiToastEvent(
+                    getString(R.string.text_manual_spindle_needs_idle), true, true));
+            return;
+        }
+        fragmentInteractionListener.onGcodeCommandReceived("M3 S" + speed);
+        optimisticSetSpindle(true);
+    }
+
+    private void optimisticSetSpindle(boolean spindleCW) {
+        MachineStatusListener.AccessoryStates cur = machineStatus.getAccessoryStates();
+        String state = (cur.flood ? "F" : "") + (cur.mist ? "M" : "")
+                + (spindleCW ? "S" : "");
+        machineStatus.setAccessoryStates(state.isEmpty() ? " " : state);
     }
 
     private void optimisticToggleCoolant(boolean flood, boolean mist) {

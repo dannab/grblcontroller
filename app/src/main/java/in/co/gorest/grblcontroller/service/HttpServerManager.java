@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 
 import in.co.gorest.grblcontroller.R;
+import in.co.gorest.grblcontroller.BuildConfig;
 
 /**
  * Thin facade around {@link HttpServerService}.
@@ -51,7 +52,7 @@ public class HttpServerManager {
 
     private static final String TAG = HttpServerManager.class.getSimpleName();
 
-    public static final int DEFAULT_PORT = 8888;
+    public static final int DEFAULT_PORT = BuildConfig.DEBUG ? 8889 : 8888;
     public static final int MIN_PASSWORD_LENGTH = 4;
     /** Fixed Basic-auth username; only the password is user-configurable. */
     public static final String USERNAME = "grbl";
